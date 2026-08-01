@@ -709,6 +709,12 @@ function populateStudyTopicOptions(selectedIds, selectedSubtopicIds){
       </div>` : ''}
     </div>`;
   }).join('') : `<span class="ink-dim" style="font-size:13px;">આ વિષયમાં કોઈ ટોપિક નથી</span>`;
+  if(selectedIds.length){
+    setTimeout(function(){
+      const firstChecked = wrap.querySelector('.study-topic-checkbox:checked');
+      if(firstChecked) firstChecked.closest('.study-topic-block').scrollIntoView({block:'center', behavior:'smooth'});
+    }, 50);
+  }
 }
 function filterStudyTopicChecklist(){
   const q = (val('f_topic_search')||'').trim().toLowerCase();
