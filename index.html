@@ -1697,12 +1697,19 @@ function calendarDayDetailHTML(dateStr){
     const loggedSubIds = new Set(logs.map(l=>l.subjectId));
     const exam = getActiveExam();
     const suggestions = exam ? timetableSuggestionsForDate(exam.id, dateStr).filter(sg=>!loggedSubIds.has(sg.subjectId)) : [];
+    const suggWrapId = 'ttsugg_'+dateStr;
+    const suggExpand = isAccordionOpen(suggWrapId);
     const suggestionsHTML = suggestions.length ? `<div class="card">
-      <div class="ink-dim fw-700 fs-125 mb-6">📋 ટાઈમટેબલ પ્રમાણે</div>
-      ${suggestions.map(sg=>`<div class="item" onclick="openStudyForm(null,'${dateStr}',{subjectId:'${sg.subjectId}',topicId:${sg.current?`'${sg.current.id}'`:'null'}})">
-        <span>${esc(sg.subjectName)}${sg.current?` <span class="ink-dim">· ${esc(sg.current.name)}</span>`:''}</span>
-        <span class="btn btn-sm btn-primary">▶️ શરૂ કરો</span>
-      </div>`).join('')}
+      <div class="item cursor-pointer" onclick="toggleAccordion('${suggWrapId}', this.querySelector('.accordion-caret'))" style="border:none; padding:0;">
+        <span class="ink-dim fw-700 fs-125">📋 ટાઈમટેબલ પ્રમાણે (${suggestions.length})</span>
+        <span class="accordion-caret ink-dim">${suggExpand?'▲':'▼'}</span>
+      </div>
+      <div id="${suggWrapId}" class="mt-8 ${suggExpand?'':'hidden'}">
+        ${suggestions.map(sg=>`<div class="item" onclick="openStudyForm(null,'${dateStr}',{subjectId:'${sg.subjectId}',topicId:${sg.current?`'${sg.current.id}'`:'null'}})">
+          <span>${esc(sg.subjectName)}${sg.current?` <span class="ink-dim">· ${esc(sg.current.name)}</span>`:''}</span>
+          <span class="btn btn-sm btn-primary">▶️ શરૂ કરો</span>
+        </div>`).join('')}
+      </div>
     </div>` : '';
     const bySubject = {};
     logs.forEach(l=>{
