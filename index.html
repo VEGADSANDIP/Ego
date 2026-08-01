@@ -18,7 +18,9 @@
   try{
     var raw = localStorage.getItem('examPathData_v1');
     var theme = raw ? (JSON.parse(raw).settings || {}).theme : null;
-    document.documentElement.setAttribute('data-theme', theme || 'light');
+    theme = theme || 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', theme==='dark' ? '#1A1A1A' : '#FFFFFF');
   }catch(e){
     document.documentElement.setAttribute('data-theme','light');
   }
@@ -2208,7 +2210,12 @@ function saveRevisionRule(){
   toast('રિવિઝન નિયમ સેવ થયો');
 }
 function toggleTheme(isDark){ DB.settings.theme = isDark ? 'dark' : 'light'; save(); applyTheme(); }
-function applyTheme(){ document.documentElement.setAttribute('data-theme', DB.settings.theme || 'light'); }
+function applyTheme(){
+  const theme = DB.settings.theme || 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if(metaTheme) metaTheme.setAttribute('content', theme==='dark' ? '#1A1A1A' : '#FFFFFF');
+}
 function exportBackup(){
   const blob = new Blob([JSON.stringify(DB,null,2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
