@@ -2183,6 +2183,12 @@ function renderSettings(){
   return `
    <h2>સેટિંગ્સ ⚙️</h2>
    ${card('થીમ', `<div class="item cursor-default"><span>ડાર્ક મોડ</span><label class="switch"><input type="checkbox" ${theme==='dark'?'checked':''} onchange="toggleTheme(this.checked)"><span class="slider"></span></label></div>`)}
+   ${card('નોટિફિકેશન 🔔', `
+     <div class="item cursor-default"><span>સ્ટેટસ</span><b>${notificationStatusText()}</b></div>
+     <div class="ink-dim fs-12 mt-8 mb-6">Timetable નો ચાલુ ટોપિક, બાકી/ઓવરડ્યુ રિવિઝન, અને સ્ટ્રીક રિમાઇન્ડર — app ખુલ્લી હોય ત્યારે મળશે. (App સંપૂર્ણ બંધ હોય ત્યારે નહીં — એ free રીતે શક્ય નથી.)</div>
+     ${(('Notification' in window) && Notification.permission==='default') ? `<button class="btn btn-primary btn-block" onclick="requestNotificationPermission()">🔔 નોટિફિકેશન ચાલુ કરો</button>` : ''}
+     ${(('Notification' in window) && Notification.permission==='granted') ? `<button class="btn btn-secondary btn-block" onclick="showAppNotification('ટેસ્ટ ✅','આ એક ટેસ્ટ નોટિફિકેશન છે','test')">ટેસ્ટ નોટિફિકેશન મોકલો</button>` : ''}
+   `)}
    ${card('ટૂલ્સ', `<button class="btn btn-secondary btn-block" onclick="showTab('timetable')">📋 મારું ટાઈમટેબલ</button>`)}
    ${card('રિવિઝન નિયમ ⚙️', `
      <div class="field"><label>શરૂઆતના દિવસો (કોમાથી અલગ કરો)</label><input type="text" id="f_rule_days" value="${(rule.startDays||[1,3,7]).join(',')}" placeholder="દા.ત. 1,3,7"></div>
@@ -2464,12 +2470,89 @@ function saveBrandName(){
   DB.settings.brandName = name;
   save(); populateBrand(); closeSheet(); toast('સેવ થયું');
 }
+/* ===================== NOTIFICATIONS ===================== */
+function notificationStatusText(){
+  if(!('Notification' in window)) return '❌ આ બ્રાઉઝર સપોર્ટ નથી કરતું';
+  if(Notification.permission==='granted') return '✅ ચાલુ છે';
+  if(Notification.permission==='denied') return '❌ બ્રાઉઝર સેટિંગ્સમાંથી બ્લોક છે — ત્યાંથી જ ચાલુ કરવું પડશે';
+  return '⚪ બંધ છે';
+}
+function requestNotificationPermission(){
+  if(!('Notification' in window)){ toast('આ બ્રાઉઝર સપોર્ટ નથી કરતું','error'); return; }
+  Notification.requestPermission().then(function(perm){
+    if(perm==='granted'){
+      toast('નોટિફિકેશન ચાલુ થયું 🔔');
+      showAppNotification('ExamPath 🎓','નોટિફિકેશન ચાલુ થઈ ગયું!','welcome');
+      checkNotifications();
+    } else toast('પરવાનગી ના મળી','error');
+    renderMain();
+  });
+}
+function showAppNotification(title, body, tag){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.ready.then(function(reg){
+      if(reg && reg.showNotification) reg.showNotification(title, {body:body, icon:'icon-192.png', badge:'icon-192.png', tag:tag||undefined});
+      else new Notification(title, {body:body, icon:'icon-192.png', tag:tag||undefined});
+    }).catch(function(){ try{ new Notification(title, {body:body, icon:'icon-192.png', tag:tag||undefined}); }catch(e){} });
+  } else {
+    try{ new Notification(title, {body:body, icon:'icon-192.png', tag:tag||undefined}); }catch(e){}
+  }
+}
+function getNotifyLog(){
+  try{
+    const raw = localStorage.getItem('examPathNotifyLog_v1');
+    const log = raw ? JSON.parse(raw) : {};
+    if(log.date !== todayStr()) return {date: todayStr()};
+    return log;
+  }catch(e){ return {date: todayStr()}; }
+}
+function saveNotifyLog(log){ try{ localStorage.setItem('examPathNotifyLog_v1', JSON.stringify(log)); }catch(e){} }
+function checkNotifications(){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  const exam = getActiveExam();
+  if(!exam) return;
+  const log = getNotifyLog();
+  let changed = false;
+
+  const block = timetableBlockNow();
+  if(block && log.lastTimetableBlockId !== block.id){
+    const s = DB.subjects.find(x=>x.id===block.subjectId);
+    const curTopic = s ? currentOrNextTopic(s.id) : null;
+    showAppNotification('🔴 હમણાં ચાલુ: '+(s?s.name:'રીડિંગ'), curTopic ? curTopic.name : 'રીડિંગ સમય', 'now-block');
+    log.lastTimetableBlockId = block.id; changed = true;
+  } else if(!block && log.lastTimetableBlockId){
+    log.lastTimetableBlockId = null; changed = true;
+  }
+
+  if(!log.revisionsNotified){
+    const pending = revisionsForActiveExam().filter(r=>r.dueDate===todayStr() && r.status==='pending').length;
+    if(pending>0) showAppNotification('🔁 આજની રિવિઝન', pending+' રિવિઝન બાકી છે', 'due-today');
+    log.revisionsNotified = true; changed = true;
+  }
+
+  if(!log.overdueNotified){
+    const overdue = revisionsForActiveExam().filter(r=>r.status==='pending' && r.dueDate<todayStr()).length;
+    if(overdue>0) showAppNotification('⚠️ ઓવરડ્યુ રિવિઝન', overdue+' રિવિઝન ઓવરડ્યુ છે', 'overdue');
+    log.overdueNotified = true; changed = true;
+  }
+
+  if(!log.streakNotified){
+    const st = calcStudyStreak(exam);
+    if(st.streak>0 && !st.todayDone) showAppNotification('🔥 સ્ટ્રીક તૂટવાની તૈયારીમાં!', 'તમારી '+st.streak+' દિવસની સ્ટ્રીક છે — આજે કંઈક અભ્યાસ નોંધો!', 'streak');
+    log.streakNotified = true; changed = true;
+  }
+
+  if(changed) saveNotifyLog(log);
+}
 function init(){
   applyTheme();
   buildNav();
   populateBrand();
   populateExamSwitcher();
   showTab('dashboard');
+  checkNotifications();
+  setInterval(checkNotifications, 60000);
 }
 window.addEventListener('DOMContentLoaded', init);
 if('serviceWorker' in navigator){

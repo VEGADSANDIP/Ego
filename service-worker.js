@@ -1,4 +1,4 @@
-const CACHE_NAME = 'exampath-cache-v2';
+const CACHE_NAME = 'exampath-cache-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -38,6 +38,18 @@ self.addEventListener('fetch', function(e){
         return networkResponse;
       }).catch(function(){ return cached; });
       return cached || fetchPromise;
+    })
+  );
+});
+
+self.addEventListener('notificationclick', function(e){
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({type:'window', includeUncontrolled:true}).then(function(clientList){
+      for(var i=0;i<clientList.length;i++){
+        if('focus' in clientList[i]) return clientList[i].focus();
+      }
+      if(self.clients.openWindow) return self.clients.openWindow('./index.html');
     })
   );
 });
