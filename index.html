@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ExamPath">
+<meta name="theme-color" content="#2E3AA8">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>ExamPath — સ્ટડી ટ્રેકર</title>
+<script>
+(function(){
+  try{
+    var raw = localStorage.getItem('examPathData_v1');
+    var theme = raw ? (JSON.parse(raw).settings || {}).theme : null;
+    document.documentElement.setAttribute('data-theme', theme || 'light');
+  }catch(e){
+    document.documentElement.setAttribute('data-theme','light');
+  }
+})();
+</script>
+<style>
+:root{
+  --bg:#F3F4FA; --surface:#FFFFFF; --surface2:#ECEEF7; --ink:#1B1E2B; --ink-dim:#6A6F87;
+  --primary:#2E3AA8; --primary-ink:#FFFFFF; --accent:#F5A623; --success:#1FA971; --danger:#E1484D; --warning:#F5A623;
+  --border:rgba(20,22,40,0.10); --shadow:0 1px 2px rgba(20,22,45,.06),0 8px 24px rgba(20,22,45,.07);
+  --overlay:rgba(10,12,25,0.5);
+  --radius:16px; --radius-sm:10px;
+}
+[data-theme="dark"]{
+  --bg:#000000; --surface:#1A1A1A; --surface2:#262626; --ink:#F5F5F5; --ink-dim:#A8A8A8;
+  --primary:#6376F5; --primary-ink:#0E1120; --accent:#FFC24B; --success:#37C98B; --danger:#FF6B6E; --warning:#FFC24B;
+  --border:rgba(255,255,255,0.08); --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.5);
+  --overlay:rgba(0,0,0,0.6);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0; height:100%; overflow:hidden;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Gujarati",Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+}
+input, textarea{
+  -webkit-user-select:text; user-select:text; -webkit-touch-callout:default;
+}
+.app-shell{max-width:480px;margin:0 auto;position:relative;height:100vh; height:100dvh; background:var(--bg); display:flex; flex-direction:column; overflow:hidden;}
+@media (min-width:600px){ .app-shell{box-shadow:var(--shadow);} body{background:var(--surface2);} }
+.hidden{display:none !important;}
+.mt-8{margin-top:8px;} .mt-10{margin-top:10px;} .mt-12{margin-top:12px;} .mt-14{margin-top:14px;} .mb-6{margin-bottom:6px;} .m-0{margin:0;}
+.cursor-default{cursor:default;} .cursor-pointer{cursor:pointer;} .item-static{border:none;padding:0;cursor:default;}
+.fs-12{font-size:12px;} .fs-125{font-size:12.5px;} .fw-400{font-weight:400;} .fw-700{font-weight:700;}
+.flex-1{flex:1;} .flex-col{display:flex; flex-direction:column;} .flex-gap-4{display:flex; gap:4px;} .flex-gap-6{display:flex; gap:6px;}
+.section-group-label{margin:0 2px 6px 2px;}
+h1,h2,h3{margin:0 0 8px 0; letter-spacing:-0.02em; font-weight:800;}
+h2{font-size:19px;}
+h3{font-size:15px;}
+p{margin:0;}
+button{font-family:inherit;}
+a{color:inherit;}
+
+.topbar{flex:0 0 auto; z-index:20; background:var(--surface); border-bottom:1px solid var(--border);}
+.topbar-inner{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; gap:8px;}
+.brand{font-weight:800; font-size:17px; letter-spacing:-0.02em;}
+.brand-row{display:flex; align-items:center; gap:8px;}
+.brand-avatar{width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden; font-size:22px; cursor:pointer; background:var(--surface2); flex-shrink:0;}
+.brand-avatar img{width:100%; height:100%; object-fit:cover; display:block;}
+#examSwitcher{max-width:150px; font-size:12px; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--ink);}
+
+.main{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px 14px 14px 14px; position:relative;}
+
+
+.section-header{display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px 2px;}
+.section-header h3{margin:0;}
+
+.card{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; margin-bottom:12px;}
+.card-title{font-weight:700; font-size:14px; margin-bottom:8px; color:var(--ink);}
+
+.hero-card{background:linear-gradient(145deg,var(--primary),#1B2680); color:#fff; border-radius:20px; padding:18px; margin-bottom:14px; box-shadow:var(--shadow);}
+[data-theme="dark"] .hero-card{background:linear-gradient(145deg,#33408C,#0A0A0A);}
+.hero-top{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+.hero-exam-name{font-size:19px; font-weight:800;}
+.hero-exam-date{font-size:12px; opacity:0.85; margin-top:2px;}
+.hero-top .btn{background:rgba(255,255,255,0.18); color:#fff;}
+.hero-ring-row{display:flex; align-items:center; gap:14px; margin-top:14px;}
+.ring-svg{flex-shrink:0;}
+.ring-progress-hero{transition:stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1), stroke .3s ease;}
+.hero-ring-stats{display:flex; flex-direction:column; gap:8px; flex:1;}
+.ring-stat{display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid rgba(255,255,255,0.15); padding-bottom:6px;}
+.ring-stat:last-child{border:none; padding-bottom:0;}
+.ring-stat b{font-size:16px;}
+.ring-stat span{opacity:0.85;}
+
+.stat-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:6px;}
+.stat-card{background:var(--surface); border-radius:14px; padding:12px 14px; box-shadow:var(--shadow);}
+.stat-icon{font-size:18px;}
+.stat-value{font-size:20px; font-weight:800; margin-top:4px; font-variant-numeric:tabular-nums;}
+.stat-label{font-size:11.5px; color:var(--ink-dim); margin-top:2px;}
+.stat-sub{font-size:11px; color:var(--primary); font-weight:700; margin-top:4px;}
+
+.item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); font-size:14px; cursor:pointer;}
+
+
+
+
+.item:last-child{border-bottom:none;}
+.ink-dim{color:var(--ink-dim); font-size:12.5px;}
+.empty-row{padding:14px 0; text-align:center; color:var(--ink-dim); font-size:13px;}
+
+.topic-row{padding:10px 0; border-bottom:1px solid var(--border);}
+.topic-row:last-child{border-bottom:none;}
+.topic-row-top{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:14px;}
+.btn:disabled{opacity:.3; cursor:default;}
+.row-highlight{animation:topicFlash 1.6s ease-out; border-radius:10px;}
+@keyframes topicFlash{
+  0%{background:rgba(255,193,7,0.28);}
+  100%{background:rgba(255,193,7,0);}
+}
+
+.badge{padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap;}
+.badge-grey{background:var(--surface2); color:var(--ink-dim);}
+.badge-warning{background:rgba(245,166,35,0.18); color:#B4740A;}
+[data-theme="dark"] .badge-warning{color:var(--warning);}
+.badge-success{background:rgba(31,169,113,0.16); color:#178658;}
+[data-theme="dark"] .badge-success{color:var(--success);}
+.badge-danger{background:rgba(225,72,77,0.15); color:#C13236;}
+[data-theme="dark"] .badge-danger{color:var(--danger);}
+.badge-primary{background:rgba(46,58,168,0.15); color:#2E3AA8;}
+[data-theme="dark"] .badge-primary{color:var(--primary);}
+.tt-day-tabs{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;}
+.tt-day-btn{flex:0 0 auto; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--ink-dim); font-size:13px; font-weight:700; cursor:pointer;}
+.tt-day-btn.active{background:var(--primary); color:#fff; border-color:var(--primary);}
+
+.progress-track{height:8px; border-radius:999px; background:var(--surface2); overflow:hidden;}
+.progress-fill{height:100%; background:var(--primary); border-radius:999px; transition:width .3s;}
+
+.btn{padding:10px 16px; border-radius:12px; font-weight:700; font-size:13.5px; border:none; cursor:pointer; background:var(--surface2); color:var(--ink);}
+.btn-primary{background:var(--primary); color:var(--primary-ink);}
+.btn-secondary{background:var(--surface2); color:var(--ink);}
+.btn-danger{background:var(--danger); color:#fff;}
+.btn-block{width:100%; text-align:center;}
+.btn-sm{padding:6px 11px; font-size:12.5px; border-radius:9px;}
+
+.field{margin-bottom:12px;}
+.field label{display:block; margin-bottom:5px; font-size:12.5px; color:var(--ink-dim); font-weight:600;}
+.field input, .field select, .field textarea{
+  width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border);
+  background:var(--bg); color:var(--ink); font-size:14.5px; font-family:inherit;
+}
+.field textarea{min-height:64px; resize:vertical;}
+
+.duration-picker{display:flex; align-items:flex-start; gap:6px;}
+.duration-col{display:flex; flex-direction:column; align-items:center; flex:1;}
+.duration-col select{width:100%; text-align:center; text-align-last:center; padding:11px 2px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--ink); font-size:16px; font-weight:700; font-family:inherit;}
+.duration-label{font-size:10.5px; color:var(--ink-dim); margin-top:5px;}
+.duration-sep{font-weight:800; font-size:18px; color:var(--ink-dim); padding-top:9px;}
+
+.sheet-overlay{position:fixed; inset:0; background:var(--overlay); z-index:100; display:flex; align-items:flex-end;}
+.sheet-overlay.hidden{display:none;}
+.sheet{background:var(--surface); width:100%; max-width:480px; margin:0 auto; border-radius:20px 20px 0 0; padding:10px 18px 22px 18px; max-height:86vh; overflow-y:auto; animation:slideUp .18s ease-out;}
+@keyframes slideUp{from{transform:translateY(24px); opacity:0.6;} to{transform:translateY(0); opacity:1;}}
+.sheet-handle{width:38px; height:4px; background:var(--border); border-radius:99px; margin:6px auto 14px auto;}
+.sheet-actions{display:flex; gap:8px; margin-top:16px;}
+.sheet-actions .btn-block{flex:1;}
+
+.toast{position:fixed; bottom:92px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13.5px; z-index:200; box-shadow:var(--shadow); max-width:85%; text-align:center;}
+.toast.hidden{display:none;}
+.toast-error{background:var(--danger); color:#fff;}
+
+.bottomnav{flex:0 0 auto; z-index:20; background:var(--surface); border-top:1px solid var(--border); display:flex; overflow-x:auto;}
+.navbtn{flex:1 0 auto; min-width:62px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 4px 8px 4px; background:none; border:none; color:var(--ink-dim); cursor:pointer; transition:color .15s, transform .15s;}
+.navbtn.active{color:var(--primary);}
+.navbtn.active .navicon{transform:scale(1.12);}
+.navicon{font-size:18px; display:inline-block; transition:transform .15s;}
+.navlabel{font-size:9.5px; font-weight:700;}
+
+.empty-state{text-align:center; padding:40px 16px; background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow);}
+.empty-icon{font-size:38px; margin-bottom:8px;}
+.empty-state h3{margin-bottom:4px;}
+.empty-state p{color:var(--ink-dim); font-size:13px; margin-bottom:16px;}
+
+.chart-card{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; margin-bottom:14px;}
+.chart-title{font-weight:700; font-size:13.5px; margin-bottom:8px;}
+canvas{width:100%; display:block;}
+
+.cal-date-row{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--surface); border-radius:12px; box-shadow:var(--shadow); cursor:pointer; margin-bottom:10px; font-weight:700; font-size:14px;}
+.cal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+.cal-weekdays{display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:11px; color:var(--ink-dim); margin-bottom:4px;}
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+.cal-cell{aspect-ratio:1; border-radius:10px; background:var(--surface); display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:12.5px; cursor:pointer; box-shadow:var(--shadow); position:relative;}
+.cal-cell.empty{background:transparent; box-shadow:none; cursor:default;}
+.cal-cell.today{border:2px solid var(--primary);}
+.cal-cell.selected{background:var(--success); color:#fff;}
+.cal-cell.selected .cal-dot{background:#fff !important;}
+.cal-dot{width:5px; height:5px; border-radius:99px; background:var(--accent); margin-top:2px;}
+.cal-dots-row{display:flex; gap:3px; margin-top:2px; justify-content:center;}
+.cal-dots-row .cal-dot{margin-top:0;}
+.cal-dot-blue{background:#3B82F6 !important;}
+.cal-dot-yellow{background:var(--accent) !important;}
+.cal-dot-red{background:var(--danger) !important;}
+
+.scroll-list{max-height:340px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+.scroll-list-sm{max-height:230px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+.scroll-list::-webkit-scrollbar, .scroll-list-sm::-webkit-scrollbar{width:5px;}
+.scroll-list::-webkit-scrollbar-thumb, .scroll-list-sm::-webkit-scrollbar-thumb{background:var(--border); border-radius:99px;}
+.scroll-list > .card:last-child, .scroll-list-sm > .card:last-child{margin-bottom:2px;}
+
+.subject-list{display:flex; flex-direction:column; gap:10px; padding:2px 0 8px 0;}
+.subject-mini-stat{text-align:center; background:var(--surface2); border-radius:10px; padding:10px 4px; min-width:0; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;}
+.subject-mini-stat b{display:block; font-size:16px; font-weight:800; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
+.subject-mini-stat span{font-size:10px; color:var(--ink-dim); white-space:nowrap; line-height:1;}
+
+.switch{position:relative; display:inline-block; width:44px; height:25px;}
+.switch input{opacity:0; width:0; height:0;}
+.slider{position:absolute; cursor:pointer; inset:0; background:var(--surface2); border-radius:999px; transition:.2s;}
+.slider:before{position:absolute; content:""; height:19px; width:19px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.3);}
+input:checked + .slider{background:var(--primary);}
+input:checked + .slider:before{transform:translateX(19px);}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand-row">
+        <span class="brand-avatar" id="brandAvatar" onclick="openBrandForm()">📚</span>
+        <span class="brand" id="brandText" onclick="openBrandForm()"></span>
+      </span>
+      <select id="examSwitcher" onchange="handleExamSwitcherChange(this)"></select>
+    </div>
+  </header>
+  <input type="file" id="brandPhotoInput" accept="image/*" style="display:none" onchange="handleBrandPhoto(event)">
+  <main class="main" id="main"></main>
+  <nav class="bottomnav" id="bottomnav"></nav>
+</div>
+
+<div class="sheet-overlay hidden" id="sheetOverlay" onclick="closeSheetOutside(event)">
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheetContent"></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+/* ===================== DATA LAYER ===================== */
+const STORAGE_KEY = 'examPathData_v1';
+
+function defaultData(){
+  return {
+    exams:[], subjects:[], topics:[], revisions:[], sections:[],
+    studyLogs:[], mockTests:[], timetable:[], chapterTimetable:[], subtopics:[],
+    settings:{theme:'light', brandName:'ExamPath', revisionRule:{startDays:[1,3,7], weekDay:'sun', weeklyCount:8}}
+  };
+}
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultData();
+    const parsed = JSON.parse(raw);
+    const merged = Object.assign(defaultData(), parsed);
+    merged.settings = Object.assign(defaultData().settings, parsed.settings||{});
+    return merged;
+  }catch(e){
+    console.error('ડેટા ખરાબ થયેલો મળ્યો, નવેસરથી શરૂ કરવામાં આવે છે', e);
+    return defaultData();
+  }
+}
+function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(e){ toast('સેવ કરવામાં તકલીફ થઈ','error'); } }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+let DB = loadData();
+let currentTab = 'dashboard';
+let examDetailId = null;
+let topicDetailId = null;
+let sectionDetailId = null;
+let lastMainTab = 'dashboard';
+let highlightTopicId = null;
+let highlightRevisionId = null;
+let calSelectedDate = null;
+let calMonth = new Date().getMonth();
+let calYear = new Date().getFullYear();
+let calMode = 'study';
+let calGridExpanded = false;
+let revCalSelectedDate = null;
+
+/* ===================== HELPERS ===================== */
+function esc(str){ if(str===undefined||str===null) return ''; return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function val(id){ const el=document.getElementById(id); return el ? el.value.trim() : ''; }
+function todayStr(){ const d=new Date(); const off=d.getTimezoneOffset(); const local=new Date(d.getTime()-off*60000); return local.toISOString().slice(0,10); }
+function formatDate(dateStr){ if(!dateStr) return '-'; const d=new Date(dateStr+'T00:00:00'); return d.toLocaleDateString('gu-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function formatDateShort(dateStr){ const d=new Date(dateStr+'T00:00:00'); return d.getDate()+'/'+(d.getMonth()+1); }
+function examDaysLeft(dateStr){ if(!dateStr) return 0; const d1=new Date(todayStr()+'T00:00:00'); const d2=new Date(dateStr+'T00:00:00'); return Math.ceil((d2-d1)/86400000); }
+function daysLeftColor(d){
+  if(d<0) return getVar('--success');
+  if(d>=30) return getVar('--success');
+  if(d>=10) return getVar('--warning');
+  return getVar('--danger');
+}
+function calcStudyStreak(exam){
+  if(!exam) return {streak:0, todayDone:false};
+  const activeIds = activeExamSubjectIds();
+  const studyDates = new Set(DB.studyLogs.filter(l=>activeIds.includes(l.subjectId)).map(l=>l.date));
+  const revDates = new Set(DB.revisions.filter(r=>activeIds.includes(r.subjectId) && r.status==='completed' && r.completedDate).map(r=>r.completedDate));
+  const hasEntry = (ds)=> studyDates.has(ds) || revDates.has(ds);
+  const today = todayStr();
+  const todayDone = hasEntry(today);
+  let cursor = new Date(today+'T00:00:00');
+  if(!todayDone) cursor.setDate(cursor.getDate()-1);
+  let streak = 0;
+  while(true){
+    const ds = cursor.toISOString().slice(0,10);
+    if(hasEntry(ds)){ streak++; cursor.setDate(cursor.getDate()-1); }
+    else break;
+  }
+  return {streak, todayDone};
+}
+function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function getActiveExam(){ return DB.exams.find(e=>e.active); }
+function examSubjects(examId){ return DB.subjects.filter(s=>s.examId===examId); }
+function subjectTopics(subjectId){ return DB.topics.filter(t=>t.subjectId===subjectId); }
+function subtopicsForTopic(topicId){ return DB.subtopics.filter(s=>s.topicId===topicId); }
+function examSections(examId){ return DB.sections.filter(x=>x.examId===examId); }
+function sectionSubjects(sectionId){ return DB.subjects.filter(s=>s.sectionId===sectionId); }
+function activeExamSubjectIds(){ const exam=getActiveExam(); if(!exam) return []; return examSubjects(exam.id).map(s=>s.id); }
+function studyLogsForActiveExam(){ const ids=activeExamSubjectIds(); return DB.studyLogs.filter(l=>ids.includes(l.subjectId)); }
+function revisionsForActiveExam(){ const ids=activeExamSubjectIds(); return DB.revisions.filter(r=>ids.includes(r.subjectId)); }
+function mockTestsForActiveExam(){ const exam=getActiveExam(); if(!exam) return []; return DB.mockTests.filter(m=>m.examId===exam.id); }
+function subjectName(id){ const s=DB.subjects.find(x=>x.id===id); return s? s.name : '-'; }
+
+function durationPickerHTML(prefix, totalSeconds){
+  totalSeconds = totalSeconds || 0;
+  const h = Math.floor(totalSeconds/3600);
+  const m = Math.floor((totalSeconds%3600)/60);
+  const s = Math.floor(totalSeconds%60);
+  const opts = (count, selected)=>Array.from({length:count},(_,i)=>i).map(i=>`<option value="${i}" ${i===selected?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('');
+  return `<div class="duration-picker">
+    <div class="duration-col"><select id="${prefix}_h">${opts(24,h)}</select><span class="duration-label">કલાક</span></div>
+    <div class="duration-sep">:</div>
+    <div class="duration-col"><select id="${prefix}_m">${opts(60,m)}</select><span class="duration-label">મિનિટ</span></div>
+    <div class="duration-sep">:</div>
+    <div class="duration-col"><select id="${prefix}_s">${opts(60,s)}</select><span class="duration-label">સેકન્ડ</span></div>
+  </div>`;
+}
+function durationPickerSeconds(prefix){
+  const h = parseInt(val(prefix+'_h'),10)||0;
+  const m = parseInt(val(prefix+'_m'),10)||0;
+  const s = parseInt(val(prefix+'_s'),10)||0;
+  return (h*3600)+(m*60)+s;
+}
+function formatDuration(hoursDecimal){
+  if(!hoursDecimal || hoursDecimal<=0) return '0 મિનિટ';
+  let totalSeconds = Math.round(hoursDecimal*3600);
+  const h = Math.floor(totalSeconds/3600);
+  totalSeconds %= 3600;
+  const m = Math.floor(totalSeconds/60);
+  const s = totalSeconds%60;
+  const parts = [];
+  if(h>0) parts.push(h+' કલાક');
+  if(m>0) parts.push(m+' મિનિટ');
+  if(s>0) parts.push(s+' સેકન્ડ');
+  return parts.length ? parts.join(' ') : '0 મિનિટ';
+}
+
+function toast(msg, type){
+  const el=document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + (type==='error' ? 'toast-error' : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>{ el.className='toast hidden'; }, 2200);
+}
+let sheetLocked = false;
+function openSheet(html, locked){
+  sheetLocked = !!locked;
+  document.getElementById('sheetContent').innerHTML = html;
+  document.getElementById('sheetOverlay').classList.remove('hidden');
+  document.body.style.overflow='hidden';
+}
+function closeSheet(){
+  sheetLocked = false;
+  document.getElementById('sheetOverlay').classList.add('hidden');
+  document.body.style.overflow='';
+}
+function closeSheetOutside(e){ if(e.target.id==='sheetOverlay' && !sheetLocked) closeSheet(); }
+
+/* ===================== SMALL UI BUILDERS ===================== */
+function card(title, inner){ return `<div class="card"><div class="card-title">${title}</div>${inner}</div>`; }
+function emptyRow(text){ return `<div class="empty-row">${text}</div>`; }
+function emptyState(icon,title,desc,btnLabel,onclickStr){
+  return `<div class="empty-state"><div class="empty-icon">${icon}</div><h3>${title}</h3><p>${desc}</p><button class="btn btn-primary" onclick="${onclickStr}">${btnLabel}</button></div>`;
+}
+function statCard(icon,value,label,onclickStr,sub){ return `<div class="stat-card ${onclickStr?'cursor-pointer':''}" ${onclickStr?`onclick="${onclickStr}"`:''}><div class="stat-icon">${icon}</div><div class="stat-value">${value}</div><div class="stat-label">${label}</div>${sub?`<div class="stat-sub">${sub}</div>`:''}</div>`; }
+
+function heroRingColor(pct){
+  if(pct>60) return getVar('--success');
+  if(pct>=30) return getVar('--warning');
+  return getVar('--danger');
+}
+function ringSVG(pct){
+  const r=54, c=2*Math.PI*r;
+  const offset = c - (pct/100)*c;
+  const color = heroRingColor(pct);
+  return `<svg width="130" height="130" viewBox="0 0 130 130" class="ring-svg">
+    <circle cx="65" cy="65" r="${r}" stroke="rgba(255,255,255,0.2)" stroke-width="10" fill="none"/>
+    <circle id="heroRingCircle" class="ring-progress-hero" cx="65" cy="65" r="${r}" stroke="${color}" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c}" data-offset="${offset}" data-target="${pct}" transform="rotate(-90 65 65)"/>
+    <text id="heroRingPercentText" x="65" y="60" text-anchor="middle" font-size="24" font-weight="800" fill="#fff">0%</text>
+    <text x="65" y="80" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.85)">પૂર્ણ</text>
+  </svg>`;
+}
+
+/* ===================== CHARTS (canvas, no external libs) ===================== */
+function roundRectPath(ctx,x,y,w,h,r){
+  if(h<1) h=1;
+  if(r>h/2) r=h/2;
+  if(r>w/2) r=w/2;
+  ctx.beginPath();
+  ctx.moveTo(x,y+r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.closePath();
+}
+function drawBarChart(id, labels, values, color, valueFormatter){
+  const canvas=document.getElementById(id);
+  if(!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 300;
+  const h = 150;
+  canvas.style.height = h+'px';
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  const max = Math.max(1, ...values);
+  const padBottom=20, padTop=18;
+  const gap = w/values.length;
+  const barW = Math.min(34, gap*0.55);
+  const dimColor = getVar('--ink-dim') || '#888';
+  const inkColor = getVar('--ink') || '#222';
+  values.forEach((v,i)=>{
+    const barH = (h-padBottom-padTop) * (v/max);
+    const x = gap*i + (gap-barW)/2;
+    const y = h-padBottom-barH;
+    ctx.fillStyle = color;
+    roundRectPath(ctx, x, y, barW, barH, 5);
+    ctx.fill();
+    ctx.font = '9.5px sans-serif';
+    ctx.fillStyle = inkColor;
+    ctx.textAlign = 'center';
+    const label = valueFormatter ? valueFormatter(v) : (v>0?String(v):'');
+    if(label) ctx.fillText(label, x+barW/2, Math.max(y-5,10));
+    ctx.font = '10.5px sans-serif';
+    ctx.fillStyle = dimColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[i], x+barW/2, h-6);
+  });
+}
+
+/* ===================== NAVIGATION ===================== */
+const TABS = [
+  {id:'dashboard', label:'ડેશબોર્ડ', icon:'📊'},
+  {id:'exams', label:'પરીક્ષા', icon:'🎓'},
+  {id:'mock', label:'મોક ટેસ્ટ', icon:'📝'},
+  {id:'calendar', label:'કેલેન્ડર', icon:'📅'},
+  {id:'settings', label:'સેટિંગ્સ', icon:'⚙️'}
+];
+function buildNav(){
+  document.getElementById('bottomnav').innerHTML = TABS.map(t=>
+    `<button class="navbtn ${t.id==='dashboard'?'active':''}" data-tab="${t.id}" onclick="showTab('${t.id}')">
+      <span class="navicon">${t.icon}</span><span class="navlabel">${esc(t.label)}</span>
+    </button>`
+  ).join('');
+}
+function showTab(id){
+  if((id==='exams'||id==='timetable') && currentTab!==id){ lastMainTab = currentTab; }
+  currentTab = id;
+  if(id==='calendar'){ calMode='study'; calGridExpanded=false; }
+  if(id!=='exams'){ topicDetailId=null; sectionDetailId=null; }
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
+  renderMain();
+  document.getElementById('main').scrollIntoView({behavior:'instant', block:'start'});
+}
+function renderMain(){
+  const map = {dashboard:renderDashboard, exams:renderExams, mock:renderMock, calendar:renderCalendar, settings:renderSettings, timetable:renderTimetable};
+  document.getElementById('main').innerHTML = map[currentTab]();
+  afterRender(currentTab);
+}
+function populateExamSwitcher(){
+  const sel = document.getElementById('examSwitcher');
+  if(DB.exams.length===0){ sel.innerHTML = `<option value="__add__">+ પરીક્ષા ઉમેરો</option>`; return; }
+  sel.innerHTML = DB.exams.map(e=>`<option value="${e.id}" ${e.active?'selected':''}>${esc(e.name)}</option>`).join('') + `<option value="__add__">+ પરીક્ષા ઉમેરો</option>`;
+}
+function handleExamSwitcherChange(selectEl){
+  if(selectEl.value==='__add__'){
+    populateExamSwitcher();
+    openExamForm(null);
+    return;
+  }
+  switchActiveExam(selectEl.value);
+  renderMain();
+}
+function switchActiveExam(id){ DB.exams.forEach(e=>e.active = (e.id===id)); sectionDetailId=null; save(); populateExamSwitcher(); }
+
+/* ===================== DASHBOARD ===================== */
+function renderDashboard(){
+  const exam = getActiveExam();
+  if(!exam){
+    return emptyState('🎓','હજુ કોઈ પરીક્ષા ઉમેરી નથી','શરૂઆત કરવા માટે એક પરીક્ષા ઉમેરો — જેમ કે GPSC, Talati, Police, GSSSB વગેરે.','પરીક્ષા ઉમેરો',"showTab('exams'); setTimeout(()=>openExamForm(null),50);");
+  }
+  const subs = examSubjects(exam.id);
+  const subIds = subs.map(s=>s.id);
+  const topics = DB.topics.filter(t=>subIds.includes(t.subjectId));
+  const completed = topics.filter(t=>t.status==='completed').length;
+  const total = topics.length;
+  const sections = examSections(exam.id);
+  let weightedTotal=0, weightedCompleted=0;
+  const priorityList = [];
+  const sectionedSubjectIds = new Set();
+  sections.forEach(sec=>{
+    const secSubs = subs.filter(s=>s.sectionId===sec.id);
+    secSubs.forEach(s=>sectionedSubjectIds.add(s.id));
+    const secTopics = topics.filter(t=>secSubs.some(s=>s.id===t.subjectId));
+    const secTotal = secTopics.length;
+    if(!secTotal) return;
+    const secCompleted = secTopics.filter(t=>t.status==='completed').length;
+    const hasMarks = sec.totalMarks && sec.totalMarks>0;
+    const unitWeight = hasMarks ? (sec.totalMarks/secTotal) : 1;
+    weightedTotal += secTotal*unitWeight;
+    weightedCompleted += secCompleted*unitWeight;
+    if(hasMarks && secCompleted<secTotal){
+      priorityList.push({section:sec, remaining:secTotal-secCompleted, priorityScore:sec.totalMarks*(1-secCompleted/secTotal)});
+    }
+  });
+  const unsectionedTopics = topics.filter(t=>{
+    const s = subs.find(x=>x.id===t.subjectId);
+    return s && !sectionedSubjectIds.has(s.id);
+  });
+  weightedTotal += unsectionedTopics.length;
+  weightedCompleted += unsectionedTopics.filter(t=>t.status==='completed').length;
+  priorityList.sort((a,b)=>b.priorityScore-a.priorityScore);
+  const pct = weightedTotal ? Math.round(weightedCompleted/weightedTotal*100) : 0;
+  const daysLeft = examDaysLeft(exam.date);
+  const streakInfo = calcStudyStreak(exam);
+  const today = todayStr();
+  const topicsDoneTodaySet = new Set();
+  studyLogsForActiveExam().filter(l=>l.date===today).forEach(l=>{
+    if(l.topicIds && l.topicIds.length){ l.topicIds.forEach(id=>topicsDoneTodaySet.add(id)); }
+    else if(l.topicId){ topicsDoneTodaySet.add(l.topicId); }
+  });
+  const topicsDoneTodayCount = topicsDoneTodaySet.size;
+  const revisionsDueToday = revisionsForActiveExam().filter(r=>r.dueDate===today);
+  const revisionsDoneTodayCount = revisionsDueToday.filter(r=>r.status==='completed').length;
+  const overdueRevisions = revisionsForActiveExam().filter(r=>r.status==='pending' && r.dueDate<today).length;
+  const overdueRevisionList = revisionsForActiveExam().filter(r=>r.status==='pending' && r.dueDate<today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const todayRevisionList = revisionsForActiveExam().filter(r=>r.status==='pending' && r.dueDate===today);
+  const todayStudyList = studyLogsForActiveExam().filter(l=>l.date===today);
+  const latestMock = [...mockTestsForActiveExam()].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const weak = computeWeakSubjects(exam.id);
+  const inProgressTopics = topics.filter(t=>t.status==='studying');
+
+  return `
+   <div class="hero-card">
+     <div class="hero-top">
+       <div>
+         <div class="hero-exam-name">${esc(exam.name)}</div>
+         <div class="hero-exam-date">📅 ${formatDate(exam.date)}</div>
+       </div>
+       <button class="btn btn-sm" onclick="showTab('exams');">વિગત</button>
+     </div>
+     <div class="hero-ring-row">
+       ${ringSVG(pct)}
+       <div class="hero-ring-stats">
+         <div class="ring-stat"><span>દિવસ બાકી</span><b id="heroDaysLeft" data-target="${daysLeft}" style="color:${daysLeft>=0?daysLeftColor(daysLeft):'#fff'};">${daysLeft>=0?0:'પૂર્ણ'}</b></div>
+         <div class="ring-stat"><span>ટોપિક પૂર્ણ</span><b><span id="heroTopicsCompleted" data-target="${completed}">0</span>/${total}</b></div>
+         <div class="ring-stat"><span>વિષયો</span><b id="heroSubjectsCount" data-target="${subs.length}">0</b></div>
+       </div>
+     </div>
+   </div>
+
+   <div class="card" style="display:flex; align-items:center; justify-content:space-between;">
+     <span>🔥 <b>${streakInfo.streak}</b> દિવસ સતત અભ્યાસ</span>
+     ${streakInfo.todayDone ? `<span class="badge badge-success">આજે ✓</span>` : `<span class="badge badge-warning">આજે હજુ બાકી</span>`}
+   </div>
+
+   ${dashboardNowCard()}
+
+   <div class="stat-grid">
+     ${statCard('📖', topicsDoneTodayCount, 'આજે અભ્યાસ ટોપિક', "calSelectedDate=todayStr(); showTab('calendar');", '')}
+     ${statCard('🔁', `${revisionsDoneTodayCount}/${revisionsDueToday.length}`, 'આજની રિવિઝન', "calSelectedDate=todayStr(); showTab('calendar'); calMode='revision'; renderMain();", '')}
+     ${statCard('⏰', overdueRevisions, 'ઓવરડ્યુ રિવિઝન')}
+     ${statCard('📘', total-completed, 'બાકી ટોપિક')}
+   </div>
+
+   ${inProgressTopics.length ? card('ચાલુ ટોપિક 🟡 <span class="ink-dim fw-400">(ટેપ કરી ચેપ્ટર જુઓ)</span>', `<div class="scroll-list-sm">${inProgressTopics.map(t=>dashboardTopicRow(t)).join('')}</div>`) : ''}
+
+   ${overdueRevisionList.length ? `<div class="card">     <div class="card-title">ઓવરડ્યુ રિવિઝન ⏰ <span class="ink-dim fw-400">(ટેપ કરી કેલેન્ડરમાં જુઓ)</span></div>
+     <div class="scroll-list-sm">${overdueRevisionList.map(r=>dashboardOverdueRevisionRow(r)).join('')}</div>
+   </div>` : ''}
+
+   ${todayRevisionList.length ? `<div class="card">     <div class="card-title">આજનું રિવિઝન 🔁 <span class="ink-dim fw-400">(ટેપ કરી કેલેન્ડરમાં જુઓ)</span></div>
+     <div class="scroll-list-sm">${todayRevisionList.map(r=>dashboardTodayRevisionRow(r)).join('')}</div>
+   </div>` : ''}
+
+   ${todayStudyList.length ? `<div class="card">     <div class="card-title">આજનો અભ્યાસ 📖</div>
+     <div class="scroll-list-sm">${todayStudyList.map(l=>dashboardTodayStudyRow(l)).join('')}</div>
+   </div>` : ''}
+
+   ${weak.length ? card('નબળા વિષયો ⚠️', weak.map(w=>`<div class="item"><span>${esc(w.name)}</span><span class="badge badge-danger">સરેરાશ ${w.avg}%</span></div>`).join('')) : ''}
+
+   ${priorityList.length ? card('વેઈટેજ પ્રમાણે અગ્રતા 🎯', priorityList.slice(0,5).map(p=>`<div class="item" onclick="navigateToSection('${p.section.id}')"><span>📂 ${esc(p.section.name)} <span class="ink-dim">(${p.section.totalMarks} ગુણ)</span></span><span class="badge badge-warning">${p.remaining} બાકી</span></div>`).join('')) : ''}
+
+   ${latestMock ? card('છેલ્લો મોક ટેસ્ટ 📝', mockSummaryRow(latestMock)) : ''}
+  `;
+}
+function computeWeakSubjects(examId){
+  const subs = examSubjects(examId);
+  const result = [];
+  subs.forEach(s=>{
+    let sum=0, count=0;
+    DB.mockTests.filter(m=>m.examId===examId).forEach(m=>{
+      const sm = (m.subjectMarks||[]).find(x=>x.subjectId===s.id);
+      if(sm && sm.total){ sum += (sm.obtained/sm.total)*100; count++; }
+    });
+    if(count){ result.push({name:s.name, avg:Math.round(sum/count)}); }
+  });
+  return result.filter(r=>r.avg<60).sort((a,b)=>a.avg-b.avg).slice(0,4);
+}
+
+/* --- Study Log form --- */
+function openStudyForm(id, defDate, prefill){
+  const exam = getActiveExam();
+  if(!exam){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
+  const l = id ? DB.studyLogs.find(x=>x.id===id) : null;
+  const subs = examSubjects(exam.id);
+  if(!subs.length){ toast('પહેલા આ પરીક્ષામાં વિષય ઉમેરો','error'); return; }
+  const sections = examSections(exam.id);
+  const hasUngrouped = subs.some(s=>!s.sectionId);
+  const prefillSubjectId = l ? l.subjectId : (prefill ? prefill.subjectId : null);
+  const currentSubject = prefillSubjectId ? subs.find(s=>s.id===prefillSubjectId) : null;
+  const currentSectionId = currentSubject ? (currentSubject.sectionId || '') : '';
+  openSheet(`
+    <h3>${l?'અભ્યાસ એડિટ':'અભ્યાસ ઉમેરો'}</h3>
+    <div class="field"><label>તારીખ</label><input type="date" id="f_date" value="${l?l.date:(defDate||todayStr())}"></div>
+    ${sections.length ? `<div class="field"><label>વિભાગ</label><select id="f_section" onchange="populateStudySubjectOptions()">
+      ${sections.map(sec=>`<option value="${sec.id}" ${currentSectionId===sec.id?'selected':''}>📂 ${esc(sec.name)}</option>`).join('')}
+      ${hasUngrouped?`<option value="" ${currentSectionId===''?'selected':''}>કોઈ વિભાગ નહીં</option>`:''}
+    </select></div>` : ''}
+    <div class="field"><label>વિષય</label><select id="f_subject" onchange="populateStudyTopicOptions()"></select></div>
+    <label style="font-size:12.5px;color:var(--ink-dim);font-weight:600;">ટોપિક (એક અથવા વધુ પસંદ કરો — વૈકલ્પિક)</label>
+    <input type="text" id="f_topic_search" placeholder="🔍 ટોપિક શોધો..." oninput="filterStudyTopicChecklist()" class="mt-8" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
+    <div id="f_topic_checklist" class="scroll-list-sm mt-8" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;"></div>
+    <div class="field" style="margin-top:16px;"><label>ચેપ્ટર / ટોપિક કવર</label><input type="text" id="f_chapters" value="${l?esc(l.chapters||''):(prefill?esc(prefill.chapters||''):'')}" placeholder="અથવા ઉપર યાદીમાંથી ટોપિક પસંદ કરો"></div>
+    <div class="field"><label>નોંધ</label><textarea id="f_notes">${l?esc(l.notes||''):''}</textarea></div>
+    <div class="sheet-actions">
+      ${l?`<button class="btn btn-danger" onclick="deleteStudyLog('${id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveStudyLog(${l?`'${id}'`:'null'})">સેવ કરો</button>
+    </div>
+  `);
+  populateStudySubjectOptions(prefillSubjectId);
+  const selectedTopicIds = l ? (l.topicIds && l.topicIds.length ? l.topicIds : (l.topicId ? [l.topicId] : [])) : (prefill && prefill.topicId ? [prefill.topicId] : []);
+  const selectedSubtopicIds = l ? (l.subtopicIds||[]) : [];
+  populateStudyTopicOptions(selectedTopicIds, selectedSubtopicIds);
+}
+function populateStudySubjectOptions(preselectSubjectId){
+  const exam = getActiveExam();
+  if(!exam) return;
+  const subs = examSubjects(exam.id);
+  const sectionEl = document.getElementById('f_section');
+  const sectionId = sectionEl ? sectionEl.value : null;
+  const filtered = sectionEl ? subs.filter(s=>(s.sectionId||'')===sectionId) : subs;
+  const subjectEl = document.getElementById('f_subject');
+  if(!subjectEl) return;
+  subjectEl.innerHTML = filtered.length ? filtered.map(s=>`<option value="${s.id}" ${preselectSubjectId===s.id?'selected':''}>${esc(s.name)}</option>`).join('') : `<option value="">આ વિભાગમાં કોઈ વિષય નથી</option>`;
+  populateStudyTopicOptions();
+}
+function populateStudyTopicOptions(selectedIds, selectedSubtopicIds){
+  selectedIds = selectedIds || [];
+  selectedSubtopicIds = selectedSubtopicIds || [];
+  const subjectId = val('f_subject');
+  const topics = subjectTopics(subjectId);
+  const wrap = document.getElementById('f_topic_checklist');
+  if(!wrap) return;
+  const searchEl = document.getElementById('f_topic_search');
+  if(searchEl) searchEl.value = '';
+  wrap.innerHTML = topics.length ? topics.map(t=>{
+    const subs = subtopicsForTopic(t.id);
+    const isChecked = selectedIds.includes(t.id);
+    const searchText = (t.name+' '+subs.map(s=>s.name).join(' ')).toLowerCase();
+    return `<div class="study-topic-block" data-search="${esc(searchText)}">
+      <label class="item cursor-pointer" style="width:100%;">
+        <span style="flex:1; padding-right:10px;">${esc(t.name)}</span>
+        <input type="checkbox" class="study-topic-checkbox" value="${t.id}" data-name="${esc(t.name)}" onchange="updateChaptersFromCheckboxes(); toggleSubtopicChecklist('${t.id}', this.checked)" ${isChecked?'checked':''} style="width:18px;height:18px;flex-shrink:0;">
+      </label>
+      ${subs.length ? `<div id="studySubtopics_${t.id}" class="${isChecked?'':'hidden'}" style="padding-left:16px;">
+        ${subs.map(st=>`<label class="item cursor-pointer" style="width:100%;">
+          <span class="ink-dim fs-125" style="flex:1; padding-right:10px;">↳ ${esc(st.name)}</span>
+          <input type="checkbox" class="study-subtopic-checkbox" value="${st.id}" data-topic="${t.id}" ${selectedSubtopicIds.includes(st.id)?'checked':''} style="width:16px;height:16px;flex-shrink:0;">
+        </label>`).join('')}
+      </div>` : ''}
+    </div>`;
+  }).join('') : `<span class="ink-dim" style="font-size:13px;">આ વિષયમાં કોઈ ટોપિક નથી</span>`;
+}
+function filterStudyTopicChecklist(){
+  const q = (val('f_topic_search')||'').trim().toLowerCase();
+  document.querySelectorAll('#f_topic_checklist .study-topic-block').forEach(el=>{
+    const match = !q || (el.dataset.search||'').includes(q);
+    el.classList.toggle('hidden', !match);
+  });
+}
+function toggleSubtopicChecklist(topicId, show){
+  const el = document.getElementById('studySubtopics_'+topicId);
+  if(el) el.classList.toggle('hidden', !show);
+}
+function updateChaptersFromCheckboxes(){
+  const boxes = document.querySelectorAll('.study-topic-checkbox:checked');
+  const names = Array.from(boxes).map(b=>b.dataset.name);
+  document.getElementById('f_chapters').value = names.join(', ');
+}
+function studyLogTopicLabels(l){
+  if(l.topicIds && l.topicIds.length){
+    const labels = [];
+    l.topicIds.forEach(id=>{
+      const t = DB.topics.find(x=>x.id===id);
+      if(!t) return;
+      const subNames = (l.subtopicIds||[]).map(sid=>{ const st=DB.subtopics.find(x=>x.id===sid); return (st && st.topicId===id) ? st.name : null; }).filter(Boolean);
+      if(subNames.length) subNames.forEach(sn=>labels.push(`${t.name} — ${sn}`));
+      else labels.push(t.name);
+    });
+    if(labels.length) return labels;
+  }
+  if(l.topicId){
+    const t = DB.topics.find(x=>x.id===l.topicId);
+    if(t) return [t.name];
+  }
+  if(l.chapters) return [l.chapters];
+  return [];
+}
+function saveStudyLog(id){
+  const date=val('f_date'), subjectId=val('f_subject'), chapters=val('f_chapters'), notes=val('f_notes');
+  const topicIds = Array.from(document.querySelectorAll('.study-topic-checkbox:checked')).map(b=>b.value);
+  const subtopicIds = Array.from(document.querySelectorAll('.study-subtopic-checkbox:checked')).map(b=>b.value);
+  const topicId = topicIds[0] || '';
+  if(!date||!subjectId){ toast('તારીખ અને વિષય ભરો','error'); return; }
+  if(id){ const l=DB.studyLogs.find(x=>x.id===id); Object.assign(l,{date,subjectId,chapters,notes,topicId,topicIds,subtopicIds}); }
+  else DB.studyLogs.push({id:uid(),date,subjectId,chapters,notes,topicId,topicIds,subtopicIds});
+  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+}
+function deleteStudyLog(id){ if(!confirm('ડિલીટ કરવું છે?'))return; DB.studyLogs=DB.studyLogs.filter(x=>x.id!==id); save(); closeSheet(); renderMain(); toast('ડિલીટ થયું'); }
+
+/* ===================== EXAMS / SUBJECTS / TOPICS ===================== */
+function renderExams(){
+  if(topicDetailId){ return renderTopicDetail(topicDetailId); }
+  const exam = getActiveExam();
+  if(!exam){ return emptyState('🎓','કોઈ પરીક્ષા નથી','તમારી પ્રથમ પરીક્ષા ઉમેરો — GPSC, Talati, Police, વગેરે.','પરીક્ષા ઉમેરો','openExamForm(null)'); }
+  return renderExamDetail(exam.id);
+}
+function renderExamDetail(examId){
+  const e = DB.exams.find(x=>x.id===examId);
+  if(!e){ examDetailId=null; return renderExams(); }
+  if(sectionDetailId){ return renderSectionDetail(sectionDetailId); }
+  const sections = examSections(examId);
+  return `
+   <button class="btn btn-sm btn-secondary" onclick="showTab(lastMainTab)">← પાછા</button>
+   <div class="mt-10">
+     <div class="card" style="margin-top:0;margin-bottom:0;">
+       <div class="item item-static">
+         <b>${esc(e.name)}</b>
+         <span>
+           <button class="btn btn-sm btn-secondary" onclick="switchActiveExam('${e.id}'); renderMain();">${e.active?'✓ સક્રિય':'સક્રિય કરો'}</button>
+           <button class="btn btn-sm btn-secondary" onclick="openExamForm('${e.id}')">✎</button>
+         </span>
+       </div>
+       <div class="ink-dim" style="margin-top:4px;">📅 ${formatDate(e.date)}${e.description?' · '+esc(e.description):''}</div>
+     </div>
+     <div class="section-header mb-6">
+       <h3>વિભાગ</h3>
+       <span class="flex-gap-6">
+         ${sections.length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionReorder('${examId}')">ક્રમ બદલો</button>`:''}
+         <button class="btn btn-sm btn-primary" onclick="openSectionForm(null,'${examId}')">+ વિભાગ</button>
+       </span>
+     </div>
+   </div>
+   ${sections.length ? `<div class="subject-list">${sections.map(sec=>sectionSlideCard(sec)).join('')}</div>` : emptyRow('કોઈ વિભાગ ઉમેર્યો નથી')}
+  `;
+}
+function sectionSlideCard(sec){
+  const subs = sectionSubjects(sec.id);
+  let totalTopics=0, completedTopics=0;
+  subs.forEach(s=>{ const topics=subjectTopics(s.id); totalTopics+=topics.length; completedTopics+=topics.filter(t=>t.status==='completed').length; });
+  const pct = totalTopics ? Math.round(completedTopics/totalTopics*100) : 0;
+  return `<div class="card cursor-pointer" onclick="sectionDetailId='${sec.id}'; renderMain();">
+      <div style="display:flex; align-items:center; gap:14px;">
+        ${miniRingSVG(pct)}
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:800; font-size:16.5px;">📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}</div>
+          <button class="btn btn-sm btn-secondary mt-8" onclick="event.stopPropagation(); openSectionForm('${sec.id}','${sec.examId}')">✎ વિભાગ એડિટ</button>
+        </div>
+      </div>
+      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${subs.length} વિષય — વિગત જોવા ટેપ કરો →</div>
+  </div>`;
+}
+function renderSectionDetail(sectionId){
+  const sec = DB.sections.find(x=>x.id===sectionId);
+  if(!sec){ sectionDetailId=null; return renderExams(); }
+  const subs = sectionSubjects(sec.id);
+  return `
+   <button class="btn btn-sm btn-secondary" onclick="sectionDetailId=null; renderMain();">← પાછા</button>
+   <div class="card mt-10">
+     <div class="item item-static">
+       <b>📂 ${esc(sec.name)}</b>
+       <span>
+         ${sec.totalMarks?`<span class="badge badge-primary">${sec.totalMarks} ગુણ</span>`:''}
+         <button class="btn btn-sm btn-secondary" onclick="openSectionForm('${sec.id}','${sec.examId}')">✎</button>
+       </span>
+     </div>
+   </div>
+   <div class="section-header mb-6">
+     <h3>વિષયો</h3>
+     <span class="flex-gap-6">
+       ${subs.length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}
+       <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
+     </span>
+   </div>
+   <div class="subject-list">${subjectListHTML(subs, '')}</div>
+  `;
+}
+function subjectListHTML(subs, q){
+  return subs.length ? `<div class="subject-list">${subs.map(s=>subjectSlideCard(s)).join('')}</div>` : emptyRow(q?'કોઈ વિષય મળ્યો નથી':'કોઈ વિષય ઉમેર્યો નથી');
+}
+function subjectSlideCard(s){
+  const topics = subjectTopics(s.id);
+  const completed = topics.filter(t=>t.status==='completed').length;
+  const pct = topics.length ? Math.round(completed/topics.length*100) : 0;
+  const revs = DB.revisions.filter(r=>r.subjectId===s.id);
+  const revDone = revs.filter(r=>r.status==='completed').length;
+  const revPct = revs.length ? Math.round(revDone/revs.length*100) : 0;
+  return `<div class="card cursor-pointer" onclick="topicDetailId='${s.id}'; renderMain();">
+      <div style="display:flex; align-items:center; gap:14px;">
+        ${miniRingSVG(pct)}
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:800; font-size:16.5px;">${esc(s.name)}</div>
+          <button class="btn btn-sm btn-secondary mt-8" onclick="event.stopPropagation(); openSubjectForm('${s.id}','${s.examId}')">✎ વિષય એડિટ</button>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
+        <div class="subject-mini-stat"><b>${topics.length}</b><span>કુલ ચેપ્ટર</span></div>
+        <div class="subject-mini-stat"><b>${topics.length-completed}</b><span>બાકી ચેપ્ટર</span></div>
+        <div class="subject-mini-stat" style="background:${pctColor(revPct)}22;"><b style="color:${pctColor(revPct)};">${revPct}%</b><span>રિવિઝન</span></div>
+      </div>
+      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો →</div>
+  </div>`;
+}
+function pctColor(pct){
+  if(pct>=70) return getVar('--success');
+  if(pct>=40) return getVar('--warning');
+  return getVar('--danger');
+}
+function miniRingSVG(pct){
+  const r=27, c=2*Math.PI*r;
+  const offset = c - (pct/100)*c;
+  const color = pctColor(pct);
+  return `<svg width="66" height="66" viewBox="0 0 66 66" style="flex-shrink:0;">
+    <circle cx="33" cy="33" r="${r}" stroke="var(--surface2)" stroke-width="7" fill="none"/>
+    <circle class="ring-progress" cx="33" cy="33" r="${r}" stroke="${color}" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c}" data-offset="${offset}" style="transition:stroke-dashoffset 0.9s ease;" transform="rotate(-90 33 33)"/>
+    <text x="33" y="38" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)">${pct}%</text>
+  </svg>`;
+}
+function refreshReorderList(getHTML){
+  const sheetEl = document.getElementById('sheet');
+  const listEl = document.getElementById('reorderList');
+  const scrollTop = sheetEl ? sheetEl.scrollTop : 0;
+  if(listEl) listEl.innerHTML = getHTML();
+  if(sheetEl) sheetEl.scrollTop = scrollTop;
+}
+function renderTopicDetail(subjectId){
+  const s = DB.subjects.find(x=>x.id===subjectId);
+  if(!s){ topicDetailId=null; return renderExams(); }
+  const topics = subjectTopics(s.id);
+  const completed = topics.filter(t=>t.status==='completed').length;
+  const pct = topics.length ? Math.round(completed/topics.length*100) : 0;
+  return `
+   <button class="btn btn-sm btn-secondary" onclick="topicDetailId=null; renderMain();">← પાછા</button>
+   <div class="card mt-10">
+     <div class="item item-static"><b>${esc(s.name)}</b><span class="ink-dim">${completed}/${topics.length} પૂર્ણ</span></div>
+     <div class="progress-track mt-8"><div class="progress-fill" style="width:${pct}%"></div></div>
+   </div>
+   <div style="margin:18px 2px 8px 2px;">
+     <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+       ${topics.length>1?`<button class="btn btn-sm btn-secondary" onclick="openTopicReorder('${s.id}')">ક્રમ બદલો</button>`:''}
+       <button class="btn btn-sm btn-secondary" onclick="openBulkTopicForm('${s.id}')">+ ઘણા ટોપિક</button>
+       <button class="btn btn-sm btn-primary" onclick="openTopicForm(null,'${s.id}')">+ ટોપિક</button>
+     </div>
+     <h3 style="margin:10px 0 0 0;">બધા ટોપિક</h3>
+   </div>
+   ${topics.length ? topics.map(t=>topicRow(t)).join('') : emptyRow('કોઈ ટોપિક નથી')}
+  `;
+}
+function topicReorderListHTML(subjectId){
+  const topics = subjectTopics(subjectId);
+  return topics.map((t,i)=>`
+      <div class="item cursor-default">
+        <span>${esc(t.name)}</span>
+        <span class="flex-gap-4">
+          <button class="btn btn-sm btn-secondary" ${i===0?'disabled':''} onclick="moveTopic('${t.id}',-1); refreshReorderList(()=>topicReorderListHTML('${subjectId}'));">▲</button>
+          <button class="btn btn-sm btn-secondary" ${i===topics.length-1?'disabled':''} onclick="moveTopic('${t.id}',1); refreshReorderList(()=>topicReorderListHTML('${subjectId}'));">▼</button>
+        </span>
+      </div>`).join('');
+}
+function openTopicReorder(subjectId){
+  openSheet(`
+    <h3>ટોપિકનો ક્રમ બદલો</h3>
+    <div class="scroll-list-sm" id="reorderList">${topicReorderListHTML(subjectId)}</div>
+  `);
+}
+function moveSubject(id, dir){
+  const list = DB.subjects;
+  const s = list.find(x=>x.id===id);
+  if(!s) return;
+  const groupIdx = [];
+  list.forEach((x,i)=>{ if(x.examId===s.examId && (x.sectionId||null)===(s.sectionId||null)) groupIdx.push(i); });
+  const pos = groupIdx.findIndex(i=>list[i].id===id);
+  const swapPos = pos + dir;
+  if(swapPos<0 || swapPos>=groupIdx.length) return;
+  const i1 = groupIdx[pos], i2 = groupIdx[swapPos];
+  const tmp = list[i1]; list[i1] = list[i2]; list[i2] = tmp;
+  save(); renderMain();
+}
+function sectionSubjectReorderListHTML(sectionId){
+  const subs = sectionSubjects(sectionId);
+  return subs.map((s,i)=>`
+      <div class="item cursor-default">
+        <span>${esc(s.name)}</span>
+        <span class="flex-gap-4">
+          <button class="btn btn-sm btn-secondary" ${i===0?'disabled':''} onclick="moveSubject('${s.id}',-1); refreshReorderList(()=>sectionSubjectReorderListHTML('${sectionId}'));">▲</button>
+          <button class="btn btn-sm btn-secondary" ${i===subs.length-1?'disabled':''} onclick="moveSubject('${s.id}',1); refreshReorderList(()=>sectionSubjectReorderListHTML('${sectionId}'));">▼</button>
+        </span>
+      </div>`).join('');
+}
+function openSectionSubjectReorder(sectionId){
+  openSheet(`
+    <h3>વિષયોનો ક્રમ બદલો</h3>
+    <div class="scroll-list-sm" id="reorderList">${sectionSubjectReorderListHTML(sectionId)}</div>
+  `);
+}
+function moveSection(id, dir){
+  const list = DB.sections;
+  const s = list.find(x=>x.id===id);
+  if(!s) return;
+  const groupIdx = [];
+  list.forEach((x,i)=>{ if(x.examId===s.examId) groupIdx.push(i); });
+  const pos = groupIdx.findIndex(i=>list[i].id===id);
+  const swapPos = pos + dir;
+  if(swapPos<0 || swapPos>=groupIdx.length) return;
+  const i1 = groupIdx[pos], i2 = groupIdx[swapPos];
+  const tmp = list[i1]; list[i1] = list[i2]; list[i2] = tmp;
+  save(); renderMain();
+}
+function sectionReorderListHTML(examId){
+  const sections = examSections(examId);
+  return sections.map((sec,i)=>`
+      <div class="item cursor-default">
+        <span>📂 ${esc(sec.name)}</span>
+        <span class="flex-gap-4">
+          <button class="btn btn-sm btn-secondary" ${i===0?'disabled':''} onclick="moveSection('${sec.id}',-1); refreshReorderList(()=>sectionReorderListHTML('${examId}'));">▲</button>
+          <button class="btn btn-sm btn-secondary" ${i===sections.length-1?'disabled':''} onclick="moveSection('${sec.id}',1); refreshReorderList(()=>sectionReorderListHTML('${examId}'));">▼</button>
+        </span>
+      </div>`).join('');
+}
+function openSectionReorder(examId){
+  openSheet(`
+    <h3>વિભાગોનો ક્રમ બદલો</h3>
+    <div class="scroll-list-sm" id="reorderList">${sectionReorderListHTML(examId)}</div>
+  `);
+}
+function dashboardTopicRow(t){
+  const s = DB.subjects.find(x=>x.id===t.subjectId);
+  const cls = t.status==='completed' ? 'badge-success' : (t.status==='studying' ? 'badge-warning' : 'badge-grey');
+  const label = t.status==='completed' ? 'પૂર્ણ 🟢' : (t.status==='studying' ? 'ચાલુ 🟡' : 'શરૂ નથી 🔴');
+  return `<div class="item cursor-pointer" onclick="navigateToSubjectTopics('${t.subjectId}','${t.id}')">
+    <span class="flex-col">
+      <b>${s?esc(s.name):''}</b>
+      <span class="ink-dim fs-125">${esc(t.name)}</span>
+    </span>
+    <span class="badge ${cls}">${label}</span>
+  </div>`;
+}
+function revisionEntityLabel(r){
+  const t = DB.topics.find(x=>x.id===r.topicId);
+  if(r.subtopicId){
+    const st = DB.subtopics.find(x=>x.id===r.subtopicId);
+    if(st) return t ? `${t.name} — ${st.name}` : st.name;
+  }
+  return t ? t.name : 'ટોપિક';
+}
+function dashboardOverdueRevisionRow(r){
+  const s = DB.subjects.find(x=>x.id===r.subjectId);
+  return `<div class="item cursor-pointer" onclick="navigateToRevisionDate('${r.dueDate}','${r.id}')">
+    <span class="flex-col">
+      <b>${s?esc(s.name):''}</b>
+      <span class="ink-dim fs-125">${esc(revisionEntityLabel(r))}</span>
+    </span>
+    <span class="badge badge-danger">${formatDate(r.dueDate)}</span>
+  </div>`;
+}
+function dashboardTodayRevisionRow(r){
+  const s = DB.subjects.find(x=>x.id===r.subjectId);
+  return `<div class="item cursor-pointer" onclick="navigateToRevisionDate(todayStr(),'${r.id}')">
+    <span class="flex-col">
+      <b>${s?esc(s.name):''}</b>
+      <span class="ink-dim fs-125">${esc(revisionEntityLabel(r))}</span>
+    </span>
+    <span class="badge badge-primary">આજે 🔁</span>
+  </div>`;
+}
+function dashboardTodayStudyRow(l){
+  const s = DB.subjects.find(x=>x.id===l.subjectId);
+  const labels = studyLogTopicLabels(l);
+  return `<div class="item" onclick="openStudyForm('${l.id}')">
+    <span class="flex-col">
+      <b>${s?esc(s.name):''}</b>
+      ${labels.map(name=>`<span class="ink-dim fs-125">${esc(name)}</span>`).join('')}
+    </span>
+    <span class="badge badge-success">પૂર્ણ ✓</span>
+  </div>`;
+}
+function topicRow(t){
+  const cls = t.status==='completed' ? 'badge-success' : (t.status==='studying' ? 'badge-warning' : 'badge-grey');
+  const label = t.status==='completed' ? 'પૂર્ણ 🟢' : (t.status==='studying' ? 'ચાલુ 🟡' : 'શરૂ નથી 🔴');
+  const highlight = (highlightTopicId===t.id) ? ' row-highlight' : '';
+  return `<div class="topic-row${highlight}" id="topic-${t.id}">
+    <div class="topic-row-top">
+      <span onclick="openTopicForm('${t.id}','${t.subjectId}')" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
+      <span class="badge ${cls}" onclick="cycleTopicStatus('${t.id}')" style="flex-shrink:0;">${label}</span>
+    </div>
+  </div>`;
+}
+function moveTopic(id, dir){
+  const list = DB.topics;
+  const t = list.find(x=>x.id===id);
+  if(!t) return;
+  const groupIdx = [];
+  list.forEach((x,i)=>{ if(x.subjectId===t.subjectId) groupIdx.push(i); });
+  const pos = groupIdx.findIndex(i=>list[i].id===id);
+  const swapPos = pos + dir;
+  if(swapPos<0 || swapPos>=groupIdx.length) return;
+  const i1 = groupIdx[pos], i2 = groupIdx[swapPos];
+  const tmp = list[i1]; list[i1] = list[i2]; list[i2] = tmp;
+  save(); renderMain();
+}
+function cycleTopicStatus(id){
+  const t = DB.topics.find(x=>x.id===id);
+  if(!t) return;
+  const subs = subtopicsForTopic(id);
+  const hasSubtopics = subs.length>0;
+  const order = ['not_started','studying','completed'];
+  const next = order[(order.indexOf(t.status)+1) % order.length];
+  const labels = {not_started:'શરૂ નથી 🔴', studying:'ચાલુ 🟡', completed:'પૂર્ણ 🟢'};
+  if(hasSubtopics && next==='completed'){
+    const pending = subs.filter(s=>!s.completed);
+    if(pending.length){
+      alert(`⚠️ આ ચેપ્ટર હજુ પૂર્ણ ન કરી શકાય — ${pending.length} સબ-ટોપિક બાકી છે:\n\n${pending.map(s=>'• '+s.name).join('\n')}\n\nપહેલા બધા સબ-ટોપિક પૂર્ણ કરો, પછી જ ચેપ્ટર પૂર્ણ થશે.`);
+      return;
+    }
+  }
+  let msg = `સ્ટેટસ "${labels[t.status]}" માંથી "${labels[next]}" કરવું છે?`;
+  if(hasSubtopics){
+    if(next==='completed') msg += '\n\nℹ️ બધા સબ-ટોપિક પૂર્ણ છે. રિવિઝન દરેક સબ-ટોપિક પ્રમાણે પહેલેથી જ જનરેટ થયેલું છે.';
+  } else {
+    if(t.status==='completed' && next==='not_started'){
+      msg += '\n\n⚠️ ધ્યાન રાખો: આ ટોપિકનું બાકી રિવિઝન શેડ્યુલ પણ કેન્સલ થઈ જશે.';
+    } else if(next==='completed'){
+      msg += '\n\n🔁 રિવિઝન શેડ્યુલ ઓટો-જનરેટ થશે.';
+    }
+  }
+  if(!confirm(msg)) return;
+  t.status = next;
+  if(next==='completed'){
+    t.completedDate = todayStr();
+    if(!hasSubtopics){ generateRevisions(t); toast('ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁'); }
+    else toast('ટોપિક પૂર્ણ!');
+  } else {
+    if(!hasSubtopics) DB.revisions = DB.revisions.filter(r=>!(r.topicId===t.id && r.status==='pending'));
+    toast('સ્ટેટસ બદલાયું');
+  }
+  save(); renderMain();
+}
+function generateRevisionsForEntity(topicId, subjectId, subtopicId){
+  if(subtopicId) DB.revisions = DB.revisions.filter(r=>r.subtopicId!==subtopicId);
+  else DB.revisions = DB.revisions.filter(r=>r.topicId!==topicId);
+  const base = new Date(todayStr()+'T00:00:00');
+  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
+  const startDays = (rule.startDays && rule.startDays.length) ? rule.startDays : [1,3,7];
+  const weekDayNum = {sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6}[rule.weekDay] ?? 0;
+  const weeklyCount = rule.weeklyCount>=0 ? rule.weeklyCount : 8;
+  const dates = [];
+  startDays.forEach(d=>{
+    const due = new Date(base); due.setDate(due.getDate()+Number(d));
+    dates.push(due);
+  });
+  const lastStartDay = Math.max(...startDays);
+  let cursor = new Date(base); cursor.setDate(cursor.getDate()+lastStartDay+1);
+  while(cursor.getDay()!==weekDayNum){ cursor.setDate(cursor.getDate()+1); }
+  for(let i=0;i<weeklyCount;i++){
+    dates.push(new Date(cursor));
+    cursor = new Date(cursor); cursor.setDate(cursor.getDate()+7);
+  }
+  dates.forEach((due,idx)=>{
+    const off = due.getTimezoneOffset();
+    const local = new Date(due.getTime()-off*60000);
+    const entry = {id:uid(), topicId, subjectId, dueDate: local.toISOString().slice(0,10), status:'pending', stage: idx+1};
+    if(subtopicId) entry.subtopicId = subtopicId;
+    DB.revisions.push(entry);
+  });
+}
+function generateRevisions(topic){
+  generateRevisionsForEntity(topic.id, topic.subjectId, null);
+}
+function generateSubtopicRevisions(subtopic){
+  generateRevisionsForEntity(subtopic.topicId, subtopic.subjectId, subtopic.id);
+}
+function openExamForm(id){
+  const e = id ? DB.exams.find(x=>x.id===id) : null;
+  openSheet(`
+    <h3>${e?'પરીક્ષા એડિટ':'નવી પરીક્ષા'}</h3>
+    <div class="field"><label>પરીક્ષાનું નામ</label><input type="text" id="f_name" value="${e?esc(e.name):''}" placeholder="દા.ત. GPSC, Talati"></div>
+    <div class="field"><label>પરીક્ષાની તારીખ</label><input type="date" id="f_date" value="${e?e.date:''}"></div>
+    <div class="field"><label>વર્ણન</label><textarea id="f_desc">${e?esc(e.description||''):''}</textarea></div>
+    <div class="sheet-actions">
+      ${e?`<button class="btn btn-danger" onclick="deleteExam('${id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveExam(${e?`'${id}'`:'null'})">સેવ કરો</button>
+    </div>
+  `);
+}
+function saveExam(id){
+  const name=val('f_name'), date=val('f_date'), desc=val('f_desc');
+  if(!name||!date){ toast('નામ અને તારીખ ભરો','error'); return; }
+  const dup = DB.exams.find(x=>x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
+  if(dup){ toast('આ નામની પરીક્ષા પહેલેથી છે','error'); return; }
+  if(id){ const e=DB.exams.find(x=>x.id===id); Object.assign(e,{name,date,description:desc}); }
+  else { const makeActive = DB.exams.length===0; DB.exams.push({id:uid(),name,date,description:desc,active:makeActive}); }
+  save(); closeSheet(); renderMain(); populateExamSwitcher(); toast('સેવ થયું');
+}
+function deleteExam(id){
+  if(!confirm('આ પરીક્ષા અને તેના તમામ વિષય/ટોપિક ડિલીટ થશે. ચાલુ રાખવું છે?'))return;
+  const subIds = DB.subjects.filter(s=>s.examId===id).map(s=>s.id);
+  DB.topics = DB.topics.filter(t=>!subIds.includes(t.subjectId));
+  DB.revisions = DB.revisions.filter(r=>!subIds.includes(r.subjectId));
+  DB.subjects = DB.subjects.filter(s=>s.examId!==id);
+  DB.sections = DB.sections.filter(x=>x.examId!==id);
+  DB.exams = DB.exams.filter(x=>x.id!==id);
+  if(DB.exams.length && !DB.exams.find(x=>x.active)) DB.exams[0].active=true;
+  examDetailId=null;
+  topicDetailId=null;
+  sectionDetailId=null;
+  save(); closeSheet(); renderMain(); populateExamSwitcher(); toast('ડિલીટ થયું');
+}
+function openSubjectForm(id, examId, sectionId){
+  const s = id ? DB.subjects.find(x=>x.id===id) : null;
+  const exId = s ? s.examId : examId;
+  const sections = examSections(exId);
+  const currentSectionId = s ? (s.sectionId||'') : (sectionId||'');
+  if(!sections.length){
+    toast('પહેલા વિભાગ ઉમેરો','error');
+    return;
+  }
+  openSheet(`
+    <h3>${s?'વિષય એડિટ':'નવો વિષય'}</h3>
+    <div class="field"><label>વિષયનું નામ</label><input type="text" id="f_name" value="${s?esc(s.name):''}"></div>
+    <div class="field"><label>કયા વિભાગમાં?</label><select id="f_section">
+      ${sections.map(sec=>`<option value="${sec.id}" ${(currentSectionId===sec.id || (!currentSectionId && sec.id===sections[0].id))?'selected':''}>📂 ${esc(sec.name)}</option>`).join('')}
+    </select></div>
+    <div class="sheet-actions">
+      ${s?`<button class="btn btn-danger" onclick="deleteSubject('${id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveSubject(${s?`'${id}'`:'null'},'${exId}')">સેવ કરો</button>
+    </div>
+  `);
+}
+function saveSubject(id, examId){
+  const name=val('f_name');
+  const sectionId = val('f_section');
+  if(!name){ toast('નામ ભરો','error'); return; }
+  if(!sectionId){ toast('વિભાગ પસંદ કરો','error'); return; }
+  const dup = DB.subjects.find(x=>x.examId===examId && x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
+  if(dup){ toast('આ નામનો વિષય પહેલેથી છે','error'); return; }
+  if(id){ const s=DB.subjects.find(x=>x.id===id); Object.assign(s,{name,sectionId}); }
+  else DB.subjects.push({id:uid(),examId,name,sectionId});
+  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+}
+function openSectionForm(id, examId){
+  const sec = id ? DB.sections.find(x=>x.id===id) : null;
+  const exId = sec ? sec.examId : examId;
+  openSheet(`
+    <h3>${sec?'વિભાગ એડિટ':'નવો વિભાગ'}</h3>
+    <div class="field"><label>વિભાગનું નામ</label><input type="text" id="f_name" value="${sec?esc(sec.name):''}" placeholder="દા.ત. સામાન્ય જ્ઞાન"></div>
+    <div class="field"><label>કુલ ગુણ</label><input type="number" id="f_marks" value="${sec?sec.totalMarks:''}"></div>
+    <div class="ink-dim" style="font-size:11.5px; margin:-8px 0 12px 0;">વિભાગમાં એકથી વધુ વિષય હોઈ શકે, દરેકના ગુણ તમે વિષયમાં જ અલગ-અલગ સેટ કરી શકો છો</div>
+    <div class="sheet-actions">
+      ${sec?`<button class="btn btn-danger" onclick="deleteSection('${id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveSection(${sec?`'${id}'`:'null'},'${exId}')">સેવ કરો</button>
+    </div>
+  `);
+}
+function saveSection(id, examId){
+  const name=val('f_name'), marks=parseFloat(val('f_marks'))||0;
+  if(!name){ toast('નામ ભરો','error'); return; }
+  const dup = DB.sections.find(x=>x.examId===examId && x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
+  if(dup){ toast('આ નામનો વિભાગ પહેલેથી છે','error'); return; }
+  if(id){ const sec=DB.sections.find(x=>x.id===id); Object.assign(sec,{name,totalMarks:marks}); }
+  else DB.sections.push({id:uid(),examId,name,totalMarks:marks});
+  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+}
+function deleteSection(id){
+  if(!confirm('આ વિભાગ ડિલીટ થશે. તેમાંના વિષયો "કોઈ વિભાગ નહીં" હેઠળ યથાવત રહેશે (ડિલીટ નહીં થાય). ચાલુ રાખવું છે?'))return;
+  DB.subjects.forEach(s=>{ if(s.sectionId===id) s.sectionId=null; });
+  DB.sections = DB.sections.filter(x=>x.id!==id);
+  if(sectionDetailId===id) sectionDetailId=null;
+  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+function deleteSubject(id){
+  if(!confirm('આ વિષય અને તેના ટોપિક ડિલીટ થશે?'))return;
+  DB.revisions = DB.revisions.filter(r=>r.subjectId!==id);
+  DB.topics = DB.topics.filter(t=>t.subjectId!==id);
+  DB.subjects = DB.subjects.filter(x=>x.id!==id);
+  if(topicDetailId===id) topicDetailId=null;
+  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+function revisionStageLabel(stage){
+  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun'};
+  const startDays = (rule.startDays && rule.startDays.length) ? rule.startDays : [1,3,7];
+  const weekDayLabel = {sun:'રવિ',mon:'સોમ',tue:'મંગળ',wed:'બુધ',thu:'ગુરુ',fri:'શુક્ર',sat:'શનિ'}[rule.weekDay] || 'રવિ';
+  return stage<=startDays.length ? `Day+${startDays[stage-1]}` : `${weekDayLabel} રિવિઝન #${stage-startDays.length}`;
+}
+function openTopicForm(id, subjectId){
+  const t = id ? DB.topics.find(x=>x.id===id) : null;
+  let infoHTML = '';
+  let subtopicsHTML = '';
+  if(t){
+    const statusLabel = t.status==='completed' ? '🟢 પૂર્ણ' : (t.status==='studying' ? '🟡 ચાલુ' : '🔴 શરૂ નથી');
+    const hasSubtopics = subtopicsForTopic(t.id).length>0;
+    const revs = hasSubtopics ? [] : DB.revisions.filter(r=>r.topicId===t.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+    infoHTML = `
+      <div class="card" style="margin-bottom:14px; background:var(--surface2);">
+        <div class="item cursor-default"><span>સ્ટેટસ</span><b>${statusLabel}</b></div>
+        ${revs.length ? `<div class="mt-8">
+          <div class="ink-dim fs-12 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>
+          ${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}
+        </div>` : ''}
+      </div>`;
+    const subs = subtopicsForTopic(t.id);
+    const subsDone = subs.filter(s=>s.completed).length;
+    subtopicsHTML = `
+      <div style="margin:18px 2px 8px 2px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 class="m-0">સબ-ટોપિક ${subs.length?`(${subsDone}/${subs.length})`:''}</h3>
+          <button class="btn btn-sm btn-secondary" onclick="openBulkSubtopicForm('${t.id}','${t.subjectId}')">+ ઘણા</button>
+        </div>
+        <div class="ink-dim fs-12 mt-8">મોટા ચેપ્ટર માટે — અંદરના ભાગ અલગ-અલગ ટ્રેક કરવા (દરેકનું રિવિઝન અલગથી જનરેટ થશે). દરેક પર ટેપ કરીને એનું રિવિઝન શેડ્યુલ જુઓ.</div>
+        <div class="field mt-10" style="display:flex; gap:8px;">
+          <input type="text" id="f_new_subtopic" placeholder="નવું સબ-ટોપિક નામ" style="flex:1;">
+          <button class="btn btn-sm btn-primary" onclick="addSingleSubtopic('${t.id}')">+ ઉમેરો</button>
+        </div>
+        ${subs.length ? subs.map(st=>subtopicRow(st)).join('') : `<div class="ink-dim fs-12" style="padding:8px 2px;">હજુ કોઈ સબ-ટોપિક નથી</div>`}
+      </div>`;
+  }
+  openSheet(`
+    <h3>${t?'ટોપિક વિગત':'નવો ટોપિક'}</h3>
+    ${infoHTML}
+    <div class="field"><label>ટોપિકનું નામ</label><input type="text" id="f_name" value="${t?esc(t.name):''}"></div>
+    <div class="sheet-actions">
+      ${t?`<button class="btn btn-danger" onclick="deleteTopic('${id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveTopic(${t?`'${id}'`:'null'},'${subjectId}')">સેવ કરો</button>
+    </div>
+    ${subtopicsHTML}
+  `);
+}
+function saveTopic(id, subjectId){
+  const name=val('f_name');
+  if(!name){ toast('નામ ભરો','error'); return; }
+  if(id){ const t=DB.topics.find(x=>x.id===id); t.name=name; }
+  else DB.topics.push({id:uid(),subjectId,name,status:'not_started'});
+  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+}
+function openBulkTopicForm(subjectId){
+  openSheet(`
+    <h3>ઘણા ટોપિક એકસાથે ઉમેરો</h3>
+    <div class="ink-dim" style="font-size:12px; margin-bottom:8px;">દરેક ટોપિકનું નામ એક-એક લાઈન પર પેસ્ટ કરો (નંબર હોય તો આપોઆપ કપાઈ જશે)</div>
+    <div class="field"><textarea id="f_bulk" rows="10" placeholder="1. બંધારણ પ્રસ્તાવના
+2. મૂળભૂત અધિકારો
+3. રાજ્યનીતિના માર્ગદર્શક સિદ્ધાંતો"></textarea></div>
+    <div class="sheet-actions">
+      <button class="btn btn-primary btn-block" onclick="saveBulkTopics('${subjectId}')">ઉમેરો</button>
+    </div>
+  `);
+}
+function saveBulkTopics(subjectId){
+  const raw = val('f_bulk') || '';
+  const lines = raw.split('\n')
+    .map(l=>l.trim())
+    .map(l=>l.replace(/^(\d+|[०-९]+|[૦-૯]+)\s*[\.\)\-:]\s*/,''))
+    .map(l=>l.trim())
+    .filter(l=>l.length>0);
+  if(!lines.length){ toast('ઓછામાં ઓછું એક નામ લખો','error'); return; }
+  lines.forEach(name=>{
+    DB.topics.push({id:uid(),subjectId,name,status:'not_started'});
+  });
+  save(); closeSheet(); renderMain(); toast(`${lines.length} ટોપિક ઉમેરાયા`);
+}
+function deleteTopic(id){
+  if(!confirm('ડિલીટ કરવું છે?'))return;
+  DB.topics = DB.topics.filter(x=>x.id!==id);
+  DB.subtopics = DB.subtopics.filter(x=>x.topicId!==id);
+  DB.revisions = DB.revisions.filter(r=>r.topicId!==id);
+  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+function subtopicRow(st){
+  const revs = DB.revisions.filter(r=>r.subtopicId===st.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const doneCount = revs.filter(r=>r.status==='completed').length;
+  const wrapId = 'subrev_'+st.id;
+  const shouldExpand = isAccordionOpen(wrapId);
+  return `<div class="mt-8">
+    <div class="item cursor-pointer" onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;">
+      <span style="flex:1; padding-right:6px;">${esc(st.name)}</span>
+      <span style="display:flex;align-items:center;gap:6px;">
+        <span class="badge ${st.completed?'badge-success':'badge-grey'}" onclick="event.stopPropagation(); toggleSubtopicComplete('${st.id}')">${st.completed?'પૂર્ણ 🟢':'બાકી 🔴'}</span>
+        ${revs.length ? `<span class="badge badge-warning">${doneCount}/${revs.length}</span>` : ''}
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteSubtopic('${st.id}')">🗑️</button>
+        <span class="accordion-caret ink-dim">${shouldExpand?'▲':'▼'}</span>
+      </span>
+    </div>
+    <div id="${wrapId}" class="${shouldExpand?'':'hidden'}" style="padding-left:6px;">
+      ${revs.length ? `<div class="ink-dim fs-12 mt-8 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}` : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — સબ-ટોપિક પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`}
+    </div>
+  </div>`;
+}
+function addSingleSubtopic(topicId){
+  const name = val('f_new_subtopic');
+  if(!name){ toast('નામ ભરો','error'); return; }
+  const t = DB.topics.find(x=>x.id===topicId);
+  if(!t) return;
+  DB.subtopics.push({id:uid(), topicId, subjectId:t.subjectId, name, completed:false});
+  save(); renderMain();
+  openTopicForm(topicId, t.subjectId);
+  toast('સબ-ટોપિક ઉમેરાયું');
+}
+function openBulkSubtopicForm(topicId, subjectId){
+  openSheet(`
+    <h3>ઘણા સબ-ટોપિક એકસાથે ઉમેરો</h3>
+    <div class="ink-dim fs-12 mb-6">દરેક સબ-ટોપિકનું નામ એક-એક લાઈન પર પેસ્ટ કરો (નંબર હોય તો આપોઆપ કપાઈ જશે)</div>
+    <div class="field"><textarea id="f_bulk" rows="10" placeholder="1. ભાગ-1
+2. ભાગ-2
+3. ભાગ-3"></textarea></div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="openTopicForm('${topicId}','${subjectId}')">રદ કરો</button>
+      <button class="btn btn-primary btn-block" onclick="saveBulkSubtopics('${topicId}','${subjectId}')">ઉમેરો</button>
+    </div>
+  `);
+}
+function saveBulkSubtopics(topicId, subjectId){
+  const raw = val('f_bulk') || '';
+  const lines = raw.split('\n')
+    .map(l=>l.trim())
+    .map(l=>l.replace(/^(\d+|[०-९]+|[૦-૯]+)\s*[\.\)\-:]\s*/,''))
+    .map(l=>l.trim())
+    .filter(l=>l.length>0);
+  if(!lines.length){ toast('ઓછામાં ઓછું એક નામ લખો','error'); return; }
+  const t = DB.topics.find(x=>x.id===topicId);
+  const subjId = t ? t.subjectId : subjectId;
+  lines.forEach(name=>{
+    DB.subtopics.push({id:uid(), topicId, subjectId:subjId, name, completed:false});
+  });
+  save(); renderMain();
+  openTopicForm(topicId, subjId);
+  toast(`${lines.length} સબ-ટોપિક ઉમેરાયા`);
+}
+function toggleSubtopicComplete(id){
+  const st = DB.subtopics.find(x=>x.id===id);
+  if(!st) return;
+  if(st.completed){
+    if(!confirm('આ સબ-ટોપિક "પૂર્ણ" માંથી "બાકી" કરવું છે?\n\n⚠️ તેનું બાકી રિવિઝન શેડ્યુલ પણ કેન્સલ થઈ જશે.')) return;
+    st.completed=false; delete st.completedDate;
+    DB.revisions = DB.revisions.filter(r=>!(r.subtopicId===st.id && r.status==='pending'));
+    save(); renderMain();
+    openTopicForm(st.topicId, st.subjectId);
+    toast('સ્ટેટસ બદલાયું');
+  } else {
+    if(!confirm('આ સબ-ટોપિક પૂર્ણ કરવું છે?\n\n🔁 રિવિઝન શેડ્યુલ ઓટો-જનરેટ થશે.')) return;
+    st.completed=true; st.completedDate=todayStr();
+    generateSubtopicRevisions(st);
+    save(); renderMain();
+    openTopicForm(st.topicId, st.subjectId);
+    toast('સબ-ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁');
+  }
+}
+function deleteSubtopic(id){
+  if(!confirm('આ સબ-ટોપિક ડિલીટ કરવું છે?'))return;
+  const st = DB.subtopics.find(x=>x.id===id);
+  DB.subtopics = DB.subtopics.filter(x=>x.id!==id);
+  DB.revisions = DB.revisions.filter(r=>r.subtopicId!==id);
+  save(); renderMain();
+  if(st) openTopicForm(st.topicId, st.subjectId);
+  toast('ડિલીટ થયું');
+}
+
+/* ===================== MOCK TESTS ===================== */
+function renderMock(){
+  const tests = [...mockTestsForActiveExam()].sort((a,b)=>b.date.localeCompare(a.date));
+  return `
+   <div class="section-header"><h2 class="m-0">મોક ટેસ્ટ 📝</h2><button class="btn btn-primary btn-sm" onclick="openMockForm(null)">+ નવો</button></div>
+   ${tests.length ? `<div class="chart-card"><div class="chart-title">ટ્રેન્ડ (%)</div><canvas id="chartMockTrend"></canvas></div>` : ''}
+   ${tests.length ? `<div class="scroll-list">${tests.map(m=>mockCard(m)).join('')}</div>` : emptyState('📝','કોઈ મોક ટેસ્ટ નથી','તમારા પ્રથમ મોક ટેસ્ટનું પરિણામ ઉમેરો','ટેસ્ટ ઉમેરો','openMockForm(null)')}
+  `;
+}
+function mockCard(m){
+  const pct = m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0;
+  const cls = pct>=70?'badge-success':(pct>=40?'badge-warning':'badge-danger');
+  return `<div class="card">
+    <div class="item" style="border:none;padding:0;cursor:pointer;" onclick="openMockForm('${m.id}')">
+      <span><b>${formatDate(m.date)}</b>${m.mode==='single'?' <span class="ink-dim fw-400">(એક વિષય)</span>':''}</span>
+      <span class="badge ${cls}">${pct}%</span>
+    </div>
+    <div class="ink-dim" style="margin-top:4px;font-size:13px;">${m.obtainedMarks}/${m.totalMarks} ગુણ${m.timeTaken?' · '+formatDuration(m.timeTaken/60):''}</div>
+    ${(m.subjectMarks&&m.subjectMarks.length)?`<button class="btn btn-sm btn-secondary mt-8" onclick="openMockAnalysis('${m.id}')">📊 એનાલિસિસ</button>`:''}
+  </div>`;
+}
+function mockSummaryRow(m){
+  const pct = m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0;
+  return `<div class="item cursor-default"><span>${formatDate(m.date)}</span><span class="badge ${pct>=60?'badge-success':'badge-warning'}">${m.obtainedMarks}/${m.totalMarks} (${pct}%)</span></div>`;
+}
+let mockFormRows = [];
+let mockFormMode = 'full';
+let mockFormEditId = null;
+function openMockForm(id){
+  const exam = getActiveExam();
+  if(!exam){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
+  if(!id){
+    openSheet(`
+      <h3>નવો મોક ટેસ્ટ 📝</h3>
+      <div class="ink-dim" style="margin-bottom:14px;">ટેસ્ટ કયા પ્રકારની છે?</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button class="btn btn-primary" style="padding:16px;" onclick="openMockFormBody(null,'single')">📗 એક વિષયની ટેસ્ટ</button>
+        <button class="btn btn-secondary" style="padding:16px;" onclick="openMockFormBody(null,'full')">📚 પૂરી પરીક્ષા (બધા વિષય)</button>
+      </div>
+    `);
+    return;
+  }
+  const m = DB.mockTests.find(x=>x.id===id);
+  let mode = m.mode;
+  if(!mode) mode = (m.subjectMarks && m.subjectMarks.length>1) ? 'full' : 'single';
+  openMockFormBody(id, mode);
+}
+function openMockFormBody(id, mode){
+  const exam = getActiveExam();
+  const subs = examSubjects(exam.id);
+  const m = id ? DB.mockTests.find(x=>x.id===id) : null;
+  mockFormMode = mode; mockFormEditId = id;
+  if(mode==='single'){
+    let row;
+    if(m && m.subjectMarks && m.subjectMarks[0]) row = m.subjectMarks[0];
+    else if(m) row = {subjectId:(subs[0]?subs[0].id:''), total:m.totalMarks, obtained:m.obtainedMarks};
+    else row = {subjectId:(subs[0]?subs[0].id:''), total:'', obtained:''};
+    mockFormRows = [Object.assign({}, row)];
+  } else {
+    mockFormRows = (m && m.subjectMarks && m.subjectMarks.length) ? m.subjectMarks.map(x=>Object.assign({},x)) : [{subjectId:(subs[0]?subs[0].id:''), total:'', obtained:''}];
+  }
+  renderMockFormSheet(id, mode, m, subs);
+}
+function renderMockFormSheet(id, mode, m, subs){
+  openSheet(`
+    <h3>${m?'મોક ટેસ્ટ એડિટ':'નવો મોક ટેસ્ટ'} ${mode==='single'?'📗':'📚'}</h3>
+    <div class="field"><label>તારીખ</label><input type="date" id="f_date" value="${m?m.date:todayStr()}"></div>
+    <div class="field"><label>સમય</label>${durationPickerHTML('f_time', m?Math.round((m.timeTaken||0)*60):0)}</div>
+    <label style="font-size:12.5px;color:var(--ink-dim);font-weight:600;">${mode==='single'?'વિષય':'વિષયો'}</label>
+    <div id="mockRowsWrap" class="mt-8">${mockFormRows.map((r,i)=>mockFormRowHTML(r,i,subs,mode)).join('')}</div>
+    ${mode==='full'?`<button class="btn btn-sm btn-secondary mt-8" onclick="addMockFormRow()">+ વિષય ઉમેરો</button>`:''}
+    <div class="sheet-actions">
+      ${id?`<button class="btn btn-danger" onclick="deleteMock('${id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveMock(${id?`'${id}'`:'null'})">સેવ કરો</button>
+    </div>
+  `);
+}
+function mockFormRowHTML(r, i, subs, mode){
+  return `<div class="field" style="display:flex;gap:6px;align-items:center;">
+    <select id="mrow_subj_${i}" style="flex:1.4;">
+      ${subs.map(s=>`<option value="${s.id}" ${r.subjectId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
+    </select>
+    <input type="number" id="mrow_total_${i}" placeholder="કુલ" value="${r.total!==''&&r.total!=null?r.total:''}" style="width:62px;">
+    <input type="number" id="mrow_obt_${i}" placeholder="ગુણ" value="${r.obtained!==''&&r.obtained!=null?r.obtained:''}" style="width:62px;">
+    ${mode==='full' && (mockFormRows.length>1) ? `<button class="btn btn-sm btn-danger" onclick="removeMockFormRow(${i})">🗑</button>` : ''}
+  </div>`;
+}
+function syncMockFormRowsFromDOM(){
+  mockFormRows.forEach((r,i)=>{
+    const subjEl=document.getElementById('mrow_subj_'+i);
+    const totEl=document.getElementById('mrow_total_'+i);
+    const obtEl=document.getElementById('mrow_obt_'+i);
+    if(subjEl) r.subjectId=subjEl.value;
+    if(totEl) r.total=totEl.value;
+    if(obtEl) r.obtained=obtEl.value;
+  });
+}
+function addMockFormRow(){
+  syncMockFormRowsFromDOM();
+  const exam = getActiveExam(); const subs = examSubjects(exam.id);
+  mockFormRows.push({subjectId:(subs[0]?subs[0].id:''), total:'', obtained:''});
+  renderMockFormSheet(mockFormEditId, mockFormMode, mockFormEditId?DB.mockTests.find(x=>x.id===mockFormEditId):null, subs);
+}
+function removeMockFormRow(i){
+  syncMockFormRowsFromDOM();
+  mockFormRows.splice(i,1);
+  const exam = getActiveExam(); const subs = examSubjects(exam.id);
+  renderMockFormSheet(mockFormEditId, mockFormMode, mockFormEditId?DB.mockTests.find(x=>x.id===mockFormEditId):null, subs);
+}
+function saveMock(id){
+  const exam = getActiveExam();
+  const date = val('f_date'), time = Math.round(durationPickerSeconds('f_time')/60);
+  if(!date){ toast('તારીખ ભરો','error'); return; }
+  const rows = [];
+  for(let i=0;i<mockFormRows.length;i++){
+    const subjEl=document.getElementById('mrow_subj_'+i), totEl=document.getElementById('mrow_total_'+i), obtEl=document.getElementById('mrow_obt_'+i);
+    const total = parseFloat(totEl.value), obtained = parseFloat(obtEl.value);
+    if(!subjEl.value || !total || total<=0 || isNaN(obtained) || obtained<0 || obtained>total){ toast('દરેક વિષયના માન્ય ગુણ ભરો','error'); return; }
+    rows.push({subjectId:subjEl.value, total, obtained});
+  }
+  if(!rows.length){ toast('ઓછામાં ઓછો એક વિષય ઉમેરો','error'); return; }
+  const totalMarks = rows.reduce((a,b)=>a+b.total,0);
+  const obtainedMarks = rows.reduce((a,b)=>a+b.obtained,0);
+  let newId = id;
+  if(id){ const m=DB.mockTests.find(x=>x.id===id); Object.assign(m,{date,totalMarks,obtainedMarks,timeTaken:time,subjectMarks:rows,mode:mockFormMode}); }
+  else { newId = uid(); DB.mockTests.push({id:newId,examId:exam.id,date,totalMarks,obtainedMarks,timeTaken:time,subjectMarks:rows,mode:mockFormMode}); }
+  save(); renderMain(); toast('સેવ થયું');
+  openMockAnalysis(newId);
+}
+function deleteMock(id){ if(!confirm('ડિલીટ કરવું છે?'))return; DB.mockTests=DB.mockTests.filter(x=>x.id!==id); save(); closeSheet(); renderMain(); toast('ડિલીટ થયું'); }
+function openMockAnalysis(id){
+  const m = DB.mockTests.find(x=>x.id===id);
+  if(!m) return;
+  const pct = m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0;
+  const overallCls = pct>=70?'badge-success':(pct>=40?'badge-warning':'badge-danger');
+  const rows = (m.subjectMarks||[]).map(sm=>{
+    const s = DB.subjects.find(x=>x.id===sm.subjectId);
+    const p = sm.total ? Math.round(sm.obtained/sm.total*100) : 0;
+    const cls = p>=70?'badge-success':(p>=40?'badge-warning':'badge-danger');
+    return `<div class="item cursor-default"><span>${s?esc(s.name):'વિષય'}</span><span class="badge ${cls}">${sm.obtained}/${sm.total} (${p}%)</span></div>`;
+  }).join('');
+  openSheet(`
+    <h3>એનાલિસિસ 📊 — ${formatDate(m.date)}</h3>
+    <div class="card" style="background:var(--surface2); margin-bottom:14px;">
+      <div class="item item-static"><b>ઓવરઓલ</b><span class="badge ${overallCls}">${m.obtainedMarks}/${m.totalMarks} (${pct}%)</span></div>
+    </div>
+    ${rows || emptyRow('વિષય-વાઈઝ ડેટા નથી')}
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="openMockForm('${m.id}')">✎ એડિટ</button>
+      <button class="btn btn-primary btn-block" onclick="closeSheet();">બંધ કરો</button>
+    </div>
+  `);
+}
+
+/* ===================== REVISION ===================== */
+function revisionRow(r, compact){
+  const isOverdue = r.status==='pending' && r.dueDate<todayStr();
+  const highlight = (highlightRevisionId===r.id) ? ' row-highlight' : '';
+  let label = revisionEntityLabel(r);
+  if(compact){
+    const st = r.subtopicId ? DB.subtopics.find(x=>x.id===r.subtopicId) : null;
+    label = st ? st.name : 'સંપૂર્ણ ચેપ્ટર';
+  }
+  return `<div class="item${highlight} cursor-default" id="revision-${r.id}">
+    <span>${esc(label)}</span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span class="badge ${r.status==='completed'?'badge-success':(isOverdue?'badge-danger':'badge-warning')}" onclick="toggleRevisionStatus('${r.id}')">${r.status==='completed'?'પૂર્ણ ✓':(isOverdue?'બાકી ⚠️':'બાકી')}</span>
+      <button class="btn btn-sm btn-danger" onclick="deleteRevision('${r.id}')">🗑️</button>
+    </span>
+  </div>`;
+}
+function toggleRevisionStatus(id){
+  const r = DB.revisions.find(x=>x.id===id);
+  if(!r) return;
+  if(r.status==='completed'){
+    if(!confirm('આ રિવિઝન "પૂર્ણ" માંથી "બાકી" કરવું છે?')) return;
+    r.status='pending'; delete r.completedDate;
+    save(); renderMain(); toast('રિવિઝન બાકી તરીકે માર્ક થયું');
+  } else {
+    if(!confirm('આ રિવિઝન પૂર્ણ કરવું છે?')) return;
+    r.status='completed'; r.completedDate=todayStr();
+    save(); renderMain(); toast('રિવિઝન પૂર્ણ 🎉');
+  }
+}
+function deleteRevision(id){
+  if(!confirm('આ રિવિઝન ડિલીટ કરવું છે?'))return;
+  DB.revisions = DB.revisions.filter(x=>x.id!==id);
+  save(); renderMain();
+  toast('ડિલીટ થયું');
+}
+
+/* ===================== GOALS ===================== */
+/* ===================== CALENDAR ===================== */
+function renderCalendar(){
+  const firstDay = new Date(calYear, calMonth, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const monthName = firstDay.toLocaleDateString('gu-IN', {month:'long', year:'numeric'});
+  let cells = '';
+  for(let i=0;i<startWeekday;i++) cells += `<div class="cal-cell empty"></div>`;
+  const calSelDate = calSelectedDate || todayStr();
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dots = dotsForDate(dateStr);
+    const isToday = dateStr===todayStr();
+    const isSelected = dateStr===calSelDate && !isToday;
+    cells += `<div class="cal-cell ${isToday?'today':''} ${isSelected?'selected':''}" onclick="calSelectedDate='${dateStr}'; renderMain();">
+      <span>${d}</span>
+      <div class="cal-dots-row">
+        ${dots.hasStudy?'<div class="cal-dot cal-dot-blue"></div>':''}
+        ${dots.hasRevisionDue?'<div class="cal-dot cal-dot-yellow"></div>':''}
+        ${dots.hasOverdueRevision?'<div class="cal-dot cal-dot-red"></div>':''}
+      </div>
+    </div>`;
+  }
+  const sel = calSelectedDate || todayStr();
+  return `
+   <div class="cal-date-row" onclick="calGridExpanded=!calGridExpanded; renderMain();">
+     <span>📅 ${formatDate(sel)}</span>
+     <span class="ink-dim">${calGridExpanded?'▲':'▼'}</span>
+   </div>
+   ${calGridExpanded ? `
+   <div class="cal-header">
+     <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderMain();">‹</button>
+     <b>${monthName}</b>
+     <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderMain();">›</button>
+   </div>
+   <div class="cal-weekdays"><div>ર</div><div>સો</div><div>મં</div><div>બુ</div><div>ગુ</div><div>શુ</div><div>શ</div></div>
+   <div class="cal-grid">${cells}</div>
+   ` : ''}
+   <div style="margin-top:16px;">
+     <div class="section-header" style="margin-top:0;">
+       <h3>${formatDate(sel)}</h3>
+       ${calMode==='study'?`<button class="btn btn-sm btn-primary" onclick="openStudyForm(null,'${sel}')">+ ઉમેરો</button>`:''}
+     </div>
+     <div style="display:flex; gap:8px; margin-bottom:10px;">
+       <button class="btn btn-sm ${calMode==='study'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='study'; renderMain();">અભ્યાસ 📖</button>
+       <button class="btn btn-sm ${calMode==='revision'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='revision'; renderMain();">રિવિઝન 🔁</button>
+     </div>
+     ${calendarDayDetailHTML(sel)}
+   </div>
+  `;
+}
+function dotsForDate(dateStr){
+  const hasStudy = studyLogsForActiveExam().some(l=>l.date===dateStr);
+  const dueRevisions = revisionsForActiveExam().filter(r=>r.dueDate===dateStr);
+  const hasRevisionDue = dueRevisions.length>0;
+  const today = todayStr();
+  const hasOverdueRevision = dateStr<today && dueRevisions.some(r=>r.status==='pending');
+  return {hasStudy, hasRevisionDue, hasOverdueRevision};
+}
+function groupSubjectIdsBySection(subjectIds){
+  const groups = [];
+  const groupIndex = {};
+  subjectIds.forEach(sid=>{
+    const subj = DB.subjects.find(x=>x.id===sid);
+    const secId = subj && subj.sectionId ? subj.sectionId : null;
+    const key = secId || '__none__';
+    if(!(key in groupIndex)){
+      groupIndex[key] = groups.length;
+      groups.push({sec: secId?DB.sections.find(x=>x.id===secId):null, subjectIds:[]});
+    }
+    groups[groupIndex[key]].subjectIds.push(sid);
+  });
+  return groups;
+}
+function renderSectionGroups(groups, subjectCardHTML){
+  return groups.map(g=>{
+    const cards = g.subjectIds.map(sid=>subjectCardHTML(sid)).join('');
+    if(g.sec) return `<div class="mt-14"><div class="ink-dim fw-700 fs-125 section-group-label">📂 ${esc(g.sec.name)}</div>${cards}</div>`;
+    return cards;
+  }).join('');
+}
+function calendarDayDetailHTML(dateStr){
+  const activeIds = activeExamSubjectIds();
+  if(calMode==='study'){
+    const logs = DB.studyLogs.filter(l=>l.date===dateStr && activeIds.includes(l.subjectId));
+    const loggedSubIds = new Set(logs.map(l=>l.subjectId));
+    const exam = getActiveExam();
+    const suggestions = exam ? timetableSuggestionsForDate(exam.id, dateStr).filter(sg=>!loggedSubIds.has(sg.subjectId)) : [];
+    const suggestionsHTML = suggestions.length ? `<div class="card">
+      <div class="ink-dim fw-700 fs-125 mb-6">📋 ટાઈમટેબલ પ્રમાણે</div>
+      ${suggestions.map(sg=>`<div class="item" onclick="openStudyForm(null,'${dateStr}',{subjectId:'${sg.subjectId}',topicId:${sg.current?`'${sg.current.id}'`:'null'}})">
+        <span>${esc(sg.subjectName)}${sg.current?` <span class="ink-dim">· ${esc(sg.current.name)}</span>`:''}</span>
+        <span class="btn btn-sm btn-primary">▶️ શરૂ કરો</span>
+      </div>`).join('')}
+    </div>` : '';
+    const bySubject = {};
+    logs.forEach(l=>{
+      if(!bySubject[l.subjectId]) bySubject[l.subjectId] = {entries:[]};
+      bySubject[l.subjectId].entries.push(l);
+    });
+    const subjectIds = Object.keys(bySubject);
+    if(!subjectIds.length) return suggestionsHTML + emptyRow('આ દિવસે કોઈ અભ્યાસ નથી');
+    const subjectCardHTML = (sid)=>{
+      const grouped = groupStudyLogsByChapter(bySubject[sid].entries);
+      return `<div class="card">
+        <div class="item item-static">
+          <b>${esc(subjectName(sid))}</b>
+        </div>
+        ${grouped.chapterGroups.map(g=>studyChapterAccordion(g.topicId, g.items)).join('')}
+        <div class="mt-8">${grouped.freeform.map(it=>`<div class="item" onclick="openStudyForm('${it.logId}')"><span>${esc(it.label)}</span></div>`).join('')}</div>
+      </div>`;
+    };
+    return suggestionsHTML + renderSectionGroups(groupSubjectIdsBySection(subjectIds), subjectCardHTML);
+  }
+  const revs = revisionsForActiveExam().filter(r=>r.dueDate===dateStr);
+  const bySubject = {};
+  revs.forEach(r=>{
+    const sid = r.subjectId || 'unknown';
+    (bySubject[sid] = bySubject[sid]||[]).push(r);
+  });
+  const subjectIds = Object.keys(bySubject);
+  let topicCards;
+  if(!subjectIds.length){
+    topicCards = emptyRow('આ દિવસે કોઈ ટોપિક રિવિઝન નથી');
+  } else {
+    const subjectCardHTML = (sid)=>{
+      const chapterGroups = groupRevisionsByChapter(bySubject[sid]);
+      return `<div class="card">
+        <div class="item item-static">
+          <b>${esc(subjectName(sid))}</b>
+        </div>
+        ${chapterGroups.map(g=>revisionChapterAccordion(g.topicId, g.items)).join('')}
+      </div>`;
+    };
+    topicCards = renderSectionGroups(groupSubjectIdsBySection(subjectIds), subjectCardHTML);
+  }
+  return topicCards;
+}
+function groupStudyLogsByChapter(entries){
+  const byChapter = {};
+  const order = [];
+  const freeform = [];
+  entries.forEach(l=>{
+    const topicIds = (l.topicIds && l.topicIds.length) ? l.topicIds : (l.topicId ? [l.topicId] : []);
+    if(!topicIds.length){
+      freeform.push({label: l.chapters || 'સામાન્ય', logId: l.id});
+      return;
+    }
+    topicIds.forEach(tid=>{
+      const subNames = (l.subtopicIds||[]).map(sid=>{ const st=DB.subtopics.find(x=>x.id===sid); return (st && st.topicId===tid) ? st.name : null; }).filter(Boolean);
+      if(!byChapter[tid]){ byChapter[tid]=[]; order.push(tid); }
+      if(subNames.length) subNames.forEach(sn=>byChapter[tid].push({label:sn, logId:l.id}));
+      else byChapter[tid].push({label:'સંપૂર્ણ ચેપ્ટર', logId:l.id});
+    });
+  });
+  return {chapterGroups: order.map(tid=>({topicId:tid, items:byChapter[tid]})), freeform};
+}
+function studyChapterAccordion(topicId, items){
+  const t = DB.topics.find(x=>x.id===topicId);
+  const wrapId = 'stch_'+topicId+'_'+items[0].logId;
+  const shouldExpand = isAccordionOpen(wrapId);
+  return `<div class="mt-8">
+    <div class="item cursor-pointer" onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;">
+      <span>${t?esc(t.name):'ટોપિક'}</span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span class="badge badge-primary">${items.length}</span>
+        <span class="accordion-caret ink-dim">${shouldExpand?'▲':'▼'}</span>
+      </span>
+    </div>
+    <div id="${wrapId}" class="${shouldExpand?'':'hidden'}" style="padding-left:6px;">
+      ${items.map(it=>`<div class="item" onclick="openStudyForm('${it.logId}')"><span>${esc(it.label)}</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+function groupRevisionsByChapter(list){
+  const byChapter = {};
+  const order = [];
+  list.forEach(r=>{
+    const key = r.topicId || 'unknown';
+    if(!byChapter[key]){ byChapter[key]=[]; order.push(key); }
+    byChapter[key].push(r);
+  });
+  return order.map(topicId=>({topicId, items:byChapter[topicId]}));
+}
+function revisionChapterAccordion(topicId, items){
+  const t = DB.topics.find(x=>x.id===topicId);
+  const doneCount = items.filter(r=>r.status==='completed').length;
+  const wrapId = 'revch_'+topicId+'_'+items[0].id;
+  const shouldExpand = isAccordionOpen(wrapId) || items.some(r=>r.id===highlightRevisionId);
+  if(shouldExpand) openAccordionIds.add(wrapId);
+  return `<div class="mt-8">
+    <div class="item cursor-pointer" onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;">
+      <span>${t?esc(t.name):'ટોપિક'}</span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span class="badge ${doneCount===items.length?'badge-success':'badge-warning'}">${doneCount}/${items.length}</span>
+        <span class="accordion-caret ink-dim">${shouldExpand?'▲':'▼'}</span>
+      </span>
+    </div>
+    <div id="${wrapId}" class="${shouldExpand?'':'hidden'}" style="padding-left:6px;">
+      ${items.map(r=>revisionRow(r,true)).join('')}
+    </div>
+  </div>`;
+}
+let openAccordionIds = new Set();
+function isAccordionOpen(wrapId){ return openAccordionIds.has(wrapId); }
+function toggleAccordion(wrapId, caretEl){
+  const el = document.getElementById(wrapId);
+  if(!el) return;
+  const nowHidden = el.classList.toggle('hidden');
+  if(nowHidden) openAccordionIds.delete(wrapId); else openAccordionIds.add(wrapId);
+  if(caretEl) caretEl.textContent = nowHidden ? '▼' : '▲';
+}
+
+/* ===================== TIMETABLE ===================== */
+const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
+const DAY_LABELS = {mon:'સોમ',tue:'મંગળ',wed:'બુધ',thu:'ગુરુ',fri:'શુક્ર',sat:'શનિ',sun:'રવિ'};
+let ttSelectedDay = null;
+let ttMode = 'time';
+function todayDayKey(){
+  const map = ['sun','mon','tue','wed','thu','fri','sat'];
+  return map[new Date().getDay()];
+}
+function formatTime12(t){
+  if(!t) return '';
+  const [h,m] = t.split(':').map(Number);
+  const period = h>=12 ? 'PM' : 'AM';
+  let h12 = h%12; if(h12===0) h12=12;
+  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
+function timeDurationLabel(start, end){
+  const [sh,sm] = start.split(':').map(Number);
+  const [eh,em] = end.split(':').map(Number);
+  let mins = (eh*60+em) - (sh*60+sm);
+  if(mins<0) mins += 24*60;
+  const h = Math.floor(mins/60), m = mins%60;
+  return `${h} કલાક ${m} મિનિટ`;
+}
+function timetableForDay(examId, day){
+  const subIds = examSubjects(examId).map(s=>s.id);
+  return DB.timetable.filter(t=>t.day===day && subIds.includes(t.subjectId)).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+}
+function currentOrNextTopic(subjectId){
+  const topics = subjectTopics(subjectId);
+  let t = topics.find(x=>x.status==='studying');
+  if(t) return t;
+  return topics.find(x=>x.status!=='completed') || null;
+}
+function subjectRevisionDueToday(subjectId){
+  const today = todayStr();
+  const revs = DB.revisions.filter(r=>r.subjectId===subjectId && r.status==='pending' && r.dueDate<=today);
+  if(!revs.length) return null;
+  revs.sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const t = DB.topics.find(x=>x.id===revs[0].topicId);
+  return t ? t.name : null;
+}
+function timetableBlockNow(){
+  const exam = getActiveExam();
+  if(!exam) return null;
+  const day = todayDayKey();
+  const now = new Date();
+  const nowStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const blocks = timetableForDay(exam.id, day);
+  return blocks.find(b=>b.startTime<=nowStr && nowStr<b.endTime) || null;
+}
+function dashboardNowCard(){
+  const block = timetableBlockNow();
+  if(!block) return '';
+  const s = DB.subjects.find(x=>x.id===block.subjectId);
+  if(!s) return '';
+  const sec = s.sectionId ? DB.sections.find(x=>x.id===s.sectionId) : null;
+  const curTopic = currentOrNextTopic(s.id);
+  const revTopicName = subjectRevisionDueToday(s.id);
+  return `<div class="card" style="background:var(--surface2); cursor:pointer;" onclick="showTab('timetable')">
+    <div class="item item-static">
+      <span class="badge badge-primary">🔴 હમણાં</span>
+      <span class="ink-dim fs-12">${formatTime12(block.startTime)} - ${formatTime12(block.endTime)}</span>
+    </div>
+    <div style="margin-top:8px; font-size:15px; font-weight:800;">${sec?`<span class="ink-dim" style="font-weight:600; font-size:12px; display:block;">📂 ${esc(sec.name)}</span>`:''}${esc(s.name)}</div>
+    ${curTopic ? `<div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:8px;">
+      <span style="font-size:13.5px;">${esc(curTopic.name)}</span>
+      <span class="badge ${curTopic.status==='studying'?'badge-warning':'badge-grey'}">${curTopic.status==='studying'?'ચાલુ 🟡':'આગળનો 🔴'}</span>
+    </div>` : `<div class="mt-8"><span class="badge badge-success">બધા ટોપિક પૂર્ણ 🎉</span></div>`}
+    ${revTopicName ? `<div style="margin-top:6px; display:flex; align-items:center; justify-content:space-between; gap:6px;"><span style="font-size:13px;">${esc(revTopicName)}</span><span class="badge badge-danger">🔁 રિવિઝન</span></div>` : ''}
+  </div>`;
+}
+function timetableSuggestionsForDate(examId, dateStr){
+  const day = dayKeyForDate(dateStr);
+  const subIds = new Set();
+  timetableForDay(examId, day).forEach(b=>subIds.add(b.subjectId));
+  chapterTimetableForDay(examId, day).forEach(e=>subIds.add(e.subjectId));
+  return Array.from(subIds).map(sid=>{
+    const s = DB.subjects.find(x=>x.id===sid);
+    if(!s) return null;
+    const current = currentOrNextTopic(sid);
+    return {subjectId:sid, subjectName:s.name, current};
+  }).filter(Boolean);
+}
+function dayKeyForDate(dateStr){
+  const map = ['sun','mon','tue','wed','thu','fri','sat'];
+  const d = new Date(dateStr+'T00:00:00');
+  return map[d.getDay()];
+}
+function renderTimetable(){
+  const exam = getActiveExam();
+  if(!exam){
+    return `<button class="btn btn-sm btn-secondary" onclick="showTab(lastMainTab);">← પાછા</button>
+    <div class="mt-10">${emptyState('📋','પહેલા પરીક્ષા ઉમેરો','ટાઈમટેબલ બનાવવા માટે પહેલા એક પરીક્ષા સિલેક્ટ કરો.','પરીક્ષા ઉમેરો','openExamForm(null)')}</div>`;
+  }
+  if(!ttSelectedDay) ttSelectedDay = todayDayKey();
+  const modeToggle = `<div style="display:flex; gap:8px; margin:10px 0 12px 0;">
+    <button class="btn btn-sm ${ttMode==='time'?'btn-primary':'btn-secondary'} flex-1" onclick="ttMode='time'; renderMain();">⏰ સમય પ્રમાણે</button>
+    <button class="btn btn-sm ${ttMode==='chapter'?'btn-primary':'btn-secondary'} flex-1" onclick="ttMode='chapter'; renderMain();">📖 ચેપ્ટર પ્રમાણે</button>
+  </div>`;
+  if(ttMode==='chapter'){
+    const chapEntries = chapterTimetableForDay(exam.id, ttSelectedDay);
+    return `
+     <button class="btn btn-sm btn-secondary" onclick="showTab(lastMainTab);">← પાછા</button>
+     <div class="section-header" style="margin-top:10px; margin-bottom:0;">
+       <h2 class="m-0">ટાઈમટેબલ 📋</h2>
+       <span class="flex-gap-6">
+         ${chapEntries.length>1?`<button class="btn btn-sm btn-secondary" onclick="openChapterTimetableReorder()">ક્રમ બદલો</button>`:''}
+         <button class="btn btn-primary btn-sm" onclick="openChapterTimetableForm(null)">+ ઉમેરો</button>
+       </span>
+     </div>
+     ${modeToggle}
+     <div class="tt-day-tabs">${DAY_KEYS.map(d=>`<button class="tt-day-btn ${ttSelectedDay===d?'active':''}" onclick="ttSelectedDay='${d}'; renderMain();">${DAY_LABELS[d]}${d===todayDayKey()?' •':''}</button>`).join('')}</div>
+     <div class="mt-12">
+       ${chapEntries.length ? chapEntries.map(e=>chapterQueueCard(e)).join('') : emptyState('📖', DAY_LABELS[ttSelectedDay]+'વારે કંઈ નથી', 'આ વારે વિષય ઉમેરો','+ ઉમેરો','openChapterTimetableForm(null)')}
+     </div>
+    `;
+  }
+  const blocks = timetableForDay(exam.id, ttSelectedDay);
+  return `
+   <button class="btn btn-sm btn-secondary" onclick="showTab(lastMainTab);">← પાછા</button>
+   <div class="section-header" style="margin-top:10px; margin-bottom:8px;">
+     <h2 class="m-0">ટાઈમટેબલ 📋</h2>
+     <button class="btn btn-primary btn-sm" onclick="openTimetableForm(null)">+ ઉમેરો</button>
+   </div>
+   ${modeToggle}
+   <div class="tt-day-tabs">${DAY_KEYS.map(d=>`<button class="tt-day-btn ${ttSelectedDay===d?'active':''}" onclick="ttSelectedDay='${d}'; renderMain();">${DAY_LABELS[d]}${d===todayDayKey()?' •':''}</button>`).join('')}</div>
+   <div class="mt-12">${blocks.length ? `<div class="mt-12">${blocks.map(b=>timetableRow(b)).join('')}</div>` : `<div class="mt-12">${emptyState('📋', DAY_LABELS[ttSelectedDay]+'વારે કંઈ નથી', 'આ વારનું ટાઈમટેબલ ઉમેરો','+ ઉમેરો','openTimetableForm(null)')}</div>`}</div>
+  `;
+}
+function chapterTimetableForDay(examId, day){
+  const subIds = examSubjects(examId).map(s=>s.id);
+  return DB.chapterTimetable.filter(e=>e.day===day && subIds.includes(e.subjectId));
+}
+function moveChapterTimetableEntry(id, dir){
+  const list = DB.chapterTimetable;
+  const e = list.find(x=>x.id===id);
+  if(!e) return;
+  const groupIdx = [];
+  list.forEach((x,i)=>{ if(x.day===e.day) groupIdx.push(i); });
+  const pos = groupIdx.findIndex(i=>list[i].id===id);
+  const swapPos = pos + dir;
+  if(swapPos<0 || swapPos>=groupIdx.length) return;
+  const i1 = groupIdx[pos], i2 = groupIdx[swapPos];
+  const tmp = list[i1]; list[i1] = list[i2]; list[i2] = tmp;
+  save(); renderMain();
+}
+function openChapterTimetableReorder(){
+  const exam = getActiveExam();
+  if(!exam) return;
+  const entries = chapterTimetableForDay(exam.id, ttSelectedDay);
+  openSheet(`
+    <h3>ક્રમ બદલો — ${DAY_LABELS[ttSelectedDay]}વાર</h3>
+    <div class="scroll-list-sm">${entries.map((e,i)=>{
+      const s = DB.subjects.find(x=>x.id===e.subjectId);
+      return `<div class="item cursor-default">
+        <span>${s?esc(s.name):'?'}</span>
+        <span class="flex-gap-4">
+          <button class="btn btn-sm btn-secondary" ${i===0?'disabled':''} onclick="moveChapterTimetableEntry('${e.id}',-1); openChapterTimetableReorder();">▲</button>
+          <button class="btn btn-sm btn-secondary" ${i===entries.length-1?'disabled':''} onclick="moveChapterTimetableEntry('${e.id}',1); openChapterTimetableReorder();">▼</button>
+        </span>
+      </div>`;
+    }).join('')}</div>
+  `);
+}
+function chapterQueueCard(entry){
+  const s = DB.subjects.find(x=>x.id===entry.subjectId);
+  if(!s){
+    return `<div class="card" style="margin-bottom:12px;">${emptyRow('વિષય મળ્યો નથી')}</div>`;
+  }
+  const topics = subjectTopics(s.id);
+  const total = topics.length;
+  const completedTopics = topics.filter(t=>t.status==='completed');
+  const current = currentOrNextTopic(s.id);
+  const pct = total ? Math.round(completedTopics.length/total*100) : 0;
+  const previewCount = 3;
+  const preview = completedTopics.slice(0, previewCount);
+  const rest = completedTopics.slice(previewCount);
+  const wrapId = 'chq_'+entry.id;
+  const completedHTML = completedTopics.length ? `
+    <div class="ink-dim" style="font-size:12px; margin-top:10px; margin-bottom:4px;">✅ પૂર્ણ થયેલા (${completedTopics.length})</div>
+    ${preview.map(t=>`<div style="padding:5px 0; text-decoration:line-through; color:var(--ink-dim); font-size:13.5px;" onclick="navigateToSubjectTopics('${s.id}','${t.id}')">${esc(t.name)}</div>`).join('')}
+    ${rest.length ? `
+      <div id="${wrapId}" class="hidden">${rest.map(t=>`<div style="padding:5px 0; text-decoration:line-through; color:var(--ink-dim); font-size:13.5px;" onclick="navigateToSubjectTopics('${s.id}','${t.id}')">${esc(t.name)}</div>`).join('')}</div>
+      <div class="ink-dim" style="font-size:12px; margin-top:4px; cursor:pointer; font-weight:700;" onclick="toggleChapterHistory('${wrapId}', this)">▼ ${rest.length} વધુ પૂર્ણ ચેપ્ટર જુઓ</div>
+    ` : ''}
+  ` : '';
+  return `<div class="card" style="margin-bottom:12px;">
+    <div class="item" style="border:none; padding:0; cursor:default;">
+      <b>${esc(s.name)}</b>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span class="ink-dim fs-12">${completedTopics.length}/${total} પૂર્ણ</span>
+        <button class="btn btn-sm btn-danger" onclick="deleteChapterTimetableEntry('${entry.id}')">🗑️</button>
+      </span>
+    </div>
+    <div class="progress-track mt-8"><div class="progress-fill" style="width:${pct}%"></div></div>
+    ${current ? `<div class="item" style="border:none; padding:0; margin-top:10px; cursor:pointer;" onclick="navigateToSubjectTopics('${s.id}','${current.id}')">
+        <span class="ink-dim fs-125">📍 આગામી ચેપ્ટર</span>
+        <span class="badge badge-primary">${esc(current.name)}</span>
+      </div>` : `<div class="mt-10"><span class="badge badge-success">બધા ચેપ્ટર પૂર્ણ 🎉</span></div>`}
+    ${completedHTML}
+  </div>`;
+}
+function toggleChapterHistory(wrapId, linkEl){
+  const el = document.getElementById(wrapId);
+  if(!el) return;
+  const nowHidden = el.classList.toggle('hidden');
+  linkEl.textContent = linkEl.textContent.replace(nowHidden?'▲':'▼', nowHidden?'▼':'▲');
+}
+function openChapterTimetableForm(id){
+  const exam = getActiveExam();
+  if(!exam) return;
+  const sections = examSections(exam.id);
+  if(!sections.length){ toast('પહેલા વિભાગ અને વિષય ઉમેરો','error'); return; }
+  const allSubs = examSubjects(exam.id);
+  if(!allSubs.length){ toast('પહેલા વિષય ઉમેરો','error'); return; }
+  const e = id ? DB.chapterTimetable.find(x=>x.id===id) : null;
+  const existingSubject = e ? DB.subjects.find(x=>x.id===e.subjectId) : null;
+  const initialSectionId = existingSubject ? (existingSubject.sectionId||'') : '';
+  openSheet(`
+    <h3>${e?'એડિટ':'નવો વિષય'} — ${DAY_LABELS[ttSelectedDay]}વાર 📖</h3>
+    <div class="field"><label>વિભાગ</label><select id="f_chtt_section" onchange="updateChapterTimetableSubjectOptions()">
+      ${sections.map(sec=>`<option value="${sec.id}" ${(initialSectionId===sec.id || (!initialSectionId && sec.id===sections[0].id))?'selected':''}>📂 ${esc(sec.name)}</option>`).join('')}
+    </select></div>
+    <div class="field"><label>વિષય</label><select id="f_chtt_subject"></select></div>
+    <div class="sheet-actions">
+      ${e?`<button class="btn btn-danger" onclick="deleteChapterTimetableEntry('${id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveChapterTimetableEntry(${e?`'${id}'`:'null'})">સેવ કરો</button>
+    </div>
+  `);
+  updateChapterTimetableSubjectOptions(e?e.subjectId:null);
+}
+function updateChapterTimetableSubjectOptions(preselectSubjectId){
+  const exam = getActiveExam();
+  const sectionEl = document.getElementById('f_chtt_section');
+  const subjectEl = document.getElementById('f_chtt_subject');
+  if(!exam || !sectionEl || !subjectEl) return;
+  const sectionId = sectionEl.value;
+  const allSubs = examSubjects(exam.id);
+  const subs = allSubs.filter(s=>s.sectionId===sectionId);
+  subjectEl.innerHTML = subs.length ? subs.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('') : `<option value="">આ વિભાગમાં કોઈ વિષય નથી</option>`;
+  if(preselectSubjectId && subs.some(s=>s.id===preselectSubjectId)){
+    subjectEl.value = preselectSubjectId;
+  }
+}
+function saveChapterTimetableEntry(id){
+  const subjectId = val('f_chtt_subject');
+  if(!subjectId){ toast('વિષય પસંદ કરો','error'); return; }
+  const dup = DB.chapterTimetable.find(x=>x.day===ttSelectedDay && x.subjectId===subjectId && x.id!==id);
+  if(dup){ toast('આ વિષય આ વારે પહેલેથી ઉમેરેલો છે','error'); return; }
+  if(id){ const e=DB.chapterTimetable.find(x=>x.id===id); Object.assign(e,{subjectId}); }
+  else DB.chapterTimetable.push({id:uid(), day:ttSelectedDay, subjectId});
+  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+}
+function deleteChapterTimetableEntry(id){
+  if(!confirm('ડિલીટ કરવું છે?'))return;
+  DB.chapterTimetable = DB.chapterTimetable.filter(x=>x.id!==id);
+  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+function timetableRow(b){
+  const s = DB.subjects.find(x=>x.id===b.subjectId);
+  const sec = s && s.sectionId ? DB.sections.find(x=>x.id===s.sectionId) : null;
+  let topicHTML;
+  let curTopic = null;
+  if(!s){
+    topicHTML = `<div class="ink-dim" style="font-size:12.5px; margin-top:6px;">વિષય મળ્યો નથી</div>`;
+  } else {
+    curTopic = currentOrNextTopic(s.id);
+    if(curTopic){
+      const isStudying = curTopic.status==='studying';
+      topicHTML = `<div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:8px;">
+        <span style="font-size:13.5px;">${esc(curTopic.name)}</span>
+        <span class="badge ${isStudying?'badge-warning':'badge-grey'}">${isStudying?'ચાલુ 🟡':'આગળનો 🔴'}</span>
+      </div>`;
+    } else {
+      topicHTML = `<div class="mt-8"><span class="badge badge-success">બધા ટોપિક પૂર્ણ 🎉</span></div>`;
+    }
+  }
+  const subjectBlock = `<div style="margin-top:6px; font-size:14.5px; font-weight:800;">${sec?`<span class="ink-dim" style="font-weight:600; font-size:12px;">📂 ${esc(sec.name)}</span><br>`:''}${s?esc(s.name):'?'}</div>${topicHTML}`;
+  return `<div class="card">
+    <div class="item item-static">
+      <span><b>${formatTime12(b.startTime)} - ${formatTime12(b.endTime)}</b> <span class="ink-dim fs-12">(${timeDurationLabel(b.startTime,b.endTime)})</span></span>
+      <button class="btn btn-sm btn-secondary" onclick="openTimetableForm('${b.id}')">✎</button>
+    </div>
+    ${s ? `<div onclick="navigateToSubjectTopics('${s.id}'${curTopic?`,'${curTopic.id}'`:''})" class="cursor-pointer">${subjectBlock}</div>` : subjectBlock}
+  </div>`;
+}
+function navigateToSection(sectionId){
+  topicDetailId = null;
+  sectionDetailId = sectionId;
+  showTab('exams');
+}
+function navigateToSubjectTopics(subjectId, topicId){
+  const s = DB.subjects.find(x=>x.id===subjectId);
+  if(!s) return;
+  sectionDetailId = s.sectionId || null;
+  topicDetailId = s.id;
+  highlightTopicId = topicId || null;
+  showTab('exams');
+}
+function navigateToRevisionDate(dateStr, revisionId){
+  calSelectedDate = dateStr;
+  highlightRevisionId = revisionId || null;
+  showTab('calendar');
+  calMode = 'revision';
+  renderMain();
+}
+function openTimetableForm(id){
+  const exam = getActiveExam();
+  if(!exam) return;
+  const sections = examSections(exam.id);
+  if(!sections.length){ toast('પહેલા વિભાગ અને વિષય ઉમેરો','error'); return; }
+  const allSubs = examSubjects(exam.id);
+  if(!allSubs.length){ toast('પહેલા વિષય ઉમેરો','error'); return; }
+  const b = id ? DB.timetable.find(x=>x.id===id) : null;
+  const existingSubject = b ? DB.subjects.find(x=>x.id===b.subjectId) : null;
+  const initialSectionId = existingSubject ? (existingSubject.sectionId||'') : '';
+  openSheet(`
+    <h3>${b?'ટાઈમટેબલ એડિટ':'નવો ટાઈમ-બ્લોક'} — ${DAY_LABELS[ttSelectedDay]}વાર ⏰</h3>
+    <div class="field"><label>વિભાગ</label><select id="f_tt_section" onchange="updateTimetableSubjectOptions()">
+      ${sections.map(sec=>`<option value="${sec.id}" ${(initialSectionId===sec.id || (!initialSectionId && sec.id===sections[0].id))?'selected':''}>📂 ${esc(sec.name)}</option>`).join('')}
+    </select></div>
+    <div class="field"><label>વિષય</label><select id="f_tt_subject"></select></div>
+    <div class="field"><label>શરૂઆતનો સમય</label><input type="time" id="f_start" value="${b?b.startTime:'09:00'}"></div>
+    <div class="field"><label>પૂરો થવાનો સમય</label><input type="time" id="f_end" value="${b?b.endTime:'10:00'}"></div>
+    <div class="sheet-actions">
+      ${b?`<button class="btn btn-danger" onclick="deleteTimetableBlock('${id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveTimetableBlock(${b?`'${id}'`:'null'})">સેવ કરો</button>
+    </div>
+  `);
+  updateTimetableSubjectOptions(b?b.subjectId:null);
+}
+function updateTimetableSubjectOptions(preselectSubjectId){
+  const exam = getActiveExam();
+  const sectionEl = document.getElementById('f_tt_section');
+  const subjectEl = document.getElementById('f_tt_subject');
+  if(!exam || !sectionEl || !subjectEl) return;
+  const sectionId = sectionEl.value;
+  const allSubs = examSubjects(exam.id);
+  const subs = allSubs.filter(s=>s.sectionId===sectionId);
+  subjectEl.innerHTML = subs.length ? subs.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('') : `<option value="">આ વિભાગમાં કોઈ વિષય નથી</option>`;
+  if(preselectSubjectId && subs.some(s=>s.id===preselectSubjectId)){
+    subjectEl.value = preselectSubjectId;
+  }
+}
+function saveTimetableBlock(id){
+  const start=val('f_start'), end=val('f_end');
+  const subjectId = val('f_tt_subject');
+  if(!start||!end||!subjectId){ toast('સમય અને વિષય પસંદ કરો','error'); return; }
+  if(id){ const b=DB.timetable.find(x=>x.id===id); Object.assign(b,{startTime:start,endTime:end,subjectId}); }
+  else DB.timetable.push({id:uid(), day:ttSelectedDay, startTime:start, endTime:end, subjectId});
+  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+}
+function deleteTimetableBlock(id){
+  if(!confirm('ડિલીટ કરવું છે?'))return;
+  DB.timetable = DB.timetable.filter(x=>x.id!==id);
+  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+
+/* ===================== SETTINGS ===================== */
+function renderSettings(){
+  const theme = DB.settings.theme;
+  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
+  const weekDayOptions = [['sun','રવિવાર'],['mon','સોમવાર'],['tue','મંગળવાર'],['wed','બુધવાર'],['thu','ગુરુવાર'],['fri','શુક્રવાર'],['sat','શનિવાર']];
+  return `
+   <h2>સેટિંગ્સ ⚙️</h2>
+   ${card('થીમ', `<div class="item cursor-default"><span>ડાર્ક મોડ</span><label class="switch"><input type="checkbox" ${theme==='dark'?'checked':''} onchange="toggleTheme(this.checked)"><span class="slider"></span></label></div>`)}
+   ${card('ટૂલ્સ', `<button class="btn btn-secondary btn-block" onclick="showTab('timetable')">📋 મારું ટાઈમટેબલ</button>`)}
+   ${card('રિવિઝન નિયમ ⚙️', `
+     <div class="field"><label>શરૂઆતના દિવસો (કોમાથી અલગ કરો)</label><input type="text" id="f_rule_days" value="${(rule.startDays||[1,3,7]).join(',')}" placeholder="દા.ત. 1,3,7"></div>
+     <div class="field"><label>કયો વાર કમ્પલસરી?</label><select id="f_rule_weekday">${weekDayOptions.map(([k,l])=>`<option value="${k}" ${rule.weekDay===k?'selected':''}>${l}</option>`).join('')}</select></div>
+     <div class="field"><label>કેટલી વાર (સપ્તાહ) સુધી?</label><input type="number" id="f_rule_count" value="${rule.weeklyCount!=null?rule.weeklyCount:8}"></div>
+     <div class="ink-dim" style="font-size:11.5px; margin-bottom:10px;">શરૂઆતના દિવસો પૂરા થયા પછી, ઉપર પસંદ કરેલા વારે દર અઠવાડિયે, ઉપર આપેલી સંખ્યા સુધી રિવિઝન બનશે. આ ફેરફાર હવે પછી "પૂર્ણ" થતા ટોપિકને જ લાગુ પડશે, જૂના રિવિઝન બદલાશે નહીં.</div>
+     <button class="btn btn-primary btn-block" onclick="saveRevisionRule()">સેવ કરો</button>
+   `)}
+   ${card('ડેટા', `
+     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="exportBackup()">⬇️ બેકઅપ એક્સપોર્ટ કરો</button>
+     <label class="btn btn-secondary btn-block" style="margin-bottom:8px;display:block;text-align:center;">⬆️ બેકઅપ ઇમ્પોર્ટ કરો<input type="file" accept="application/json" style="display:none" onchange="importBackup(event)"></label>
+     <button class="btn btn-danger btn-block" onclick="resetAllData()">🗑️ બધો ડેટા રીસેટ કરો</button>
+   `)}
+   ${card('વિશે', `<div class="ink-dim" style="font-size:13px;line-height:1.7;">ExamPath — સંપૂર્ણ ઓફલાઈન સ્ટડી ટ્રેકર.<br>તમામ ડેટા ફક્ત તમારા મોબાઈલમાં (બ્રાઉઝર સ્ટોરેજ) સેવ થાય છે — ક્યાંય ઈન્ટરનેટ પર મોકલવામાં આવતો નથી. નિયમિત બેકઅપ એક્સપોર્ટ કરવાની ભલામણ છે.</div>`)}
+  `;
+}
+function saveRevisionRule(){
+  const daysRaw = val('f_rule_days');
+  const startDays = daysRaw.split(',').map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n) && n>0).sort((a,b)=>a-b);
+  const weekDay = val('f_rule_weekday') || 'sun';
+  const weeklyCount = Math.max(0, parseInt(val('f_rule_count'),10) || 0);
+  if(!startDays.length){ toast('ઓછામાં ઓછો એક દિવસ ભરો','error'); return; }
+  DB.settings.revisionRule = {startDays, weekDay, weeklyCount};
+  save();
+  toast('રિવિઝન નિયમ સેવ થયો');
+}
+function toggleTheme(isDark){ DB.settings.theme = isDark ? 'dark' : 'light'; save(); applyTheme(); }
+function applyTheme(){ document.documentElement.setAttribute('data-theme', DB.settings.theme || 'light'); }
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(DB,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `exampath-backup-${todayStr()}.json`; a.click();
+  URL.revokeObjectURL(url);
+  toast('બેકઅપ ડાઉનલોડ થયું');
+}
+function importBackup(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const parsed = JSON.parse(e.target.result);
+      DB = Object.assign(defaultData(), parsed);
+      save(); applyTheme(); populateBrand(); populateExamSwitcher(); examDetailId=null; renderMain();
+      toast('બેકઅપ ઇમ્પોર્ટ થયું');
+    }catch(err){ toast('ફાઈલ યોગ્ય નથી','error'); }
+  };
+  reader.readAsText(file);
+}
+function resetAllData(){
+  openSheet(`
+    <h3>⚠️ બધો ડેટા રીસેટ કરો</h3>
+    <div class="ink-dim" style="font-size:13px; margin-bottom:14px; line-height:1.6;">આ ક્રિયાથી તમારી બધી પરીક્ષા, વિભાગ, વિષય, ટોપિક, અભ્યાસ લોગ, રિવિઝન, મોક ટેસ્ટ — બધો ડેટા કાયમ માટે ડિલીટ થઈ જશે. આ ક્રિયા પાછી થઈ શકતી નથી.</div>
+    <div class="field"><label>ખાતરી કરવા માટે નીચે બરાબર <b>DELETE</b> ટાઈપ કરો</label><input type="text" id="f_resetConfirm" placeholder="DELETE" autocomplete="off" oninput="document.getElementById('confirmResetBtn').disabled = (this.value.trim().toUpperCase()!=='DELETE');"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-danger btn-block" id="confirmResetBtn" disabled onclick="confirmResetAllData()">🗑️ કાયમ માટે ડિલીટ કરો</button>
+    </div>
+  `);
+}
+function confirmResetAllData(){
+  const v = (val('f_resetConfirm')||'').trim().toUpperCase();
+  if(v!=='DELETE'){ toast('DELETE બરાબર ટાઈપ કરો','error'); return; }
+  localStorage.removeItem(STORAGE_KEY);
+  DB = defaultData(); save(); examDetailId=null; applyTheme(); populateBrand(); populateExamSwitcher(); renderMain();
+  closeSheet();
+  toast('ડેટા રીસેટ થયો');
+}
+
+/* ===================== AFTER-RENDER CHART HOOKS ===================== */
+function animateDashboardHero(){
+  const ringCircle = document.getElementById('heroRingCircle');
+  if(!ringCircle) return;
+  const ringText = document.getElementById('heroRingPercentText');
+  const daysEl = document.getElementById('heroDaysLeft');
+  const topicsEl = document.getElementById('heroTopicsCompleted');
+  const subsEl = document.getElementById('heroSubjectsCount');
+  const pctTarget = Number(ringCircle.dataset.target||0);
+  const daysTarget = daysEl ? Number(daysEl.dataset.target) : null;
+  const topicsTarget = topicsEl ? Number(topicsEl.dataset.target||0) : 0;
+  const subsTarget = subsEl ? Number(subsEl.dataset.target||0) : 0;
+  const duration = 1200;
+  requestAnimationFrame(()=>{ ringCircle.style.strokeDashoffset = ringCircle.dataset.offset; });
+  const startTime = performance.now();
+  function tick(now){
+    const progress = Math.min(1, (now-startTime)/duration);
+    const eased = 1 - Math.pow(1-progress, 3);
+    if(ringText) ringText.textContent = Math.round(pctTarget*eased) + '%';
+    if(topicsEl) topicsEl.textContent = Math.round(topicsTarget*eased);
+    if(subsEl) subsEl.textContent = Math.round(subsTarget*eased);
+    if(daysEl && daysTarget!==null && daysTarget>=0) daysEl.textContent = Math.round(daysTarget*eased);
+    if(progress<1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+function afterRender(tab){
+  if(tab==='dashboard'){
+    animateDashboardHero();
+  }
+  if(tab==='mock'){
+    const tests = [...mockTestsForActiveExam()].sort((a,b)=>a.date.localeCompare(b.date)).slice(-8);
+    if(tests.length){
+      const labels = tests.map(m=>formatDateShort(m.date));
+      const values = tests.map(m=>m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0);
+      drawBarChart('chartMockTrend', labels, values, getVar('--accent'), v=>v+'%');
+    }
+  }
+  if(tab==='exams'){
+    requestAnimationFrame(()=>{
+      document.querySelectorAll('#main .ring-progress').forEach(el=>{
+        el.style.strokeDashoffset = el.dataset.offset;
+      });
+    });
+    if(highlightTopicId){
+      const targetId = highlightTopicId;
+      highlightTopicId = null;
+      requestAnimationFrame(()=>{
+        const el = document.getElementById('topic-'+targetId);
+        if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+      });
+    }
+  }
+  if(tab==='calendar' && highlightRevisionId){
+    const targetId = highlightRevisionId;
+    highlightRevisionId = null;
+    requestAnimationFrame(()=>{
+      const el = document.getElementById('revision-'+targetId);
+      if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  }
+}
+function populateBrand(){
+  const el = document.getElementById('brandText');
+  if(el) el.textContent = DB.settings.brandName || 'ExamPath';
+  const avatar = document.getElementById('brandAvatar');
+  if(avatar){
+    avatar.innerHTML = DB.settings.photoData ? `<img src="${DB.settings.photoData}" alt="photo">` : '📚';
+  }
+}
+function triggerPhotoUpload(){
+  document.getElementById('brandPhotoInput').click();
+}
+function handleBrandPhoto(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    openCropSheet(e.target.result);
+  };
+  reader.readAsDataURL(file);
+  evt.target.value = '';
+}
+let cropState = null;
+function openCropSheet(dataUrl){
+  const img = new Image();
+  img.onload = function(){
+    openSheet(`
+      <h3>ફોટો ગોઠવો 🖼️</h3>
+      <div id="cropViewport" style="width:100%; max-width:280px; aspect-ratio:1; margin:0 auto 14px auto; border-radius:16px; overflow:hidden; position:relative; background:var(--surface2); touch-action:none; cursor:grab;">
+        <img id="cropImg" src="${dataUrl}" draggable="false" style="position:absolute; left:0; top:0; transform-origin:top left; user-select:none;">
+      </div>
+      <div class="field mb-6">
+        <label>ઝૂમ 🔍</label>
+        <input type="range" id="cropZoom" min="100" max="300" value="100" oninput="onCropZoomChange(this.value)" style="width:100%;">
+      </div>
+      <div class="ink-dim" style="font-size:12px; text-align:center; margin-bottom:6px;">ફોટો ડ્રેગ કરીને ગોઠવો, ઝૂમ સ્લાઇડરથી મોટું-નાનું કરો</div>
+      <div class="sheet-actions">
+        <button class="btn btn-secondary" onclick="cropState=null; closeSheet();">રદ કરો</button>
+        <button class="btn btn-primary btn-block" onclick="saveCroppedPhoto();">સેવ કરો</button>
+      </div>
+    `);
+    setTimeout(()=>initCropViewport(img), 30);
+  };
+  img.src = dataUrl;
+}
+function initCropViewport(img){
+  const viewport = document.getElementById('cropViewport');
+  if(!viewport) return;
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const baseScale = Math.max(vw/img.naturalWidth, vh/img.naturalHeight);
+  cropState = {
+    img, viewportEl: viewport, imgEl: document.getElementById('cropImg'),
+    vw, vh, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
+    baseScale, zoom: 1, offsetX: 0, offsetY: 0, dragging: false,
+    startX: 0, startY: 0, startOffsetX: 0, startOffsetY: 0
+  };
+  const s = cropState;
+  const scale = s.baseScale * s.zoom;
+  s.offsetX = (s.vw - s.naturalWidth*scale)/2;
+  s.offsetY = (s.vh - s.naturalHeight*scale)/2;
+  applyCropTransform();
+  viewport.addEventListener('pointerdown', cropPointerDown);
+  viewport.addEventListener('pointermove', cropPointerMove);
+  viewport.addEventListener('pointerup', cropPointerUp);
+  viewport.addEventListener('pointercancel', cropPointerUp);
+}
+function clampCropOffset(){
+  const s = cropState;
+  const scale = s.baseScale * s.zoom;
+  const dw = s.naturalWidth*scale, dh = s.naturalHeight*scale;
+  s.offsetX = Math.min(0, Math.max(s.vw-dw, s.offsetX));
+  s.offsetY = Math.min(0, Math.max(s.vh-dh, s.offsetY));
+}
+function applyCropTransform(){
+  const s = cropState;
+  const scale = s.baseScale * s.zoom;
+  s.imgEl.style.width = (s.naturalWidth*scale)+'px';
+  s.imgEl.style.height = (s.naturalHeight*scale)+'px';
+  s.imgEl.style.transform = `translate(${s.offsetX}px, ${s.offsetY}px)`;
+}
+function onCropZoomChange(val){
+  if(!cropState) return;
+  cropState.zoom = Number(val)/100;
+  clampCropOffset();
+  applyCropTransform();
+}
+function cropPointerDown(e){
+  if(!cropState) return;
+  cropState.dragging = true;
+  cropState.startX = e.clientX; cropState.startY = e.clientY;
+  cropState.startOffsetX = cropState.offsetX; cropState.startOffsetY = cropState.offsetY;
+  cropState.viewportEl.setPointerCapture(e.pointerId);
+  cropState.viewportEl.style.cursor = 'grabbing';
+}
+function cropPointerMove(e){
+  if(!cropState || !cropState.dragging) return;
+  cropState.offsetX = cropState.startOffsetX + (e.clientX - cropState.startX);
+  cropState.offsetY = cropState.startOffsetY + (e.clientY - cropState.startY);
+  clampCropOffset();
+  applyCropTransform();
+}
+function cropPointerUp(){
+  if(!cropState) return;
+  cropState.dragging = false;
+  cropState.viewportEl.style.cursor = 'grab';
+}
+function saveCroppedPhoto(){
+  if(!cropState) return;
+  const s = cropState;
+  const OUT = 320;
+  const outScale = OUT / s.vw;
+  const scale = s.baseScale * s.zoom;
+  const canvas = document.createElement('canvas');
+  canvas.width = OUT; canvas.height = OUT;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(s.img, s.offsetX*outScale, s.offsetY*outScale, s.naturalWidth*scale*outScale, s.naturalHeight*scale*outScale);
+  DB.settings.photoData = canvas.toDataURL('image/jpeg', 0.88);
+  cropState = null;
+  save(); populateBrand(); closeSheet(); toast('ફોટો સેવ થયો');
+}
+function removeBrandPhoto(){
+  delete DB.settings.photoData;
+  save(); populateBrand(); closeSheet(); toast('ફોટો કાઢી નાખ્યો');
+}
+function openBrandForm(){
+  const photo = DB.settings.photoData;
+  openSheet(`
+    <h3>પ્રોફાઈલ</h3>
+    <div style="display:flex; justify-content:center; margin-bottom:18px;">
+      <div style="width:92px; height:92px; border-radius:50%; overflow:hidden; border:3px solid #D4AF37; background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:36px;">
+        ${photo ? `<img src="${photo}" style="width:100%; height:100%; object-fit:cover;">` : '📚'}
+      </div>
+    </div>
+    <div class="field"><label>હેડરમાં દેખાતું નામ</label><input type="text" id="f_brand" value="${esc(DB.settings.brandName || 'ExamPath')}" placeholder="ExamPath"></div>
+    <div class="sheet-actions">
+      ${photo?`<button class="btn btn-danger" onclick="removeBrandPhoto()">ફોટો કાઢો</button>`:''}
+      <button class="btn btn-secondary" onclick="closeSheet(); triggerPhotoUpload();">ફોટો બદલો</button>
+      <button class="btn btn-primary btn-block" onclick="saveBrandName()">સેવ કરો</button>
+    </div>
+  `);
+}
+function saveBrandName(){
+  const name = val('f_brand') || 'ExamPath';
+  DB.settings.brandName = name;
+  save(); populateBrand(); closeSheet(); toast('સેવ થયું');
+}
+function init(){
+  applyTheme();
+  buildNav();
+  populateBrand();
+  populateExamSwitcher();
+  showTab('dashboard');
+}
+window.addEventListener('DOMContentLoaded', init);
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('service-worker.js').catch(function(e){ console.error('SW register failed', e); });
+  });
+}
+</script>
+</body>
+</html>

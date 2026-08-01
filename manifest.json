@@ -1,0 +1,16 @@
+{
+  "name": "ExamPath — સ્ટડી ટ્રેકર",
+  "short_name": "ExamPath",
+  "description": "પરીક્ષાની તૈયારી માટે સ્ટડી ટ્રેકર",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3F4FA",
+  "theme_color": "#2E3AA8",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
