@@ -1895,6 +1895,8 @@ function dashboardNowCard(){
   </div>`;
 }
 function timetableSuggestionsForDate(examId, dateStr){
+  const diffDays = Math.round((new Date(dateStr+'T00:00:00') - new Date(todayStr()+'T00:00:00')) / 86400000);
+  if(diffDays > 6) return [];
   const day = dayKeyForDate(dateStr);
   const subIds = new Set();
   timetableForDay(examId, day).forEach(b=>subIds.add(b.subjectId));
