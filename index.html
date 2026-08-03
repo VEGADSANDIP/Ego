@@ -809,8 +809,8 @@ function sectionSlideCard(sec){
         ${miniRingSVG(pct)}
         <div style="flex:1; min-width:0;">
           <div style="font-weight:800; font-size:16.5px;">📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}</div>
-          <button class="btn btn-sm btn-secondary mt-8" onclick="event.stopPropagation(); openSectionForm('${sec.id}','${sec.examId}')">✎ વિભાગ એડિટ</button>
         </div>
+        <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="event.stopPropagation(); openSectionForm('${sec.id}','${sec.examId}')">✎</button>
       </div>
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${subs.length} વિષય — વિગત જોવા ટેપ કરો →</div>
   </div>`;
@@ -855,8 +855,8 @@ function subjectSlideCard(s){
         ${miniRingSVG(pct)}
         <div style="flex:1; min-width:0;">
           <div style="font-weight:800; font-size:16.5px;">${esc(s.name)}</div>
-          <button class="btn btn-sm btn-secondary mt-8" onclick="event.stopPropagation(); openSubjectForm('${s.id}','${s.examId}')">✎ વિષય એડિટ</button>
         </div>
+        <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="event.stopPropagation(); openSubjectForm('${s.id}','${s.examId}')">✎</button>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
         <div class="subject-mini-stat"><b>${topics.length}</b><span>કુલ ચેપ્ટર</span></div>
