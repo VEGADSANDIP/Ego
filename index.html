@@ -223,6 +223,72 @@ canvas{width:100%; display:block;}
 .slider:before{position:absolute; content:""; height:19px; width:19px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.3);}
 input:checked + .slider{background:var(--primary);}
 input:checked + .slider:before{transform:translateX(19px);}
+
+/* ===================== RESPONSIVE: TABLET (>=768px) ===================== */
+@media (min-width:768px){
+  .sheet-overlay{ align-items:center; }
+  .sheet{
+    border-radius:20px;
+    max-height:80vh;
+    animation:fadeScaleIn .18s ease-out;
+    box-shadow:0 20px 60px rgba(0,0,0,0.35);
+  }
+}
+@keyframes fadeScaleIn{ from{ transform:scale(0.96); opacity:0; } to{ transform:scale(1); opacity:1; } }
+@media (hover:hover) and (pointer:fine){
+  body{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+  .item:hover{ background:var(--surface2); }
+  .card.cursor-pointer:hover{ box-shadow:0 4px 18px rgba(0,0,0,0.18); }
+  .navbtn:hover{ color:var(--primary); }
+  .btn:hover{ filter:brightness(1.08); }
+}
+
+/* ===================== RESPONSIVE: DESKTOP (>=1024px) ===================== */
+@media (min-width:1024px){
+  body{ display:flex; align-items:center; justify-content:center; }
+  .app-shell{
+    max-width:1100px;
+    width:100%;
+    height:92vh;
+    margin:4vh auto;
+    border-radius:20px;
+    display:grid;
+    grid-template-columns:220px 1fr;
+    grid-template-rows:auto 1fr;
+    grid-template-areas:
+      "nav topbar"
+      "nav main";
+  }
+  .topbar{ grid-area:topbar; }
+  .main{ grid-area:main; padding:22px 28px; }
+  .bottomnav{
+    grid-area:nav;
+    flex-direction:column;
+    justify-content:flex-start;
+    align-items:stretch;
+    width:220px;
+    height:100%;
+    border-top:none;
+    border-right:1px solid var(--border);
+    overflow-y:auto;
+    padding:14px 0;
+    gap:2px;
+  }
+  .navbtn{
+    flex-direction:row;
+    justify-content:flex-start;
+    gap:12px;
+    padding:11px 20px;
+    min-width:0;
+    border-radius:0 999px 999px 0;
+    margin-right:10px;
+  }
+  .navbtn.active{ background:var(--surface2); }
+  .navicon{ font-size:20px; }
+  .navlabel{ font-size:13px; }
+  .stat-grid{ grid-template-columns:repeat(4,1fr); }
+  .subject-list{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+}
 </style>
 </head>
 <body>
