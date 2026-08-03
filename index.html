@@ -223,72 +223,6 @@ canvas{width:100%; display:block;}
 .slider:before{position:absolute; content:""; height:19px; width:19px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.3);}
 input:checked + .slider{background:var(--primary);}
 input:checked + .slider:before{transform:translateX(19px);}
-
-/* ===================== RESPONSIVE: TABLET (>=768px) ===================== */
-@media (min-width:768px){
-  .sheet-overlay{ align-items:center; }
-  .sheet{
-    border-radius:20px;
-    max-height:80vh;
-    animation:fadeScaleIn .18s ease-out;
-    box-shadow:0 20px 60px rgba(0,0,0,0.35);
-  }
-}
-@keyframes fadeScaleIn{ from{ transform:scale(0.96); opacity:0; } to{ transform:scale(1); opacity:1; } }
-@media (hover:hover) and (pointer:fine){
-  body{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
-  .item:hover{ background:var(--surface2); }
-  .card.cursor-pointer:hover{ box-shadow:0 4px 18px rgba(0,0,0,0.18); }
-  .navbtn:hover{ color:var(--primary); }
-  .btn:hover{ filter:brightness(1.08); }
-}
-
-/* ===================== RESPONSIVE: DESKTOP (>=1024px) ===================== */
-@media (min-width:900px){
-  body{ display:flex; align-items:center; justify-content:center; }
-  .app-shell{
-    max-width:1100px;
-    width:100%;
-    height:92vh;
-    margin:4vh auto;
-    border-radius:20px;
-    display:grid;
-    grid-template-columns:220px 1fr;
-    grid-template-rows:auto 1fr;
-    grid-template-areas:
-      "nav topbar"
-      "nav main";
-  }
-  .topbar{ grid-area:topbar; }
-  .main{ grid-area:main; padding:22px 28px; }
-  .bottomnav{
-    grid-area:nav;
-    flex-direction:column;
-    justify-content:flex-start;
-    align-items:stretch;
-    width:220px;
-    height:100%;
-    border-top:none;
-    border-right:1px solid var(--border);
-    overflow-y:auto;
-    padding:14px 0;
-    gap:2px;
-  }
-  .navbtn{
-    flex-direction:row;
-    justify-content:flex-start;
-    gap:12px;
-    padding:11px 20px;
-    min-width:0;
-    border-radius:0 999px 999px 0;
-    margin-right:10px;
-  }
-  .navbtn.active{ background:var(--surface2); }
-  .navicon{ font-size:20px; }
-  .navlabel{ font-size:13px; }
-  .stat-grid{ grid-template-columns:repeat(4,1fr); }
-  .subject-list{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
-}
 </style>
 </head>
 <body>
@@ -865,19 +799,23 @@ function renderExamDetail(examId){
    ${sections.length ? `<div class="subject-list">${sections.map(sec=>sectionSlideCard(sec)).join('')}</div>` : emptyRow('કોઈ વિભાગ ઉમેર્યો નથી')}
   `;
 }
+function progressCardHeader(pct, titleHTML, editOnClick){
+  return `<div style="display:flex; align-items:center; gap:14px;">
+    ${miniRingSVG(pct)}
+    <div style="flex:1; min-width:0;">
+      <div style="font-weight:800; font-size:16.5px;">${titleHTML}</div>
+    </div>
+    <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="event.stopPropagation(); ${editOnClick}">✎</button>
+  </div>`;
+}
 function sectionSlideCard(sec){
   const subs = sectionSubjects(sec.id);
   let totalTopics=0, completedTopics=0;
   subs.forEach(s=>{ const topics=subjectTopics(s.id); totalTopics+=topics.length; completedTopics+=topics.filter(t=>t.status==='completed').length; });
   const pct = totalTopics ? Math.round(completedTopics/totalTopics*100) : 0;
+  const title = `📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}`;
   return `<div class="card cursor-pointer" onclick="sectionDetailId='${sec.id}'; renderMain();">
-      <div style="display:flex; align-items:center; gap:14px;">
-        ${miniRingSVG(pct)}
-        <div style="flex:1; min-width:0;">
-          <div style="font-weight:800; font-size:16.5px;">📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}</div>
-        </div>
-        <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="event.stopPropagation(); openSectionForm('${sec.id}','${sec.examId}')">✎</button>
-      </div>
+      ${progressCardHeader(pct, title, `openSectionForm('${sec.id}','${sec.examId}')`)}
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${subs.length} વિષય — વિગત જોવા ટેપ કરો →</div>
   </div>`;
 }
@@ -917,13 +855,7 @@ function subjectSlideCard(s){
   const revDone = revs.filter(r=>r.status==='completed').length;
   const revPct = revs.length ? Math.round(revDone/revs.length*100) : 0;
   return `<div class="card cursor-pointer" onclick="topicDetailId='${s.id}'; renderMain();">
-      <div style="display:flex; align-items:center; gap:14px;">
-        ${miniRingSVG(pct)}
-        <div style="flex:1; min-width:0;">
-          <div style="font-weight:800; font-size:16.5px;">${esc(s.name)}</div>
-        </div>
-        <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="event.stopPropagation(); openSubjectForm('${s.id}','${s.examId}')">✎</button>
-      </div>
+      ${progressCardHeader(pct, esc(s.name), `openSubjectForm('${s.id}','${s.examId}')`)}
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
         <div class="subject-mini-stat"><b>${topics.length}</b><span>કુલ ચેપ્ટર</span></div>
         <div class="subject-mini-stat"><b>${topics.length-completed}</b><span>બાકી ચેપ્ટર</span></div>
