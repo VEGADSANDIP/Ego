@@ -1334,20 +1334,10 @@ function subtopicRow(st){
   const doneCount = revs.filter(r=>r.status==='completed').length;
   const wrapId = 'subrev_'+st.id;
   const shouldExpand = isAccordionOpen(wrapId);
-  return `<div class="mt-8">
-    <div class="item cursor-pointer" onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;">
-      <span style="flex:1; padding-right:6px;">${esc(st.name)}</span>
-      <span style="display:flex;align-items:center;gap:6px;">
-        <span class="badge ${st.completed?'badge-success':'badge-grey'}" onclick="event.stopPropagation(); toggleSubtopicComplete('${st.id}')">${st.completed?'પૂર્ણ 🟢':'બાકી 🔴'}</span>
-        ${revs.length ? `<span class="badge badge-warning">${doneCount}/${revs.length}</span>` : ''}
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteSubtopic('${st.id}')">🗑️</button>
-        <span class="accordion-caret ink-dim">${shouldExpand?'▲':'▼'}</span>
-      </span>
-    </div>
-    <div id="${wrapId}" class="${shouldExpand?'':'hidden'}" style="padding-left:6px;">
-      ${revs.length ? `<div class="ink-dim fs-12 mt-8 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}` : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — સબ-ટોપિક પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`}
-    </div>
-  </div>`;
+  const headerHTML = `<span style="flex:1; padding-right:6px;">${esc(st.name)}</span>`;
+  const badgeHTML = `<span class="badge ${st.completed?'badge-success':'badge-grey'}" onclick="event.stopPropagation(); toggleSubtopicComplete('${st.id}')">${st.completed?'પૂર્ણ 🟢':'બાકી 🔴'}</span>${revs.length ? `<span class="badge badge-warning">${doneCount}/${revs.length}</span>` : ''}<button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteSubtopic('${st.id}')">🗑️</button>`;
+  const bodyHTML = revs.length ? `<div class="ink-dim fs-12 mt-8 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}` : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — સબ-ટોપિક પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
+  return renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, shouldExpand, {gap:6});
 }
 function addSingleSubtopic(topicId){
   const name = val('f_new_subtopic');
@@ -1700,18 +1690,18 @@ function calendarDayDetailHTML(dateStr){
     const suggestions = exam ? timetableSuggestionsForDate(exam.id, dateStr).filter(sg=>!loggedSubIds.has(sg.subjectId)) : [];
     const suggWrapId = 'ttsugg_'+dateStr;
     const suggExpand = isAccordionOpen(suggWrapId);
-    const suggestionsHTML = suggestions.length ? `<div class="card">
-      <div class="item cursor-pointer" onclick="toggleAccordion('${suggWrapId}', this.querySelector('.accordion-caret'))" style="border:none; padding:0;">
-        <span class="ink-dim fw-700 fs-125">📋 ટાઈમટેબલ પ્રમાણે (${suggestions.length})</span>
-        <span class="accordion-caret ink-dim">${suggExpand?'▲':'▼'}</span>
-      </div>
-      <div id="${suggWrapId}" class="mt-8 ${suggExpand?'':'hidden'}">
-        ${suggestions.map(sg=>`<div class="item" onclick="openStudyForm(null,'${dateStr}',{subjectId:'${sg.subjectId}',topicId:${sg.current?`'${sg.current.id}'`:'null'}})">
-          <span style="flex:1; min-width:0; padding-right:10px;">${esc(sg.subjectName)}${sg.current?` <span class="ink-dim">· ${esc(sg.current.name)}</span>`:''}</span>
-          <span class="btn btn-sm btn-primary" style="flex-shrink:0; white-space:nowrap;">▶️ શરૂ કરો</span>
-        </div>`).join('')}
-      </div>
-    </div>` : '';
+    const suggBodyHTML = suggestions.map(sg=>`<div class="item" onclick="openStudyForm(null,'${dateStr}',{subjectId:'${sg.subjectId}',topicId:${sg.current?`'${sg.current.id}'`:'null'}})">
+      <span style="flex:1; min-width:0; padding-right:10px;">${esc(sg.subjectName)}${sg.current?` <span class="ink-dim">· ${esc(sg.current.name)}</span>`:''}</span>
+      <span class="btn btn-sm btn-primary" style="flex-shrink:0; white-space:nowrap;">▶️ શરૂ કરો</span>
+    </div>`).join('');
+    const suggestionsHTML = suggestions.length ? `<div class="card">${renderAccordionBlock(
+      suggWrapId,
+      `<span class="ink-dim fw-700 fs-125">📋 ટાઈમટેબલ પ્રમાણે (${suggestions.length})</span>`,
+      '',
+      suggBodyHTML,
+      suggExpand,
+      {wrapperClass:'', headerStyle:'border:none; padding:0;', bodyClass:'mt-8', bodyStyle:''}
+    )}</div>` : '';
     const bySubject = {};
     logs.forEach(l=>{
       if(!bySubject[l.subjectId]) bySubject[l.subjectId] = {entries:[]};
@@ -1774,22 +1764,34 @@ function groupStudyLogsByChapter(entries){
   });
   return {chapterGroups: order.map(tid=>({topicId:tid, items:byChapter[tid]})), freeform};
 }
+function renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, expand, opts){
+  opts = opts || {};
+  const wrapperClass = opts.wrapperClass !== undefined ? opts.wrapperClass : 'mt-8';
+  const headerStyle = opts.headerStyle !== undefined ? opts.headerStyle : 'border:1px solid var(--border); border-radius:10px; padding:8px 10px;';
+  const bodyClass = opts.bodyClass !== undefined ? opts.bodyClass : '';
+  const bodyStyle = opts.bodyStyle !== undefined ? opts.bodyStyle : 'padding-left:6px;';
+  const gap = opts.gap || 8;
+  return `<div class="${wrapperClass}">
+    <div class="item cursor-pointer" onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" style="${headerStyle}">
+      ${headerHTML}
+      <span style="display:flex; align-items:center; gap:${gap}px;">
+        ${badgeHTML||''}
+        <span class="accordion-caret ink-dim">${expand?'▲':'▼'}</span>
+      </span>
+    </div>
+    <div id="${wrapId}" class="${bodyClass}${bodyClass?' ':''}${expand?'':'hidden'}" style="${bodyStyle}">
+      ${bodyHTML}
+    </div>
+  </div>`;
+}
 function studyChapterAccordion(topicId, items){
   const t = DB.topics.find(x=>x.id===topicId);
   const wrapId = 'stch_'+topicId+'_'+items[0].logId;
   const shouldExpand = isAccordionOpen(wrapId);
-  return `<div class="mt-8">
-    <div class="item cursor-pointer" onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;">
-      <span>${t?esc(t.name):'ટોપિક'}</span>
-      <span style="display:flex; align-items:center; gap:8px;">
-        <span class="badge badge-primary">${items.length}</span>
-        <span class="accordion-caret ink-dim">${shouldExpand?'▲':'▼'}</span>
-      </span>
-    </div>
-    <div id="${wrapId}" class="${shouldExpand?'':'hidden'}" style="padding-left:6px;">
-      ${items.map(it=>`<div class="item" onclick="openStudyForm('${it.logId}')"><span>${esc(it.label)}</span></div>`).join('')}
-    </div>
-  </div>`;
+  const headerHTML = `<span>${t?esc(t.name):'ટોપિક'}</span>`;
+  const badgeHTML = `<span class="badge badge-primary">${items.length}</span>`;
+  const bodyHTML = items.map(it=>`<div class="item" onclick="openStudyForm('${it.logId}')"><span>${esc(it.label)}</span></div>`).join('');
+  return renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, shouldExpand);
 }
 function groupRevisionsByChapter(list){
   const byChapter = {};
@@ -1807,18 +1809,10 @@ function revisionChapterAccordion(topicId, items){
   const wrapId = 'revch_'+topicId+'_'+items[0].id;
   const shouldExpand = isAccordionOpen(wrapId) || items.some(r=>r.id===highlightRevisionId);
   if(shouldExpand) openAccordionIds.add(wrapId);
-  return `<div class="mt-8">
-    <div class="item cursor-pointer" onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;">
-      <span>${t?esc(t.name):'ટોપિક'}</span>
-      <span style="display:flex; align-items:center; gap:8px;">
-        <span class="badge ${doneCount===items.length?'badge-success':'badge-warning'}">${doneCount}/${items.length}</span>
-        <span class="accordion-caret ink-dim">${shouldExpand?'▲':'▼'}</span>
-      </span>
-    </div>
-    <div id="${wrapId}" class="${shouldExpand?'':'hidden'}" style="padding-left:6px;">
-      ${items.map(r=>revisionRow(r,true)).join('')}
-    </div>
-  </div>`;
+  const headerHTML = `<span>${t?esc(t.name):'ટોપિક'}</span>`;
+  const badgeHTML = `<span class="badge ${doneCount===items.length?'badge-success':'badge-warning'}">${doneCount}/${items.length}</span>`;
+  const bodyHTML = items.map(r=>revisionRow(r,true)).join('');
+  return renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, shouldExpand);
 }
 let openAccordionIds = new Set();
 function isAccordionOpen(wrapId){ return openAccordionIds.has(wrapId); }
