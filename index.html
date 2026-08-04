@@ -294,6 +294,9 @@ let revCalSelectedDate = null;
 
 /* ===================== HELPERS ===================== */
 function esc(str){ if(str===undefined||str===null) return ''; return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function backButtonHTML(onclickCode){
+  return `<button class="btn btn-sm btn-secondary" onclick="${onclickCode}">← પાછા</button>`;
+}
 function val(id){ const el=document.getElementById(id); return el ? el.value.trim() : ''; }
 function todayStr(){ const d=new Date(); const off=d.getTimezoneOffset(); const local=new Date(d.getTime()-off*60000); return local.toISOString().slice(0,10); }
 function formatDate(dateStr){ if(!dateStr) return '-'; const d=new Date(dateStr+'T00:00:00'); return d.toLocaleDateString('gu-IN',{day:'2-digit',month:'short',year:'numeric'}); }
@@ -776,7 +779,7 @@ function renderExamDetail(examId){
   if(sectionDetailId){ return renderSectionDetail(sectionDetailId); }
   const sections = examSections(examId);
   return `
-   <button class="btn btn-sm btn-secondary" onclick="showTab(lastMainTab)">← પાછા</button>
+   ${backButtonHTML("showTab(lastMainTab)")}
    <div class="mt-10">
      <div class="card" style="margin-top:0;margin-bottom:0;">
        <div class="item item-static">
@@ -824,7 +827,7 @@ function renderSectionDetail(sectionId){
   if(!sec){ sectionDetailId=null; return renderExams(); }
   const subs = sectionSubjects(sec.id);
   return `
-   <button class="btn btn-sm btn-secondary" onclick="sectionDetailId=null; renderMain();">← પાછા</button>
+   ${backButtonHTML("sectionDetailId=null; renderMain();")}
    <div class="card mt-10">
      <div class="item item-static">
        <b>📂 ${esc(sec.name)}</b>
@@ -893,7 +896,7 @@ function renderTopicDetail(subjectId){
   const completed = topics.filter(t=>t.status==='completed').length;
   const pct = topics.length ? Math.round(completed/topics.length*100) : 0;
   return `
-   <button class="btn btn-sm btn-secondary" onclick="topicDetailId=null; renderMain();">← પાછા</button>
+   ${backButtonHTML("topicDetailId=null; renderMain();")}
    <div class="card mt-10">
      <div class="item item-static"><b>${esc(s.name)}</b><span class="ink-dim">${completed}/${topics.length} પૂર્ણ</span></div>
      <div class="progress-track mt-8"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -1921,7 +1924,7 @@ function dayKeyForDate(dateStr){
 function renderTimetable(){
   const exam = getActiveExam();
   if(!exam){
-    return `<button class="btn btn-sm btn-secondary" onclick="showTab(lastMainTab);">← પાછા</button>
+    return `${backButtonHTML("showTab(lastMainTab);")}
     <div class="mt-10">${emptyState('📋','પહેલા પરીક્ષા ઉમેરો','ટાઈમટેબલ બનાવવા માટે પહેલા એક પરીક્ષા સિલેક્ટ કરો.','પરીક્ષા ઉમેરો','openExamForm(null)')}</div>`;
   }
   if(!ttSelectedDay) ttSelectedDay = todayDayKey();
@@ -1932,7 +1935,7 @@ function renderTimetable(){
   if(ttMode==='chapter'){
     const chapEntries = chapterTimetableForDay(exam.id, ttSelectedDay);
     return `
-     <button class="btn btn-sm btn-secondary" onclick="showTab(lastMainTab);">← પાછા</button>
+     ${backButtonHTML("showTab(lastMainTab);")}
      <div class="section-header" style="margin-top:10px; margin-bottom:0;">
        <h2 class="m-0">ટાઈમટેબલ 📋</h2>
        <span class="flex-gap-6">
@@ -1949,7 +1952,7 @@ function renderTimetable(){
   }
   const blocks = timetableForDay(exam.id, ttSelectedDay);
   return `
-   <button class="btn btn-sm btn-secondary" onclick="showTab(lastMainTab);">← પાછા</button>
+   ${backButtonHTML("showTab(lastMainTab);")}
    <div class="section-header" style="margin-top:10px; margin-bottom:8px;">
      <h2 class="m-0">ટાઈમટેબલ 📋</h2>
      <button class="btn btn-primary btn-sm" onclick="openTimetableForm(null)">+ ઉમેરો</button>
