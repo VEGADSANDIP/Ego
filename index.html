@@ -778,6 +778,7 @@ function renderExamDetail(examId){
   if(!e){ examDetailId=null; return renderExams(); }
   if(sectionDetailId){ return renderSectionDetail(sectionDetailId); }
   const sections = examSections(examId);
+  const totalSectionMarks = sections.reduce((a,sec)=>a+Number(sec.totalMarks||0),0);
   return `
    ${backButtonHTML("showTab(lastMainTab)")}
    <div class="mt-10">
@@ -790,6 +791,7 @@ function renderExamDetail(examId){
          </span>
        </div>
        <div class="ink-dim" style="margin-top:4px;">📅 ${formatDate(e.date)}${e.description?' · '+esc(e.description):''}</div>
+       ${totalSectionMarks>0?`<div class="item item-static mt-8"><span class="ink-dim">કુલ ગુણ (બધા વિભાગ)</span><span class="badge badge-primary" style="font-weight:700;">${totalSectionMarks} ગુણ</span></div>`:''}
      </div>
      <div class="section-header mb-6">
        <h3>વિભાગ</h3>
@@ -1484,16 +1486,51 @@ function renderMockFormSheet(id, mode, m, subs){
       <button class="btn btn-primary btn-block" onclick="saveMock(${id?`'${id}'`:'null'})">સેવ કરો</button>
     </div>
   `);
+  populateMockChapterChecklist();
 }
 function mockFormRowHTML(r, i, subs, mode){
-  return `<div class="field" style="display:flex;gap:6px;align-items:center;">
-    <select id="mrow_subj_${i}" style="flex:1.4;">
+  const subjectRow = `<div class="field" style="display:flex;gap:6px;align-items:center;">
+    <select id="mrow_subj_${i}" style="flex:1.4;" ${mode==='single'?`onchange="onMockSubjectChange(${i})"`:''}>
       ${subs.map(s=>`<option value="${s.id}" ${r.subjectId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
     </select>
     <input type="number" id="mrow_total_${i}" placeholder="કુલ" value="${r.total!==''&&r.total!=null?r.total:''}" style="width:62px;">
     <input type="number" id="mrow_obt_${i}" placeholder="ગુણ" value="${r.obtained!==''&&r.obtained!=null?r.obtained:''}" style="width:62px;">
     ${mode==='full' && (mockFormRows.length>1) ? `<button class="btn btn-sm btn-danger" onclick="removeMockFormRow(${i})">🗑</button>` : ''}
   </div>`;
+  if(mode!=='single') return subjectRow;
+  return subjectRow + `
+    <div class="ink-dim fs-12 mb-6">ચેપ્ટર (વૈકલ્પિક — કયા ચેપ્ટરમાંથી ટેસ્ટ હતી)</div>
+    <input type="text" id="mock_chapter_search" placeholder="🔍 ચેપ્ટર શોધો..." oninput="filterMockChapterChecklist()" class="mb-6" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
+    <div id="mockChapterChecklist" class="scroll-list-sm" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;"></div>
+  `;
+}
+function populateMockChapterChecklist(){
+  if(mockFormMode!=='single') return;
+  const wrap = document.getElementById('mockChapterChecklist');
+  if(!wrap) return;
+  const subjEl = document.getElementById('mrow_subj_0');
+  const subjectId = subjEl ? subjEl.value : (mockFormRows[0]?mockFormRows[0].subjectId:'');
+  const topics = subjectTopics(subjectId);
+  const selected = (mockFormRows[0] && mockFormRows[0].chapterIds) || [];
+  wrap.innerHTML = topics.length ? topics.map(t=>`<label class="item cursor-pointer" style="width:100%;" data-search="${esc(t.name.toLowerCase())}">
+    <span style="flex:1; padding-right:10px;">${esc(t.name)}</span>
+    <input type="checkbox" class="mock-chapter-checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''} style="width:18px;height:18px;flex-shrink:0;">
+  </label>`).join('') : `<span class="ink-dim" style="font-size:13px;">આ વિષયમાં કોઈ ટોપિક નથી</span>`;
+  const searchEl = document.getElementById('mock_chapter_search');
+  if(searchEl) searchEl.value = '';
+}
+function filterMockChapterChecklist(){
+  const q = (val('mock_chapter_search')||'').trim().toLowerCase();
+  document.querySelectorAll('#mockChapterChecklist label').forEach(el=>{
+    const match = !q || (el.dataset.search||'').includes(q);
+    el.style.display = match ? '' : 'none';
+  });
+}
+function onMockSubjectChange(i){
+  if(i===0 && mockFormMode==='single'){
+    if(mockFormRows[0]) mockFormRows[0].chapterIds = [];
+    populateMockChapterChecklist();
+  }
 }
 function syncMockFormRowsFromDOM(){
   mockFormRows.forEach((r,i)=>{
@@ -1529,6 +1566,10 @@ function saveMock(id){
     rows.push({subjectId:subjEl.value, total, obtained});
   }
   if(!rows.length){ toast('ઓછામાં ઓછો એક વિષય ઉમેરો','error'); return; }
+  if(mockFormMode==='single'){
+    const checkedChapters = Array.from(document.querySelectorAll('.mock-chapter-checkbox:checked')).map(b=>b.value);
+    if(checkedChapters.length) rows[0].chapterIds = checkedChapters;
+  }
   const totalMarks = rows.reduce((a,b)=>a+b.total,0);
   const obtainedMarks = rows.reduce((a,b)=>a+b.obtained,0);
   let newId = id;
@@ -1547,7 +1588,8 @@ function openMockAnalysis(id){
     const s = DB.subjects.find(x=>x.id===sm.subjectId);
     const p = sm.total ? Math.round(sm.obtained/sm.total*100) : 0;
     const cls = p>=70?'badge-success':(p>=40?'badge-warning':'badge-danger');
-    return `<div class="item cursor-default"><span>${s?esc(s.name):'વિષય'}</span><span class="badge ${cls}">${sm.obtained}/${sm.total} (${p}%)</span></div>`;
+    const chapterNames = (sm.chapterIds||[]).map(cid=>{ const t=DB.topics.find(x=>x.id===cid); return t?t.name:null; }).filter(Boolean);
+    return `<div class="item cursor-default"><span>${s?esc(s.name):'વિષય'}${chapterNames.length?`<br><span class="ink-dim fs-12">📘 ${esc(chapterNames.join(', '))}</span>`:''}</span><span class="badge ${cls}">${sm.obtained}/${sm.total} (${p}%)</span></div>`;
   }).join('');
   openSheet(`
     <h3>એનાલિસિસ 📊 — ${formatDate(m.date)}</h3>
