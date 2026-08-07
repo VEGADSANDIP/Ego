@@ -910,7 +910,7 @@ function renderTopicDetail(subjectId){
      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
        ${topics.length>1?`<button class="btn btn-sm btn-secondary" onclick="openTopicReorder('${s.id}')">ક્રમ બદલો</button>`:''}
        <button class="btn btn-sm btn-secondary" onclick="openBulkTopicForm('${s.id}')">+ ઘણા ટોપિક</button>
-       <button class="btn btn-sm btn-primary" onclick="openTopicForm(null,'${s.id}')">+ ટોપિક</button>
+       <button class="btn btn-sm btn-primary" onclick="openTopicEditForm(null,'${s.id}')">+ ટોપિક</button>
      </div>
      <h3 style="margin:10px 0 0 0;">બધા ટોપિક</h3>
    </div>
@@ -1058,22 +1058,27 @@ function dashboardTodayStudyRow(l){
 function topicImportanceStars(level){
   return '⭐'.repeat(Math.max(0, Math.min(3, level||0)));
 }
-function cycleTopicImportance(id){
-  const t = DB.topics.find(x=>x.id===id);
-  if(!t) return;
-  t.importance = ((t.importance||0)+1) % 4;
-  save(); renderMain();
-}
 function topicRow(t){
   const cls = t.status==='completed' ? 'badge-success' : (t.status==='studying' ? 'badge-warning' : 'badge-grey');
   const label = t.status==='completed' ? 'પૂર્ણ 🟢' : (t.status==='studying' ? 'ચાલુ 🟡' : 'શરૂ નથી 🔴');
   const highlight = (highlightTopicId===t.id) ? ' row-highlight' : '';
+  const subs = subtopicsForTopic(t.id);
   const stars = topicImportanceStars(t.importance);
   return `<div class="topic-row${highlight}" id="topic-${t.id}">
     <div class="topic-row-top">
-      <span onclick="openTopicForm('${t.id}','${t.subjectId}')" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
-      <span onclick="event.stopPropagation(); cycleTopicImportance('${t.id}')" class="ink-dim fs-125" style="flex-shrink:0; cursor:pointer; min-width:20px; text-align:center;">${stars || '☆'}</span>
-      <span class="badge ${cls}" onclick="cycleTopicStatus('${t.id}')" style="flex-shrink:0;">${label}</span>
+      <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
+      <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>
+    </div>
+    <div class="flex-gap-6 mt-8" style="flex-wrap:wrap;">
+      <span class="badge ${cls}" onclick="cycleTopicStatus('${t.id}')">${label}</span>
+      <span class="badge badge-grey" onclick="openTopicSubtopicManageForm('${t.id}')">📑 સબ-ટોપિક${subs.length?` (${subs.length})`:''}</span>
+      <span class="badge badge-grey" onclick="openTopicRevisionForm('${t.id}')">🔁 રિવિઝન</span>
+    </div>
+    <div class="mt-8 cursor-pointer" onclick="cycleTopicImportance('${t.id}')">
+      <span class="ink-dim fs-125">${stars || '☆ સ્ટાર (ટેપ કરો)'}</span>
+    </div>
+    <div class="mt-8 cursor-pointer" onclick="openTopicNoteForm('${t.id}')">
+      <span class="ink-dim fs-12">📅 ${t.importanceNote ? esc(t.importanceNote) : 'નોંધ ઉમેરો (કયા વર્ષમાં પુછાયું)'}</span>
     </div>
   </div>`;
 }
@@ -1273,65 +1278,188 @@ function revisionStageLabel(stage){
   const weekDayLabel = {sun:'રવિ',mon:'સોમ',tue:'મંગળ',wed:'બુધ',thu:'ગુરુ',fri:'શુક્ર',sat:'શનિ'}[rule.weekDay] || 'રવિ';
   return stage<=startDays.length ? `Day+${startDays[stage-1]}` : `${weekDayLabel} રિવિઝન #${stage-startDays.length}`;
 }
-function cycleTopicImportance(id, refreshForm){
+function cycleTopicImportance(id){
   const t = DB.topics.find(x=>x.id===id);
   if(!t) return;
   t.importance = ((t.importance||0)+1) % 4;
   save(); renderMain();
-  if(refreshForm) openTopicForm(id, t.subjectId);
 }
-function openTopicForm(id, subjectId){
+function openTopicEditForm(id, subjectId){
   const t = id ? DB.topics.find(x=>x.id===id) : null;
-  let infoHTML = '';
-  let subtopicsHTML = '';
-  if(t){
-    const statusLabel = t.status==='completed' ? '🟢 પૂર્ણ' : (t.status==='studying' ? '🟡 ચાલુ' : '🔴 શરૂ નથી');
-    const hasSubtopics = subtopicsForTopic(t.id).length>0;
-    const revs = hasSubtopics ? [] : DB.revisions.filter(r=>r.topicId===t.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-    infoHTML = `
-      <div class="card" style="margin-bottom:14px; background:var(--surface2);">
-        <div class="item cursor-default"><span>સ્ટેટસ</span><b>${statusLabel}</b></div>
-        <div class="item cursor-pointer" onclick="cycleTopicImportance('${t.id}', true)"><span>⭐ મહત્વ (પેપર એનાલિસિસ)</span><b class="ink-dim">${topicImportanceStars(t.importance) || 'ટેપ કરો ☆'}</b></div>
-        <div class="field mt-8"><input type="text" id="f_importance_note" value="${t.importanceNote?esc(t.importanceNote):''}" placeholder="કયા વર્ષોમાં પુછાયું — દા.ત. 2024, 2021, 2018"></div>
-        ${revs.length ? `<div class="mt-8">
-          <div class="ink-dim fs-12 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>
-          ${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}
-        </div>` : ''}
-      </div>`;
-    const subs = subtopicsForTopic(t.id);
-    const subsDone = subs.filter(s=>s.completed).length;
-    subtopicsHTML = `
-      <div style="margin:18px 2px 8px 2px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 class="m-0">સબ-ટોપિક ${subs.length?`(${subsDone}/${subs.length})`:''}</h3>
-          <button class="btn btn-sm btn-secondary" onclick="openBulkSubtopicForm('${t.id}','${t.subjectId}')">+ ઘણા</button>
-        </div>
-        <div class="ink-dim fs-12 mt-8">મોટા ચેપ્ટર માટે — અંદરના ભાગ અલગ-અલગ ટ્રેક કરવા (દરેકનું રિવિઝન અલગથી જનરેટ થશે). દરેક પર ટેપ કરીને એનું રિવિઝન શેડ્યુલ જુઓ.</div>
-        <div class="field mt-10" style="display:flex; gap:8px;">
-          <input type="text" id="f_new_subtopic" placeholder="નવું સબ-ટોપિક નામ" style="flex:1;">
-          <button class="btn btn-sm btn-primary" onclick="addSingleSubtopic('${t.id}')">+ ઉમેરો</button>
-        </div>
-        ${subs.length ? subs.map(st=>subtopicRow(st)).join('') : `<div class="ink-dim fs-12" style="padding:8px 2px;">હજુ કોઈ સબ-ટોપિક નથી</div>`}
-      </div>`;
-  }
   openSheet(`
-    <h3>${t?'ટોપિક વિગત':'નવો ટોપિક'}</h3>
-    ${infoHTML}
+    <h3>${t?'ટોપિક એડિટ':'નવો ટોપિક'}</h3>
     <div class="field"><label>ટોપિકનું નામ</label><input type="text" id="f_name" value="${t?esc(t.name):''}"></div>
     <div class="sheet-actions">
       ${t?`<button class="btn btn-danger" onclick="deleteTopic('${id}')">ડિલીટ</button>`:''}
-      <button class="btn btn-primary btn-block" onclick="saveTopic(${t?`'${id}'`:'null'},'${subjectId}')">સેવ કરો</button>
+      <button class="btn btn-primary btn-block" onclick="saveTopic(${t?`'${id}'`:'null'},'${t?t.subjectId:subjectId}')">સેવ કરો</button>
     </div>
-    ${subtopicsHTML}
   `);
 }
 function saveTopic(id, subjectId){
   const name=val('f_name');
   if(!name){ toast('નામ ભરો','error'); return; }
-  const note = val('f_importance_note');
-  if(id){ const t=DB.topics.find(x=>x.id===id); t.name=name; if(document.getElementById('f_importance_note')) t.importanceNote=note; }
+  if(id){ const t=DB.topics.find(x=>x.id===id); t.name=name; }
   else DB.topics.push({id:uid(),subjectId,name,status:'not_started'});
   save(); closeSheet(); renderMain(); toast('સેવ થયું');
+}
+function deleteTopic(id){
+  if(!confirm('ડિલીટ કરવું છે?'))return;
+  DB.topics = DB.topics.filter(x=>x.id!==id);
+  DB.subtopics = DB.subtopics.filter(x=>x.topicId!==id);
+  DB.revisions = DB.revisions.filter(r=>r.topicId!==id);
+  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+function openTopicNoteForm(id){
+  const t = DB.topics.find(x=>x.id===id);
+  if(!t) return;
+  openSheet(`
+    <h3>નોંધ — કયા વર્ષોમાં પુછાયું</h3>
+    <div class="ink-dim fs-12 mb-6">પેપર એનાલિસિસ માટે — દા.ત. 2024, 2021, 2018</div>
+    <div class="field"><input type="text" id="f_importance_note" value="${t.importanceNote?esc(t.importanceNote):''}" placeholder="2024, 2021, 2018"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-primary btn-block" onclick="saveTopicNote('${id}')">સેવ કરો</button>
+    </div>
+  `);
+}
+function saveTopicNote(id){
+  const t = DB.topics.find(x=>x.id===id);
+  if(!t) return;
+  t.importanceNote = val('f_importance_note');
+  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+}
+function openTopicSubtopicManageForm(topicId){
+  const t = DB.topics.find(x=>x.id===topicId);
+  if(!t) return;
+  const subs = subtopicsForTopic(topicId);
+  openSheet(`
+    <h3>સબ-ટોપિક મેનેજ કરો</h3>
+    <div class="ink-dim fs-12 mb-6">${esc(t.name)} — નામ ઉમેરો / બદલો / ડિલીટ કરો</div>
+    <div class="field" style="display:flex; gap:8px;">
+      <input type="text" id="f_new_subtopic" placeholder="નવું સબ-ટોપિક નામ" style="flex:1;">
+      <button class="btn btn-sm btn-primary" onclick="addSingleSubtopic('${topicId}')">+ ઉમેરો</button>
+    </div>
+    <button class="btn btn-sm btn-secondary btn-block mb-6" onclick="openBulkSubtopicForm('${topicId}','${t.subjectId}')">+ ઘણા એકસાથે</button>
+    ${subs.length ? subs.map(st=>subtopicManageRow(st)).join('') : `<div class="ink-dim fs-12" style="padding:8px 2px;">હજુ કોઈ સબ-ટોપિક નથી</div>`}
+  `);
+}
+function subtopicManageRow(st){
+  return `<div class="item"><span>${esc(st.name)}</span><button class="btn btn-sm btn-secondary" onclick="openSubtopicEditForm('${st.id}')">✎</button></div>`;
+}
+function openSubtopicEditForm(id){
+  const st = DB.subtopics.find(x=>x.id===id);
+  if(!st) return;
+  openSheet(`
+    <h3>સબ-ટોપિક એડિટ</h3>
+    <div class="field"><label>નામ</label><input type="text" id="f_subtopic_name" value="${esc(st.name)}"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-danger" onclick="deleteSubtopic('${id}')">ડિલીટ</button>
+      <button class="btn btn-primary btn-block" onclick="saveSubtopicName('${id}')">સેવ કરો</button>
+    </div>
+  `);
+}
+function saveSubtopicName(id){
+  const st = DB.subtopics.find(x=>x.id===id);
+  if(!st) return;
+  const name = val('f_subtopic_name');
+  if(!name){ toast('નામ ભરો','error'); return; }
+  st.name = name;
+  save(); renderMain();
+  openTopicSubtopicManageForm(st.topicId);
+  toast('સેવ થયું');
+}
+function openTopicRevisionForm(topicId){
+  const t = DB.topics.find(x=>x.id===topicId);
+  if(!t) return;
+  const hasSubtopics = subtopicsForTopic(t.id).length>0;
+  let bodyHTML = '';
+  if(!hasSubtopics){
+    const revs = DB.revisions.filter(r=>r.topicId===t.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+    bodyHTML = revs.length ? revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}" onclick="toggleRevisionStatus('${r.id}'); openTopicRevisionForm('${topicId}');">${r.status==='completed'?'પૂર્ણ ✓':'બાકી'}</span></div>`).join('') : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — ચેપ્ટર પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
+  } else {
+    bodyHTML = subtopicsForTopic(t.id).map(st=>subtopicRevisionRow(st)).join('');
+  }
+  openSheet(`
+    <h3>🔁 રિવિઝન — ${esc(t.name)}</h3>
+    ${bodyHTML}
+  `);
+}
+function subtopicRevisionRow(st){
+  const revs = DB.revisions.filter(r=>r.subtopicId===st.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const doneCount = revs.filter(r=>r.status==='completed').length;
+  const wrapId = 'subrev_'+st.id;
+  const shouldExpand = isAccordionOpen(wrapId);
+  const headerHTML = `<span style="flex:1; padding-right:6px;">${esc(st.name)}</span>`;
+  const badgeHTML = `<span class="badge ${st.completed?'badge-success':'badge-grey'}" onclick="event.stopPropagation(); toggleSubtopicComplete('${st.id}')">${st.completed?'પૂર્ણ 🟢':'બાકી 🔴'}</span>${revs.length ? `<span class="badge badge-warning">${doneCount}/${revs.length}</span>` : ''}`;
+  const bodyHTML = revs.length ? `<div class="ink-dim fs-12 mt-8 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}` : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — સબ-ટોપિક પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
+  return renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, shouldExpand, {gap:6});
+}
+function addSingleSubtopic(topicId){
+  const name = val('f_new_subtopic');
+  if(!name){ toast('નામ ભરો','error'); return; }
+  const t = DB.topics.find(x=>x.id===topicId);
+  if(!t) return;
+  DB.subtopics.push({id:uid(), topicId, subjectId:t.subjectId, name, completed:false});
+  save(); renderMain();
+  openTopicSubtopicManageForm(topicId);
+  toast('સબ-ટોપિક ઉમેરાયું');
+}
+function openBulkSubtopicForm(topicId, subjectId){
+  openSheet(`
+    <h3>ઘણા સબ-ટોપિક એકસાથે ઉમેરો</h3>
+    <div class="ink-dim fs-12 mb-6">દરેક સબ-ટોપિકનું નામ એક-એક લાઈન પર પેસ્ટ કરો (નંબર હોય તો આપોઆપ કપાઈ જશે)</div>
+    <div class="field"><textarea id="f_bulk" rows="10" placeholder="1. ભાગ-1
+2. ભાગ-2
+3. ભાગ-3"></textarea></div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="openTopicSubtopicManageForm('${topicId}')">રદ કરો</button>
+      <button class="btn btn-primary btn-block" onclick="saveBulkSubtopics('${topicId}','${subjectId}')">ઉમેરો</button>
+    </div>
+  `);
+}
+function saveBulkSubtopics(topicId, subjectId){
+  const raw = val('f_bulk') || '';
+  const lines = raw.split('\n')
+    .map(l=>l.trim())
+    .map(l=>l.replace(/^(\d+|[०-९]+|[૦-૯]+)\s*[\.\)\-:]\s*/,''))
+    .map(l=>l.trim())
+    .filter(l=>l.length>0);
+  if(!lines.length){ toast('ઓછામાં ઓછું એક નામ લખો','error'); return; }
+  const t = DB.topics.find(x=>x.id===topicId);
+  const subjId = t ? t.subjectId : subjectId;
+  lines.forEach(name=>{
+    DB.subtopics.push({id:uid(), topicId, subjectId:subjId, name, completed:false});
+  });
+  save(); renderMain();
+  openTopicSubtopicManageForm(topicId);
+  toast(`${lines.length} સબ-ટોપિક ઉમેરાયા`);
+}
+function toggleSubtopicComplete(id){
+  const st = DB.subtopics.find(x=>x.id===id);
+  if(!st) return;
+  if(st.completed){
+    if(!confirm('આ સબ-ટોપિક "પૂર્ણ" માંથી "બાકી" કરવું છે?\n\n⚠️ તેનું બાકી રિવિઝન શેડ્યુલ પણ કેન્સલ થઈ જશે.')) return;
+    st.completed=false; delete st.completedDate;
+    DB.revisions = DB.revisions.filter(r=>!(r.subtopicId===st.id && r.status==='pending'));
+    save(); renderMain();
+    openTopicRevisionForm(st.topicId);
+    toast('સ્ટેટસ બદલાયું');
+  } else {
+    if(!confirm('આ સબ-ટોપિક પૂર્ણ કરવું છે?\n\n🔁 રિવિઝન શેડ્યુલ ઓટો-જનરેટ થશે.')) return;
+    st.completed=true; st.completedDate=todayStr();
+    generateSubtopicRevisions(st);
+    save(); renderMain();
+    openTopicRevisionForm(st.topicId);
+    toast('સબ-ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁');
+  }
+}
+function deleteSubtopic(id){
+  if(!confirm('આ સબ-ટોપિક ડિલીટ કરવું છે?'))return;
+  const st = DB.subtopics.find(x=>x.id===id);
+  DB.subtopics = DB.subtopics.filter(x=>x.id!==id);
+  DB.revisions = DB.revisions.filter(r=>r.subtopicId!==id);
+  save(); renderMain();
+  if(st) openTopicSubtopicManageForm(st.topicId);
+  toast('ડિલીટ થયું');
 }
 function openBulkTopicForm(subjectId){
   openSheet(`
@@ -1357,91 +1485,6 @@ function saveBulkTopics(subjectId){
     DB.topics.push({id:uid(),subjectId,name,status:'not_started'});
   });
   save(); closeSheet(); renderMain(); toast(`${lines.length} ટોપિક ઉમેરાયા`);
-}
-function deleteTopic(id){
-  if(!confirm('ડિલીટ કરવું છે?'))return;
-  DB.topics = DB.topics.filter(x=>x.id!==id);
-  DB.subtopics = DB.subtopics.filter(x=>x.topicId!==id);
-  DB.revisions = DB.revisions.filter(r=>r.topicId!==id);
-  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
-}
-function subtopicRow(st){
-  const revs = DB.revisions.filter(r=>r.subtopicId===st.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  const doneCount = revs.filter(r=>r.status==='completed').length;
-  const wrapId = 'subrev_'+st.id;
-  const shouldExpand = isAccordionOpen(wrapId);
-  const headerHTML = `<span style="flex:1; padding-right:6px;">${esc(st.name)}</span>`;
-  const badgeHTML = `<span class="badge ${st.completed?'badge-success':'badge-grey'}" onclick="event.stopPropagation(); toggleSubtopicComplete('${st.id}')">${st.completed?'પૂર્ણ 🟢':'બાકી 🔴'}</span>${revs.length ? `<span class="badge badge-warning">${doneCount}/${revs.length}</span>` : ''}<button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteSubtopic('${st.id}')">🗑️</button>`;
-  const bodyHTML = revs.length ? `<div class="ink-dim fs-12 mt-8 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}` : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — સબ-ટોપિક પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
-  return renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, shouldExpand, {gap:6});
-}
-function addSingleSubtopic(topicId){
-  const name = val('f_new_subtopic');
-  if(!name){ toast('નામ ભરો','error'); return; }
-  const t = DB.topics.find(x=>x.id===topicId);
-  if(!t) return;
-  DB.subtopics.push({id:uid(), topicId, subjectId:t.subjectId, name, completed:false});
-  save(); renderMain();
-  openTopicForm(topicId, t.subjectId);
-  toast('સબ-ટોપિક ઉમેરાયું');
-}
-function openBulkSubtopicForm(topicId, subjectId){
-  openSheet(`
-    <h3>ઘણા સબ-ટોપિક એકસાથે ઉમેરો</h3>
-    <div class="ink-dim fs-12 mb-6">દરેક સબ-ટોપિકનું નામ એક-એક લાઈન પર પેસ્ટ કરો (નંબર હોય તો આપોઆપ કપાઈ જશે)</div>
-    <div class="field"><textarea id="f_bulk" rows="10" placeholder="1. ભાગ-1
-2. ભાગ-2
-3. ભાગ-3"></textarea></div>
-    <div class="sheet-actions">
-      <button class="btn btn-secondary" onclick="openTopicForm('${topicId}','${subjectId}')">રદ કરો</button>
-      <button class="btn btn-primary btn-block" onclick="saveBulkSubtopics('${topicId}','${subjectId}')">ઉમેરો</button>
-    </div>
-  `);
-}
-function saveBulkSubtopics(topicId, subjectId){
-  const raw = val('f_bulk') || '';
-  const lines = raw.split('\n')
-    .map(l=>l.trim())
-    .map(l=>l.replace(/^(\d+|[०-९]+|[૦-૯]+)\s*[\.\)\-:]\s*/,''))
-    .map(l=>l.trim())
-    .filter(l=>l.length>0);
-  if(!lines.length){ toast('ઓછામાં ઓછું એક નામ લખો','error'); return; }
-  const t = DB.topics.find(x=>x.id===topicId);
-  const subjId = t ? t.subjectId : subjectId;
-  lines.forEach(name=>{
-    DB.subtopics.push({id:uid(), topicId, subjectId:subjId, name, completed:false});
-  });
-  save(); renderMain();
-  openTopicForm(topicId, subjId);
-  toast(`${lines.length} સબ-ટોપિક ઉમેરાયા`);
-}
-function toggleSubtopicComplete(id){
-  const st = DB.subtopics.find(x=>x.id===id);
-  if(!st) return;
-  if(st.completed){
-    if(!confirm('આ સબ-ટોપિક "પૂર્ણ" માંથી "બાકી" કરવું છે?\n\n⚠️ તેનું બાકી રિવિઝન શેડ્યુલ પણ કેન્સલ થઈ જશે.')) return;
-    st.completed=false; delete st.completedDate;
-    DB.revisions = DB.revisions.filter(r=>!(r.subtopicId===st.id && r.status==='pending'));
-    save(); renderMain();
-    openTopicForm(st.topicId, st.subjectId);
-    toast('સ્ટેટસ બદલાયું');
-  } else {
-    if(!confirm('આ સબ-ટોપિક પૂર્ણ કરવું છે?\n\n🔁 રિવિઝન શેડ્યુલ ઓટો-જનરેટ થશે.')) return;
-    st.completed=true; st.completedDate=todayStr();
-    generateSubtopicRevisions(st);
-    save(); renderMain();
-    openTopicForm(st.topicId, st.subjectId);
-    toast('સબ-ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁');
-  }
-}
-function deleteSubtopic(id){
-  if(!confirm('આ સબ-ટોપિક ડિલીટ કરવું છે?'))return;
-  const st = DB.subtopics.find(x=>x.id===id);
-  DB.subtopics = DB.subtopics.filter(x=>x.id!==id);
-  DB.revisions = DB.revisions.filter(r=>r.subtopicId!==id);
-  save(); renderMain();
-  if(st) openTopicForm(st.topicId, st.subjectId);
-  toast('ડિલીટ થયું');
 }
 
 /* ===================== MOCK TESTS ===================== */
