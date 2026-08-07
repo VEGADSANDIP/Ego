@@ -570,6 +570,7 @@ function renderDashboard(){
   const latestMock = [...mockTestsForActiveExam()].sort((a,b)=>b.date.localeCompare(a.date))[0];
   const weak = computeWeakSubjects(exam.id);
   const inProgressTopics = topics.filter(t=>t.status==='studying');
+  const importantPendingTopics = topics.filter(t=>(t.importance||0)>0 && t.status!=='completed').sort((a,b)=>(b.importance||0)-(a.importance||0));
 
   return `
    <div class="hero-card">
@@ -605,6 +606,8 @@ function renderDashboard(){
    </div>
 
    ${inProgressTopics.length ? card('ચાલુ ટોપિક 🟡 <span class="ink-dim fw-400">(ટેપ કરી ચેપ્ટર જુઓ)</span>', `<div class="scroll-list-sm">${inProgressTopics.map(t=>dashboardTopicRow(t)).join('')}</div>`) : ''}
+
+   ${importantPendingTopics.length ? card('⭐ મહત્વના બાકી ટોપિક <span class="ink-dim fw-400">(પેપર એનાલિસિસ પ્રમાણે)</span>', `<div class="scroll-list-sm">${importantPendingTopics.map(t=>dashboardImportantTopicRow(t)).join('')}</div>`) : ''}
 
    ${overdueRevisionList.length ? `<div class="card">     <div class="card-title">ઓવરડ્યુ રિવિઝન ⏰ <span class="ink-dim fw-400">(ટેપ કરી કેલેન્ડરમાં જુઓ)</span></div>
      <div class="scroll-list-sm">${overdueRevisionList.map(r=>dashboardOverdueRevisionRow(r)).join('')}</div>
@@ -991,6 +994,16 @@ function openSectionReorder(examId){
     <div class="scroll-list-sm" id="reorderList">${sectionReorderListHTML(examId)}</div>
   `);
 }
+function dashboardImportantTopicRow(t){
+  const s = DB.subjects.find(x=>x.id===t.subjectId);
+  return `<div class="item cursor-pointer" onclick="navigateToSubjectTopics('${t.subjectId}','${t.id}')">
+    <span class="flex-col">
+      <b>${s?esc(s.name):''}</b>
+      <span class="ink-dim fs-125">${esc(t.name)}${t.importanceNote?` · ${esc(t.importanceNote)}`:''}</span>
+    </span>
+    <span class="ink-dim fs-125">${topicImportanceStars(t.importance)}</span>
+  </div>`;
+}
 function dashboardTopicRow(t){
   const s = DB.subjects.find(x=>x.id===t.subjectId);
   const cls = t.status==='completed' ? 'badge-success' : (t.status==='studying' ? 'badge-warning' : 'badge-grey');
@@ -1042,13 +1055,24 @@ function dashboardTodayStudyRow(l){
     <span class="badge badge-success">પૂર્ણ ✓</span>
   </div>`;
 }
+function topicImportanceStars(level){
+  return '⭐'.repeat(Math.max(0, Math.min(3, level||0)));
+}
+function cycleTopicImportance(id){
+  const t = DB.topics.find(x=>x.id===id);
+  if(!t) return;
+  t.importance = ((t.importance||0)+1) % 4;
+  save(); renderMain();
+}
 function topicRow(t){
   const cls = t.status==='completed' ? 'badge-success' : (t.status==='studying' ? 'badge-warning' : 'badge-grey');
   const label = t.status==='completed' ? 'પૂર્ણ 🟢' : (t.status==='studying' ? 'ચાલુ 🟡' : 'શરૂ નથી 🔴');
   const highlight = (highlightTopicId===t.id) ? ' row-highlight' : '';
+  const stars = topicImportanceStars(t.importance);
   return `<div class="topic-row${highlight}" id="topic-${t.id}">
     <div class="topic-row-top">
       <span onclick="openTopicForm('${t.id}','${t.subjectId}')" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
+      <span onclick="event.stopPropagation(); cycleTopicImportance('${t.id}')" class="ink-dim fs-125" style="flex-shrink:0; cursor:pointer; min-width:20px; text-align:center;">${stars || '☆'}</span>
       <span class="badge ${cls}" onclick="cycleTopicStatus('${t.id}')" style="flex-shrink:0;">${label}</span>
     </div>
   </div>`;
@@ -1249,6 +1273,13 @@ function revisionStageLabel(stage){
   const weekDayLabel = {sun:'રવિ',mon:'સોમ',tue:'મંગળ',wed:'બુધ',thu:'ગુરુ',fri:'શુક્ર',sat:'શનિ'}[rule.weekDay] || 'રવિ';
   return stage<=startDays.length ? `Day+${startDays[stage-1]}` : `${weekDayLabel} રિવિઝન #${stage-startDays.length}`;
 }
+function cycleTopicImportance(id, refreshForm){
+  const t = DB.topics.find(x=>x.id===id);
+  if(!t) return;
+  t.importance = ((t.importance||0)+1) % 4;
+  save(); renderMain();
+  if(refreshForm) openTopicForm(id, t.subjectId);
+}
 function openTopicForm(id, subjectId){
   const t = id ? DB.topics.find(x=>x.id===id) : null;
   let infoHTML = '';
@@ -1260,6 +1291,8 @@ function openTopicForm(id, subjectId){
     infoHTML = `
       <div class="card" style="margin-bottom:14px; background:var(--surface2);">
         <div class="item cursor-default"><span>સ્ટેટસ</span><b>${statusLabel}</b></div>
+        <div class="item cursor-pointer" onclick="cycleTopicImportance('${t.id}', true)"><span>⭐ મહત્વ (પેપર એનાલિસિસ)</span><b class="ink-dim">${topicImportanceStars(t.importance) || 'ટેપ કરો ☆'}</b></div>
+        <div class="field mt-8"><input type="text" id="f_importance_note" value="${t.importanceNote?esc(t.importanceNote):''}" placeholder="કયા વર્ષોમાં પુછાયું — દા.ત. 2024, 2021, 2018"></div>
         ${revs.length ? `<div class="mt-8">
           <div class="ink-dim fs-12 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>
           ${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}
@@ -1295,7 +1328,8 @@ function openTopicForm(id, subjectId){
 function saveTopic(id, subjectId){
   const name=val('f_name');
   if(!name){ toast('નામ ભરો','error'); return; }
-  if(id){ const t=DB.topics.find(x=>x.id===id); t.name=name; }
+  const note = val('f_importance_note');
+  if(id){ const t=DB.topics.find(x=>x.id===id); t.name=name; if(document.getElementById('f_importance_note')) t.importanceNote=note; }
   else DB.topics.push({id:uid(),subjectId,name,status:'not_started'});
   save(); closeSheet(); renderMain(); toast('સેવ થયું');
 }
