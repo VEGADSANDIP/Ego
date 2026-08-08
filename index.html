@@ -1059,26 +1059,31 @@ function topicImportanceStars(level){
   return '⭐'.repeat(Math.max(0, Math.min(3, level||0)));
 }
 function topicRow(t){
-  const cls = t.status==='completed' ? 'badge-success' : (t.status==='studying' ? 'badge-warning' : 'badge-grey');
-  const label = t.status==='completed' ? 'પૂર્ણ 🟢' : (t.status==='studying' ? 'ચાલુ 🟡' : 'શરૂ નથી 🔴');
+  const statusDot = t.status==='completed' ? '🟢' : (t.status==='studying' ? '🟡' : '🔴');
   const highlight = (highlightTopicId===t.id) ? ' row-highlight' : '';
   const subs = subtopicsForTopic(t.id);
   const stars = topicImportanceStars(t.importance);
+  const wrapId = 'topicdd_'+t.id;
+  const shouldExpand = isAccordionOpen(wrapId);
   return `<div class="topic-row${highlight}" id="topic-${t.id}">
     <div class="topic-row-top">
+      <span onclick="cycleTopicStatus('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px;">${statusDot}</span>
       <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
+      ${stars ? `<span onclick="event.stopPropagation(); cycleTopicImportance('${t.id}')" class="ink-dim fs-12" style="flex-shrink:0; cursor:pointer;">${stars}</span>` : ''}
+      <span onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" class="ink-dim" style="flex-shrink:0; cursor:pointer; padding:0 4px; font-size:12px;"><span class="accordion-caret">${shouldExpand?'▲':'▼'}</span></span>
       <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>
     </div>
-    <div class="flex-gap-6 mt-8" style="flex-wrap:wrap;">
-      <span class="badge ${cls}" onclick="cycleTopicStatus('${t.id}')">${label}</span>
-      <span class="badge badge-grey" onclick="openTopicSubtopicManageForm('${t.id}')">📑 સબ-ટોપિક${subs.length?` (${subs.length})`:''}</span>
-      <span class="badge badge-grey" onclick="openTopicRevisionForm('${t.id}')">🔁 રિવિઝન</span>
-    </div>
-    <div class="mt-8 cursor-pointer" onclick="cycleTopicImportance('${t.id}')">
-      <span class="ink-dim fs-125">${stars || '☆ સ્ટાર (ટેપ કરો)'}</span>
-    </div>
-    <div class="mt-8 cursor-pointer" onclick="openTopicNoteForm('${t.id}')">
-      <span class="ink-dim fs-12">📅 ${t.importanceNote ? esc(t.importanceNote) : 'નોંધ ઉમેરો (કયા વર્ષમાં પુછાયું)'}</span>
+    <div id="${wrapId}" class="${shouldExpand?'':'hidden'}">
+      <div class="flex-gap-6 mt-8" style="flex-wrap:wrap;">
+        <span class="badge badge-grey" onclick="openTopicSubtopicManageForm('${t.id}')">📑 સબ-ટોપિક${subs.length?` (${subs.length})`:''}</span>
+        <span class="badge badge-grey" onclick="openTopicRevisionForm('${t.id}')">🔁 રિવિઝન</span>
+      </div>
+      <div class="mt-8 cursor-pointer" onclick="cycleTopicImportance('${t.id}')">
+        <span class="ink-dim fs-125">${stars || '☆ સ્ટાર (ટેપ કરો)'}</span>
+      </div>
+      <div class="mt-8 cursor-pointer" onclick="openTopicNoteForm('${t.id}')">
+        <span class="ink-dim fs-12">📅 ${t.importanceNote ? esc(t.importanceNote) : 'નોંધ ઉમેરો (કયા વર્ષમાં પુછાયું)'}</span>
+      </div>
     </div>
   </div>`;
 }
