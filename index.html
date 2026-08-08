@@ -1120,7 +1120,7 @@ function cycleTopicStatus(id){
     if(next==='completed') msg += '\n\nℹ️ બધા સબ-ટોપિક પૂર્ણ છે. રિવિઝન દરેક સબ-ટોપિક પ્રમાણે પહેલેથી જ જનરેટ થયેલું છે.';
   } else {
     if(t.status==='completed' && next==='not_started'){
-      msg += '\n\n⚠️ ધ્યાન રાખો: આ ટોપિકનું બાકી રિવિઝન શેડ્યુલ પણ કેન્સલ થઈ જશે.';
+      msg += '\n\n⚠️ ધ્યાન રાખો: આ ટોપિકનું બધું રિવિઝન (પૂર્ણ થયેલું પણ) કેન્સલ થઈ જશે.';
     } else if(next==='completed'){
       msg += '\n\n🔁 રિવિઝન શેડ્યુલ ઓટો-જનરેટ થશે.';
     }
@@ -1132,7 +1132,7 @@ function cycleTopicStatus(id){
     if(!hasSubtopics){ generateRevisions(t); toast('ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁'); }
     else toast('ટોપિક પૂર્ણ!');
   } else {
-    if(!hasSubtopics) DB.revisions = DB.revisions.filter(r=>!(r.topicId===t.id && r.status==='pending'));
+    if(!hasSubtopics) DB.revisions = DB.revisions.filter(r=>r.topicId!==t.id);
     toast('સ્ટેટસ બદલાયું');
   }
   save(); renderMain();
@@ -1442,9 +1442,9 @@ function toggleSubtopicComplete(id){
   const st = DB.subtopics.find(x=>x.id===id);
   if(!st) return;
   if(st.completed){
-    if(!confirm('આ સબ-ટોપિક "પૂર્ણ" માંથી "બાકી" કરવું છે?\n\n⚠️ તેનું બાકી રિવિઝન શેડ્યુલ પણ કેન્સલ થઈ જશે.')) return;
+    if(!confirm('આ સબ-ટોપિક "પૂર્ણ" માંથી "બાકી" કરવું છે?\n\n⚠️ તેનું બધું રિવિઝન (પૂર્ણ થયેલું પણ) કેન્સલ થઈ જશે.')) return;
     st.completed=false; delete st.completedDate;
-    DB.revisions = DB.revisions.filter(r=>!(r.subtopicId===st.id && r.status==='pending'));
+    DB.revisions = DB.revisions.filter(r=>r.subtopicId!==st.id);
     save(); renderMain();
     openTopicRevisionForm(st.topicId);
     toast('સ્ટેટસ બદલાયું');
@@ -1783,6 +1783,20 @@ function dotsForDate(dateStr){
   const hasOverdueRevision = dateStr<today && dueRevisions.some(r=>r.status==='pending');
   return {hasStudy, hasRevisionDue, hasOverdueRevision};
 }
+function sortSubjectIdsByTimetable(subjectIds, dateStr){
+  const exam = getActiveExam();
+  if(!exam) return subjectIds;
+  const day = dayKeyForDate(dateStr);
+  const blocks = timetableForDay(exam.id, day);
+  const order = {};
+  blocks.forEach((b,idx)=>{ if(!(b.subjectId in order)) order[b.subjectId] = idx; });
+  return [...subjectIds].sort((a,b)=>{
+    const oa = (a in order) ? order[a] : Infinity;
+    const ob = (b in order) ? order[b] : Infinity;
+    if(oa!==ob) return oa-ob;
+    return 0;
+  });
+}
 function groupSubjectIdsBySection(subjectIds){
   const groups = [];
   const groupIndex = {};
@@ -1831,7 +1845,7 @@ function calendarDayDetailHTML(dateStr){
       if(!bySubject[l.subjectId]) bySubject[l.subjectId] = {entries:[]};
       bySubject[l.subjectId].entries.push(l);
     });
-    const subjectIds = Object.keys(bySubject);
+    const subjectIds = sortSubjectIdsByTimetable(Object.keys(bySubject), dateStr);
     if(!subjectIds.length) return suggestionsHTML + emptyRow('આ દિવસે કોઈ અભ્યાસ નથી');
     const subjectCardHTML = (sid)=>{
       const grouped = groupStudyLogsByChapter(bySubject[sid].entries);
@@ -1851,7 +1865,7 @@ function calendarDayDetailHTML(dateStr){
     const sid = r.subjectId || 'unknown';
     (bySubject[sid] = bySubject[sid]||[]).push(r);
   });
-  const subjectIds = Object.keys(bySubject);
+  const subjectIds = sortSubjectIdsByTimetable(Object.keys(bySubject), dateStr);
   let topicCards;
   if(!subjectIds.length){
     topicCards = emptyRow('આ દિવસે કોઈ ટોપિક રિવિઝન નથી');
