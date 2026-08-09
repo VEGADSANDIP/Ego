@@ -1,4 +1,4 @@
-const CACHE_NAME = 'exampath-cache-v20';
+const CACHE_NAME = 'exampath-cache-v21';
 const ASSETS = [
   './',
   './index.html',

@@ -258,7 +258,7 @@ function defaultData(){
   return {
     exams:[], subjects:[], topics:[], revisions:[], sections:[],
     studyLogs:[], mockTests:[], timetable:[], chapterTimetable:[], subtopics:[],
-    settings:{theme:'light', brandName:'ExamPath', revisionRule:{startDays:[1,3,7], weekDay:'sun', weeklyCount:8}}
+    settings:{theme:'light', brandName:'ExamPath', revisionRule:{startDays:[1,3,7], weekDay:'sun', weeklyCount:8}, sortPrefs:{sections:'default', subjects:'default', topics:'default'}}
   };
 }
 function loadData(){
@@ -804,9 +804,81 @@ function renderExamDetail(examId){
        </span>
      </div>
    </div>
-   ${sections.length ? `<div class="subject-list">${sections.map(sec=>sectionSlideCard(sec)).join('')}</div>` : emptyRow('કોઈ વિભાગ ઉમેર્યો નથી')}
+   ${sections.length ? `${filterSortToolbarHTML('sections','sectionSearchInput','filterSectionsList')}<div class="subject-list" id="sectionsListWrap">${sortSectionsList(sections).map(sec=>sectionSlideCard(sec)).join('')}</div>` : emptyRow('કોઈ વિભાગ ઉમેર્યો નથી')}
   `;
 }
+const SORT_OPTIONS = {
+  sections: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['pct_desc','% પૂર્ણ ↓'],['pct_asc','% પૂર્ણ ↑']],
+  subjects: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['topics_desc','% ટોપિક ↓'],['topics_asc','% ટોપિક ↑'],['revision_desc','% રિવિઝન ↓'],['revision_asc','% રિવિઝન ↑']],
+  topics: [['default','ક્રમ પ્રમાણે'],['star_desc','⭐ સ્ટાર પ્રમાણે'],['status_done_first','પૂર્ણ પહેલા'],['status_pending_first','બાકી પહેલા']]
+};
+function filterSortToolbarHTML(level, searchInputId, filterFnName){
+  const current = (DB.settings.sortPrefs && DB.settings.sortPrefs[level]) || 'default';
+  const opts = SORT_OPTIONS[level];
+  return `<div class="flex-gap-6 mb-6">
+    <input type="text" id="${searchInputId}" placeholder="🔍 શોધો..." oninput="${filterFnName}()" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
+    <select onchange="setSortPref('${level}', this.value)" style="flex-shrink:0; max-width:130px;">
+      ${opts.map(([v,l])=>`<option value="${v}" ${current===v?'selected':''}>${l}</option>`).join('')}
+    </select>
+  </div>`;
+}
+function setSortPref(level, value){
+  if(!DB.settings.sortPrefs) DB.settings.sortPrefs = {};
+  DB.settings.sortPrefs[level] = value;
+  save(); renderMain();
+}
+function sortSectionsList(sections){
+  const mode = (DB.settings.sortPrefs && DB.settings.sortPrefs.sections) || 'default';
+  if(mode==='default') return sections;
+  if(mode==='name') return [...sections].sort((a,b)=>a.name.localeCompare(b.name));
+  const withPct = sections.map(sec=>{
+    const subs = sectionSubjects(sec.id);
+    let total=0, done=0;
+    subs.forEach(s=>{ const topics=subjectTopics(s.id); total+=topics.length; done+=topics.filter(t=>t.status==='completed').length; });
+    return {sec, pct: total?done/total*100:0};
+  });
+  if(mode==='pct_desc') return withPct.sort((a,b)=>b.pct-a.pct).map(x=>x.sec);
+  if(mode==='pct_asc') return withPct.sort((a,b)=>a.pct-b.pct).map(x=>x.sec);
+  return sections;
+}
+function sortSubjectsList(subs){
+  const mode = (DB.settings.sortPrefs && DB.settings.sortPrefs.subjects) || 'default';
+  if(mode==='default') return subs;
+  if(mode==='name') return [...subs].sort((a,b)=>a.name.localeCompare(b.name));
+  const withStats = subs.map(s=>{
+    const topics = subjectTopics(s.id);
+    const topicsPct = topics.length ? topics.filter(t=>t.status==='completed').length/topics.length*100 : 0;
+    const revs = DB.revisions.filter(r=>r.subjectId===s.id);
+    const revPct = revs.length ? revs.filter(r=>r.status==='completed').length/revs.length*100 : 0;
+    return {s, topicsPct, revPct};
+  });
+  if(mode==='topics_desc') return withStats.sort((a,b)=>b.topicsPct-a.topicsPct).map(x=>x.s);
+  if(mode==='topics_asc') return withStats.sort((a,b)=>a.topicsPct-b.topicsPct).map(x=>x.s);
+  if(mode==='revision_desc') return withStats.sort((a,b)=>b.revPct-a.revPct).map(x=>x.s);
+  if(mode==='revision_asc') return withStats.sort((a,b)=>a.revPct-b.revPct).map(x=>x.s);
+  return subs;
+}
+function sortTopicsList(topics){
+  const mode = (DB.settings.sortPrefs && DB.settings.sortPrefs.topics) || 'default';
+  if(mode==='default') return topics;
+  if(mode==='star_desc') return [...topics].sort((a,b)=>(b.importance||0)-(a.importance||0));
+  const rank = {completed:0, studying:1, not_started:2};
+  const rankRev = {completed:2, studying:1, not_started:0};
+  if(mode==='status_done_first') return [...topics].sort((a,b)=>rank[a.status]-rank[b.status]);
+  if(mode==='status_pending_first') return [...topics].sort((a,b)=>rankRev[a.status]-rankRev[b.status]);
+  return topics;
+}
+function filterListBySearch(inputId, wrapId){
+  const q = (val(inputId)||'').trim().toLowerCase();
+  const wrap = document.getElementById(wrapId);
+  if(!wrap) return;
+  wrap.querySelectorAll(':scope > [data-search]').forEach(el=>{
+    el.style.display = (!q || (el.dataset.search||'').includes(q)) ? '' : 'none';
+  });
+}
+function filterSectionsList(){ filterListBySearch('sectionSearchInput','sectionsListWrap'); }
+function filterSubjectsList(){ filterListBySearch('subjectSearchInput','subjectsListWrap'); }
+function filterTopicsList(){ filterListBySearch('topicSearchInput','topicsListWrap'); }
 function progressCardHeader(pct, titleHTML, editOnClick){
   return `<div style="display:flex; align-items:center; gap:14px;">
     ${miniRingSVG(pct)}
@@ -822,7 +894,7 @@ function sectionSlideCard(sec){
   subs.forEach(s=>{ const topics=subjectTopics(s.id); totalTopics+=topics.length; completedTopics+=topics.filter(t=>t.status==='completed').length; });
   const pct = totalTopics ? Math.round(completedTopics/totalTopics*100) : 0;
   const title = `📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}`;
-  return `<div class="card cursor-pointer" onclick="sectionDetailId='${sec.id}'; renderMain();">
+  return `<div class="card cursor-pointer" data-search="${esc(sec.name.toLowerCase())}" onclick="sectionDetailId='${sec.id}'; renderMain();">
       ${progressCardHeader(pct, title, `openSectionForm('${sec.id}','${sec.examId}')`)}
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${subs.length} વિષય — વિગત જોવા ટેપ કરો →</div>
   </div>`;
@@ -849,11 +921,12 @@ function renderSectionDetail(sectionId){
        <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
      </span>
    </div>
-   <div class="subject-list">${subjectListHTML(subs, '')}</div>
+   ${subjectListHTML(subs)}
   `;
 }
-function subjectListHTML(subs, q){
-  return subs.length ? `<div class="subject-list">${subs.map(s=>subjectSlideCard(s)).join('')}</div>` : emptyRow(q?'કોઈ વિષય મળ્યો નથી':'કોઈ વિષય ઉમેર્યો નથી');
+function subjectListHTML(subs){
+  if(!subs.length) return emptyRow('કોઈ વિષય ઉમેર્યો નથી');
+  return `${filterSortToolbarHTML('subjects','subjectSearchInput','filterSubjectsList')}<div class="subject-list" id="subjectsListWrap">${sortSubjectsList(subs).map(s=>subjectSlideCard(s)).join('')}</div>`;
 }
 function subjectSlideCard(s){
   const topics = subjectTopics(s.id);
@@ -862,7 +935,7 @@ function subjectSlideCard(s){
   const revs = DB.revisions.filter(r=>r.subjectId===s.id);
   const revDone = revs.filter(r=>r.status==='completed').length;
   const revPct = revs.length ? Math.round(revDone/revs.length*100) : 0;
-  return `<div class="card cursor-pointer" onclick="topicDetailId='${s.id}'; renderMain();">
+  return `<div class="card cursor-pointer" data-search="${esc(s.name.toLowerCase())}" onclick="topicDetailId='${s.id}'; renderMain();">
       ${progressCardHeader(pct, esc(s.name), `openSubjectForm('${s.id}','${s.examId}')`)}
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
         <div class="subject-mini-stat"><b>${topics.length}</b><span>કુલ ચેપ્ટર</span></div>
@@ -914,7 +987,7 @@ function renderTopicDetail(subjectId){
      </div>
      <h3 style="margin:10px 0 0 0;">બધા ટોપિક</h3>
    </div>
-   ${topics.length ? topics.map(t=>topicRow(t)).join('') : emptyRow('કોઈ ટોપિક નથી')}
+   ${topics.length ? `${filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList')}<div id="topicsListWrap">${sortTopicsList(topics).map(t=>topicRow(t)).join('')}</div>` : emptyRow('કોઈ ટોપિક નથી')}
   `;
 }
 function topicReorderListHTML(subjectId){
@@ -1065,7 +1138,7 @@ function topicRow(t){
   const stars = topicImportanceStars(t.importance);
   const wrapId = 'topicdd_'+t.id;
   const shouldExpand = isAccordionOpen(wrapId);
-  return `<div class="topic-row${highlight}" id="topic-${t.id}">
+  return `<div class="topic-row${highlight}" data-search="${esc(t.name.toLowerCase())}" id="topic-${t.id}">
     <div class="topic-row-top">
       <span onclick="cycleTopicStatus('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px;">${statusDot}</span>
       <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
