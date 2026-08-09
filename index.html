@@ -810,7 +810,7 @@ function renderExamDetail(examId){
 const SORT_OPTIONS = {
   sections: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['pct_desc','% પૂર્ણ ↓'],['pct_asc','% પૂર્ણ ↑']],
   subjects: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['topics_desc','% ટોપિક ↓'],['topics_asc','% ટોપિક ↑'],['revision_desc','% રિવિઝન ↓'],['revision_asc','% રિવિઝન ↑']],
-  topics: [['default','ક્રમ પ્રમાણે'],['star_desc','⭐ સ્ટાર પ્રમાણે'],['status_done_first','પૂર્ણ પહેલા'],['status_pending_first','બાકી પહેલા']]
+  topics: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['star_desc','⭐ સ્ટાર પ્રમાણે'],['status_done_first','પૂર્ણ પહેલા'],['status_pending_first','બાકી પહેલા']]
 };
 function filterSortToolbarHTML(level, searchInputId, filterFnName){
   const current = (DB.settings.sortPrefs && DB.settings.sortPrefs[level]) || 'default';
@@ -861,6 +861,7 @@ function sortSubjectsList(subs){
 function sortTopicsList(topics){
   const mode = (DB.settings.sortPrefs && DB.settings.sortPrefs.topics) || 'default';
   if(mode==='default') return topics;
+  if(mode==='name') return [...topics].sort((a,b)=>a.name.localeCompare(b.name));
   if(mode==='star_desc') return [...topics].sort((a,b)=>(b.importance||0)-(a.importance||0));
   const rank = {completed:0, studying:1, not_started:2};
   const rankRev = {completed:2, studying:1, not_started:0};
