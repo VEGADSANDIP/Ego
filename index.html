@@ -817,7 +817,7 @@ function filterSortToolbarHTML(level, searchInputId, filterFnName){
   const opts = SORT_OPTIONS[level];
   return `<div class="flex-gap-6 mb-6">
     <input type="text" id="${searchInputId}" placeholder="🔍 શોધો..." oninput="${filterFnName}()" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
-    <select onchange="setSortPref('${level}', this.value)" style="flex-shrink:0; max-width:130px;">
+    <select onchange="setSortPref('${level}', this.value)" style="flex-shrink:0; max-width:135px; padding:8px 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit;">
       ${opts.map(([v,l])=>`<option value="${v}" ${current===v?'selected':''}>${l}</option>`).join('')}
     </select>
   </div>`;
@@ -1142,7 +1142,7 @@ function topicRow(t){
     <div class="topic-row-top">
       <span onclick="cycleTopicStatus('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px;">${statusDot}</span>
       <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
-      ${stars ? `<span onclick="event.stopPropagation(); cycleTopicImportance('${t.id}')" class="ink-dim fs-12" style="flex-shrink:0; cursor:pointer;">${stars}</span>` : ''}
+      ${stars ? `<span class="ink-dim fs-12" style="flex-shrink:0;">${stars}</span>` : ''}
       <span onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" class="ink-dim" style="flex-shrink:0; cursor:pointer; padding:0 4px; font-size:12px;"><span class="accordion-caret">${shouldExpand?'▲':'▼'}</span></span>
       <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>
     </div>
@@ -1151,9 +1151,7 @@ function topicRow(t){
         <span class="badge badge-grey" onclick="openTopicSubtopicManageForm('${t.id}')">📑 સબ-ટોપિક${subs.length?` (${subs.length})`:''}</span>
         <span class="badge badge-grey" onclick="openTopicRevisionForm('${t.id}')">🔁 રિવિઝન</span>
       </div>
-      <div class="mt-8 cursor-pointer" onclick="cycleTopicImportance('${t.id}')">
-        <span class="ink-dim fs-125">${stars || '☆ સ્ટાર (ટેપ કરો)'}</span>
-      </div>
+      ${starRatingHTML(t.id, t.importance)}
       <div class="mt-8 cursor-pointer" onclick="openTopicNoteForm('${t.id}')">
         <span class="ink-dim fs-12">📅 ${t.importanceNote ? esc(t.importanceNote) : 'નોંધ ઉમેરો (કયા વર્ષમાં પુછાયું)'}</span>
       </div>
@@ -1356,10 +1354,18 @@ function revisionStageLabel(stage){
   const weekDayLabel = {sun:'રવિ',mon:'સોમ',tue:'મંગળ',wed:'બુધ',thu:'ગુરુ',fri:'શુક્ર',sat:'શનિ'}[rule.weekDay] || 'રવિ';
   return stage<=startDays.length ? `Day+${startDays[stage-1]}` : `${weekDayLabel} રિવિઝન #${stage-startDays.length}`;
 }
-function cycleTopicImportance(id){
+function starRatingHTML(topicId, level){
+  level = level||0;
+  let stars = '';
+  for(let i=1;i<=3;i++){
+    stars += `<span onclick="setTopicImportance('${topicId}', ${i})" style="font-size:22px; line-height:1; cursor:pointer;">${i<=level?'⭐':'☆'}</span>`;
+  }
+  return `<div class="mt-8" style="display:flex; gap:4px; align-items:center;">${stars}${level>0?`<span onclick="setTopicImportance('${topicId}', 0)" class="ink-dim fs-12 cursor-pointer" style="margin-left:8px;">સાફ કરો</span>`:''}</div>`;
+}
+function setTopicImportance(id, level){
   const t = DB.topics.find(x=>x.id===id);
   if(!t) return;
-  t.importance = ((t.importance||0)+1) % 4;
+  t.importance = level;
   save(); renderMain();
 }
 function openTopicEditForm(id, subjectId){
