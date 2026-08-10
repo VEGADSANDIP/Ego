@@ -258,7 +258,7 @@ function defaultData(){
   return {
     exams:[], subjects:[], topics:[], revisions:[], sections:[],
     studyLogs:[], mockTests:[], timetable:[], chapterTimetable:[], subtopics:[],
-    settings:{theme:'light', brandName:'ExamPath', revisionRule:{startDays:[1,3,7], weekDay:'sun', weeklyCount:8}, sortPrefs:{sections:'default', subjects:'default', topics:'default'}}
+    settings:{theme:'light', brandName:'ExamPath', revisionRule:{startDays:[1,3,7], weekDay:'sun', weeklyCount:8}, sortPrefs:{sections:'default', subjects:{}, topics:{}}}
   };
 }
 function loadData(){
@@ -812,23 +812,34 @@ const SORT_OPTIONS = {
   subjects: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['topics_desc','% ટોપિક ↓'],['topics_asc','% ટોપિક ↑'],['revision_desc','% રિવિઝન ↓'],['revision_asc','% રિવિઝન ↑']],
   topics: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['star_desc','⭐ સ્ટાર પ્રમાણે'],['status_done_first','પૂર્ણ પહેલા'],['status_pending_first','બાકી પહેલા']]
 };
-function filterSortToolbarHTML(level, searchInputId, filterFnName){
-  const current = (DB.settings.sortPrefs && DB.settings.sortPrefs[level]) || 'default';
+function getSortPref(level, key){
+  const sp = DB.settings.sortPrefs;
+  if(!sp) return 'default';
+  if(level==='sections') return sp.sections || 'default';
+  if(level==='subjects') return (sp.subjects && sp.subjects[key||'none']) || 'default';
+  if(level==='topics') return (sp.topics && sp.topics[key]) || 'default';
+  return 'default';
+}
+function filterSortToolbarHTML(level, searchInputId, filterFnName, key){
+  const current = getSortPref(level, key);
   const opts = SORT_OPTIONS[level];
   return `<div class="flex-gap-6 mb-6">
     <input type="text" id="${searchInputId}" placeholder="🔍 શોધો..." oninput="${filterFnName}()" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
-    <select onchange="setSortPref('${level}', this.value)" style="flex-shrink:0; max-width:135px; padding:8px 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit;">
+    <select onchange="setSortPref('${level}', this.value, ${key?`'${key}'`:'null'})" style="flex-shrink:0; max-width:135px; padding:8px 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit;">
       ${opts.map(([v,l])=>`<option value="${v}" ${current===v?'selected':''}>${l}</option>`).join('')}
     </select>
   </div>`;
 }
-function setSortPref(level, value){
-  if(!DB.settings.sortPrefs) DB.settings.sortPrefs = {};
-  DB.settings.sortPrefs[level] = value;
+function setSortPref(level, value, key){
+  if(!DB.settings.sortPrefs) DB.settings.sortPrefs = {sections:'default', subjects:{}, topics:{}};
+  const sp = DB.settings.sortPrefs;
+  if(level==='sections'){ sp.sections = value; }
+  else if(level==='subjects'){ if(!sp.subjects) sp.subjects = {}; sp.subjects[key||'none'] = value; }
+  else if(level==='topics'){ if(!sp.topics) sp.topics = {}; sp.topics[key] = value; }
   save(); renderMain();
 }
 function sortSectionsList(sections){
-  const mode = (DB.settings.sortPrefs && DB.settings.sortPrefs.sections) || 'default';
+  const mode = getSortPref('sections');
   if(mode==='default') return sections;
   if(mode==='name') return [...sections].sort((a,b)=>a.name.localeCompare(b.name));
   const withPct = sections.map(sec=>{
@@ -841,8 +852,8 @@ function sortSectionsList(sections){
   if(mode==='pct_asc') return withPct.sort((a,b)=>a.pct-b.pct).map(x=>x.sec);
   return sections;
 }
-function sortSubjectsList(subs){
-  const mode = (DB.settings.sortPrefs && DB.settings.sortPrefs.subjects) || 'default';
+function sortSubjectsList(subs, sectionKey){
+  const mode = getSortPref('subjects', sectionKey);
   if(mode==='default') return subs;
   if(mode==='name') return [...subs].sort((a,b)=>a.name.localeCompare(b.name));
   const withStats = subs.map(s=>{
@@ -858,8 +869,8 @@ function sortSubjectsList(subs){
   if(mode==='revision_asc') return withStats.sort((a,b)=>a.revPct-b.revPct).map(x=>x.s);
   return subs;
 }
-function sortTopicsList(topics){
-  const mode = (DB.settings.sortPrefs && DB.settings.sortPrefs.topics) || 'default';
+function sortTopicsList(topics, subjectKey){
+  const mode = getSortPref('topics', subjectKey);
   if(mode==='default') return topics;
   if(mode==='name') return [...topics].sort((a,b)=>a.name.localeCompare(b.name));
   if(mode==='star_desc') return [...topics].sort((a,b)=>(b.importance||0)-(a.importance||0));
@@ -922,12 +933,12 @@ function renderSectionDetail(sectionId){
        <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
      </span>
    </div>
-   ${subjectListHTML(subs)}
+   ${subjectListHTML(subs, sec.id)}
   `;
 }
-function subjectListHTML(subs){
+function subjectListHTML(subs, sectionKey){
   if(!subs.length) return emptyRow('કોઈ વિષય ઉમેર્યો નથી');
-  return `${filterSortToolbarHTML('subjects','subjectSearchInput','filterSubjectsList')}<div class="subject-list" id="subjectsListWrap">${sortSubjectsList(subs).map(s=>subjectSlideCard(s)).join('')}</div>`;
+  return `${filterSortToolbarHTML('subjects','subjectSearchInput','filterSubjectsList', sectionKey)}<div class="subject-list" id="subjectsListWrap">${sortSubjectsList(subs, sectionKey).map(s=>subjectSlideCard(s)).join('')}</div>`;
 }
 function subjectSlideCard(s){
   const topics = subjectTopics(s.id);
@@ -988,7 +999,7 @@ function renderTopicDetail(subjectId){
      </div>
      <h3 style="margin:10px 0 0 0;">બધા ટોપિક</h3>
    </div>
-   ${topics.length ? `${filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList')}<div id="topicsListWrap">${sortTopicsList(topics).map(t=>topicRow(t)).join('')}</div>` : emptyRow('કોઈ ટોપિક નથી')}
+   ${topics.length ? `${filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList', s.id)}<div id="topicsListWrap">${sortTopicsList(topics, s.id).map(t=>topicRow(t)).join('')}</div>` : emptyRow('કોઈ ટોપિક નથી')}
   `;
 }
 function topicReorderListHTML(subjectId){
