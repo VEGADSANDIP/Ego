@@ -816,8 +816,8 @@ function getSortPref(level, key){
   const sp = DB.settings.sortPrefs;
   if(!sp) return 'default';
   if(level==='sections') return sp.sections || 'default';
-  if(level==='subjects') return (sp.subjects && sp.subjects[key||'none']) || 'default';
-  if(level==='topics') return (sp.topics && sp.topics[key]) || 'default';
+  if(level==='subjects') return (sp.subjects && typeof sp.subjects==='object' && sp.subjects[key||'none']) || 'default';
+  if(level==='topics') return (sp.topics && typeof sp.topics==='object' && sp.topics[key]) || 'default';
   return 'default';
 }
 function filterSortToolbarHTML(level, searchInputId, filterFnName, key){
@@ -834,8 +834,8 @@ function setSortPref(level, value, key){
   if(!DB.settings.sortPrefs) DB.settings.sortPrefs = {sections:'default', subjects:{}, topics:{}};
   const sp = DB.settings.sortPrefs;
   if(level==='sections'){ sp.sections = value; }
-  else if(level==='subjects'){ if(!sp.subjects) sp.subjects = {}; sp.subjects[key||'none'] = value; }
-  else if(level==='topics'){ if(!sp.topics) sp.topics = {}; sp.topics[key] = value; }
+  else if(level==='subjects'){ if(!sp.subjects || typeof sp.subjects!=='object') sp.subjects = {}; sp.subjects[key||'none'] = value; }
+  else if(level==='topics'){ if(!sp.topics || typeof sp.topics!=='object') sp.topics = {}; sp.topics[key] = value; }
   save(); renderMain();
 }
 function sortSectionsList(sections){
