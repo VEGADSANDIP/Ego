@@ -1198,33 +1198,76 @@ function cycleTopicStatus(id){
       return;
     }
   }
+  if(!hasSubtopics && next==='completed'){
+    openCompleteTopicSheet(id);
+    return;
+  }
   let msg = `સ્ટેટસ "${labels[t.status]}" માંથી "${labels[next]}" કરવું છે?`;
   if(hasSubtopics){
     if(next==='completed') msg += '\n\nℹ️ બધા સબ-ટોપિક પૂર્ણ છે. રિવિઝન દરેક સબ-ટોપિક પ્રમાણે પહેલેથી જ જનરેટ થયેલું છે.';
   } else {
     if(t.status==='completed' && next==='not_started'){
       msg += '\n\n⚠️ ધ્યાન રાખો: આ ટોપિકનું બધું રિવિઝન (પૂર્ણ થયેલું પણ) કેન્સલ થઈ જશે.';
-    } else if(next==='completed'){
-      msg += '\n\n🔁 રિવિઝન શેડ્યુલ ઓટો-જનરેટ થશે.';
     }
   }
   if(!confirm(msg)) return;
   t.status = next;
   if(next==='completed'){
     t.completedDate = todayStr();
-    if(!hasSubtopics){ generateRevisions(t); toast('ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁'); }
-    else toast('ટોપિક પૂર્ણ!');
+    toast('ટોપિક પૂર્ણ!');
   } else {
     if(!hasSubtopics) DB.revisions = DB.revisions.filter(r=>r.topicId!==t.id);
     toast('સ્ટેટસ બદલાયું');
   }
   save(); renderMain();
 }
-function generateRevisionsForEntity(topicId, subjectId, subtopicId){
+function openCompleteTopicSheet(id){
+  const t = DB.topics.find(x=>x.id===id);
+  if(!t) return;
+  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
+  openSheet(`
+    <h3>ટોપિક પૂર્ણ કરવું છે?</h3>
+    <div class="ink-dim fs-12 mb-6">${esc(t.name)}</div>
+    <button class="btn btn-primary btn-block mb-6" onclick="completeTopicWithRule('${id}')">✓ પૂર્ણ કરો — ડિફૉલ્ટ રિવિઝન (${(rule.startDays||[1,3,7]).join(',')} દિવસ...)</button>
+    <button class="btn btn-secondary btn-block" onclick="openCustomRevisionForm('topic','${id}')">✨ કસ્ટમ પેટર્ન સેટ કરો</button>
+  `);
+}
+function completeTopicWithRule(id, customRule){
+  const t = DB.topics.find(x=>x.id===id);
+  if(!t) return;
+  t.status = 'completed';
+  t.completedDate = todayStr();
+  generateRevisions(t, customRule);
+  save(); closeSheet(); renderMain();
+  toast(customRule ? 'ટોપિક પૂર્ણ! કસ્ટમ રિવિઝન જનરેટ થઈ 🔁' : 'ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁');
+}
+function openCustomRevisionForm(entityType, id){
+  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
+  const weekDayOptions = [['sun','રવિવાર'],['mon','સોમવાર'],['tue','મંગળવાર'],['wed','બુધવાર'],['thu','ગુરુવાર'],['fri','શુક્રવાર'],['sat','શનિવાર']];
+  openSheet(`
+    <h3>✨ કસ્ટમ રિવિઝન પેટર્ન</h3>
+    <div class="ink-dim fs-12 mb-6">ફક્ત આ એક ટોપિક/સબ-ટોપિક પૂરતું — Settings નો ડિફૉલ્ટ નિયમ બદલાશે નહીં</div>
+    <div class="field"><label>શરૂઆતના દિવસો (કોમાથી અલગ કરો)</label><input type="text" id="f_custom_days" value="${(rule.startDays||[1,3,7]).join(',')}" placeholder="દા.ત. 1,3,7"></div>
+    <div class="field"><label>કયો વાર કમ્પલસરી?</label><select id="f_custom_weekday">${weekDayOptions.map(([k,l])=>`<option value="${k}" ${rule.weekDay===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div class="field"><label>કેટલી વાર (સપ્તાહ) સુધી?</label><input type="number" id="f_custom_count" value="${rule.weeklyCount!=null?rule.weeklyCount:8}"></div>
+    <button class="btn btn-primary btn-block" onclick="saveCustomRevisionForm('${entityType}','${id}')">પૂર્ણ કરો ને રિવિઝન સેટ કરો</button>
+  `);
+}
+function saveCustomRevisionForm(entityType, id){
+  const daysRaw = val('f_custom_days');
+  const startDays = daysRaw.split(',').map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n) && n>0).sort((a,b)=>a-b);
+  const weekDay = val('f_custom_weekday') || 'sun';
+  const weeklyCount = Math.max(0, parseInt(val('f_custom_count'),10) || 0);
+  if(!startDays.length){ toast('ઓછામાં ઓછો એક દિવસ ભરો','error'); return; }
+  const customRule = {startDays, weekDay, weeklyCount};
+  if(entityType==='topic') completeTopicWithRule(id, customRule);
+  else completeSubtopicWithRule(id, customRule);
+}
+function generateRevisionsForEntity(topicId, subjectId, subtopicId, customRule){
   if(subtopicId) DB.revisions = DB.revisions.filter(r=>r.subtopicId!==subtopicId);
   else DB.revisions = DB.revisions.filter(r=>r.topicId!==topicId);
   const base = new Date(todayStr()+'T00:00:00');
-  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
+  const rule = customRule || DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
   const startDays = (rule.startDays && rule.startDays.length) ? rule.startDays : [1,3,7];
   const weekDayNum = {sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6}[rule.weekDay] ?? 0;
   const weeklyCount = rule.weeklyCount>=0 ? rule.weeklyCount : 8;
@@ -1248,11 +1291,11 @@ function generateRevisionsForEntity(topicId, subjectId, subtopicId){
     DB.revisions.push(entry);
   });
 }
-function generateRevisions(topic){
-  generateRevisionsForEntity(topic.id, topic.subjectId, null);
+function generateRevisions(topic, customRule){
+  generateRevisionsForEntity(topic.id, topic.subjectId, null, customRule);
 }
-function generateSubtopicRevisions(subtopic){
-  generateRevisionsForEntity(subtopic.topicId, subtopic.subjectId, subtopic.id);
+function generateSubtopicRevisions(subtopic, customRule){
+  generateRevisionsForEntity(subtopic.topicId, subtopic.subjectId, subtopic.id, customRule);
 }
 function openExamForm(id){
   const e = id ? DB.exams.find(x=>x.id===id) : null;
@@ -1540,13 +1583,28 @@ function toggleSubtopicComplete(id){
     openTopicRevisionForm(st.topicId);
     toast('સ્ટેટસ બદલાયું');
   } else {
-    if(!confirm('આ સબ-ટોપિક પૂર્ણ કરવું છે?\n\n🔁 રિવિઝન શેડ્યુલ ઓટો-જનરેટ થશે.')) return;
-    st.completed=true; st.completedDate=todayStr();
-    generateSubtopicRevisions(st);
-    save(); renderMain();
-    openTopicRevisionForm(st.topicId);
-    toast('સબ-ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁');
+    openCompleteSubtopicSheet(id);
   }
+}
+function openCompleteSubtopicSheet(id){
+  const st = DB.subtopics.find(x=>x.id===id);
+  if(!st) return;
+  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
+  openSheet(`
+    <h3>સબ-ટોપિક પૂર્ણ કરવું છે?</h3>
+    <div class="ink-dim fs-12 mb-6">${esc(st.name)}</div>
+    <button class="btn btn-primary btn-block mb-6" onclick="completeSubtopicWithRule('${id}')">✓ પૂર્ણ કરો — ડિફૉલ્ટ રિવિઝન (${(rule.startDays||[1,3,7]).join(',')} દિવસ...)</button>
+    <button class="btn btn-secondary btn-block" onclick="openCustomRevisionForm('subtopic','${id}')">✨ કસ્ટમ પેટર્ન સેટ કરો</button>
+  `);
+}
+function completeSubtopicWithRule(id, customRule){
+  const st = DB.subtopics.find(x=>x.id===id);
+  if(!st) return;
+  st.completed=true; st.completedDate=todayStr();
+  generateSubtopicRevisions(st, customRule);
+  save(); renderMain();
+  openTopicRevisionForm(st.topicId);
+  toast(customRule ? 'સબ-ટોપિક પૂર્ણ! કસ્ટમ રિવિઝન જનરેટ થઈ 🔁' : 'સબ-ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁');
 }
 function deleteSubtopic(id){
   if(!confirm('આ સબ-ટોપિક ડિલીટ કરવું છે?'))return;
