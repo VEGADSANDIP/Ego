@@ -1319,13 +1319,23 @@ function saveExam(id){
   else { const makeActive = DB.exams.length===0; DB.exams.push({id:uid(),name,date,description:desc,active:makeActive}); }
   save(); closeSheet(); renderMain(); populateExamSwitcher(); toast('સેવ થયું');
 }
+function cascadeDeleteSubjectData(subjectId){
+  const topicIds = DB.topics.filter(t=>t.subjectId===subjectId).map(t=>t.id);
+  DB.subtopics = DB.subtopics.filter(st=>!topicIds.includes(st.topicId));
+  DB.revisions = DB.revisions.filter(r=>r.subjectId!==subjectId);
+  DB.topics = DB.topics.filter(t=>t.subjectId!==subjectId);
+  DB.studyLogs = DB.studyLogs.filter(l=>l.subjectId!==subjectId);
+  DB.timetable = DB.timetable.filter(x=>x.subjectId!==subjectId);
+  DB.chapterTimetable = DB.chapterTimetable.filter(x=>x.subjectId!==subjectId);
+  DB.mockTests.forEach(m=>{ if(m.subjectMarks) m.subjectMarks = m.subjectMarks.filter(sm=>sm.subjectId!==subjectId); });
+}
 function deleteExam(id){
-  if(!confirm('આ પરીક્ષા અને તેના તમામ વિષય/ટોપિક ડિલીટ થશે. ચાલુ રાખવું છે?'))return;
+  if(!confirm('આ પરીક્ષા અને તેના તમામ વિભાગ/વિષય/ટોપિક/સબ-ટોપિક/રિવિઝન/અભ્યાસ/ટાઈમટેબલ/મોક ટેસ્ટ — બધું ડિલીટ થશે. ચાલુ રાખવું છે?'))return;
   const subIds = DB.subjects.filter(s=>s.examId===id).map(s=>s.id);
-  DB.topics = DB.topics.filter(t=>!subIds.includes(t.subjectId));
-  DB.revisions = DB.revisions.filter(r=>!subIds.includes(r.subjectId));
+  subIds.forEach(sid=>cascadeDeleteSubjectData(sid));
   DB.subjects = DB.subjects.filter(s=>s.examId!==id);
   DB.sections = DB.sections.filter(x=>x.examId!==id);
+  DB.mockTests = DB.mockTests.filter(m=>m.examId!==id);
   DB.exams = DB.exams.filter(x=>x.id!==id);
   if(DB.exams.length && !DB.exams.find(x=>x.active)) DB.exams[0].active=true;
   examDetailId=null;
@@ -1396,9 +1406,8 @@ function deleteSection(id){
   save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
 }
 function deleteSubject(id){
-  if(!confirm('આ વિષય અને તેના ટોપિક ડિલીટ થશે?'))return;
-  DB.revisions = DB.revisions.filter(r=>r.subjectId!==id);
-  DB.topics = DB.topics.filter(t=>t.subjectId!==id);
+  if(!confirm('આ વિષય, તેના ટોપિક/સબ-ટોપિક, રિવિઝન, અભ્યાસ-લોગ, ટાઈમટેબલ — બધું ડિલીટ થશે. ચાલુ રાખવું છે?'))return;
+  cascadeDeleteSubjectData(id);
   DB.subjects = DB.subjects.filter(x=>x.id!==id);
   if(topicDetailId===id) topicDetailId=null;
   save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
@@ -1442,10 +1451,16 @@ function saveTopic(id, subjectId){
   save(); closeSheet(); renderMain(); toast('સેવ થયું');
 }
 function deleteTopic(id){
-  if(!confirm('ડિલીટ કરવું છે?'))return;
+  if(!confirm('ડિલીટ કરવું છે? આ ટોપિકના સબ-ટોપિક, રિવિઝન, અભ્યાસ-લોગ સંદર્ભ પણ સાફ થશે.'))return;
+  const subIds = DB.subtopics.filter(x=>x.topicId===id).map(x=>x.id);
   DB.topics = DB.topics.filter(x=>x.id!==id);
   DB.subtopics = DB.subtopics.filter(x=>x.topicId!==id);
   DB.revisions = DB.revisions.filter(r=>r.topicId!==id);
+  DB.studyLogs.forEach(l=>{
+    if(l.topicId===id) l.topicId='';
+    if(l.topicIds) l.topicIds = l.topicIds.filter(tid=>tid!==id);
+    if(l.subtopicIds && subIds.length) l.subtopicIds = l.subtopicIds.filter(sid=>!subIds.includes(sid));
+  });
   save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
 }
 function openTopicNoteForm(id){
@@ -1611,6 +1626,7 @@ function deleteSubtopic(id){
   const st = DB.subtopics.find(x=>x.id===id);
   DB.subtopics = DB.subtopics.filter(x=>x.id!==id);
   DB.revisions = DB.revisions.filter(r=>r.subtopicId!==id);
+  DB.studyLogs.forEach(l=>{ if(l.subtopicIds) l.subtopicIds = l.subtopicIds.filter(sid=>sid!==id); });
   save(); renderMain();
   if(st) openTopicSubtopicManageForm(st.topicId);
   toast('ડિલીટ થયું');
@@ -2497,6 +2513,8 @@ function renderSettings(){
    ${card('ડેટા', `
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="exportBackup()">⬇️ બેકઅપ એક્સપોર્ટ કરો</button>
      <label class="btn btn-secondary btn-block" style="margin-bottom:8px;display:block;text-align:center;">⬆️ બેકઅપ ઇમ્પોર્ટ કરો<input type="file" accept="application/json" style="display:none" onchange="importBackup(event)"></label>
+     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="cleanOrphanedData()">🧹 જૂનો છૂટો ડેટા સાફ કરો</button>
+     <div class="ink-dim fs-12 mb-6">ડિલીટ થયેલા વિષય/ટોપિક સાથે જોડાયેલો, પણ પાછળ રહી ગયેલો ડેટા (અભ્યાસ-લોગ, રિવિઝન, ટાઈમટેબલ) સાફ કરે — સેફ, બાકી કંઈ અસર નહીં થાય</div>
      <button class="btn btn-danger btn-block" onclick="resetAllData()">🗑️ બધો ડેટા રીસેટ કરો</button>
    `)}
    ${card('વિશે', `<div class="ink-dim" style="font-size:13px;line-height:1.7;">ExamPath — સંપૂર્ણ ઓફલાઈન સ્ટડી ટ્રેકર.<br>તમામ ડેટા ફક્ત તમારા મોબાઈલમાં (બ્રાઉઝર સ્ટોરેજ) સેવ થાય છે — ક્યાંય ઈન્ટરનેટ પર મોકલવામાં આવતો નથી. નિયમિત બેકઅપ એક્સપોર્ટ કરવાની ભલામણ છે.</div>`)}
@@ -2518,6 +2536,42 @@ function applyTheme(){
   document.documentElement.setAttribute('data-theme', theme);
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if(metaTheme) metaTheme.setAttribute('content', theme==='dark' ? '#1A1A1A' : '#FFFFFF');
+}
+function cleanOrphanedData(){
+  if(!confirm('ડિલીટ થયેલા વિષય/ટોપિક સાથે જોડાયેલો જૂનો, છૂટો પડેલો ડેટા સાફ કરવો છે? (સ્ટડી લોગ, રિવિઝન, ટાઈમટેબલ, મોક ટેસ્ટના ભાગ વગેરેમાંથી)')) return;
+  const examIds = new Set(DB.exams.map(e=>e.id));
+  const beforeSections = DB.sections.length;
+  DB.sections = DB.sections.filter(s=>examIds.has(s.examId));
+  const beforeSubjects = DB.subjects.length;
+  DB.subjects = DB.subjects.filter(s=>examIds.has(s.examId));
+  const sectionIds = new Set(DB.sections.map(s=>s.id));
+  DB.subjects.forEach(s=>{ if(s.sectionId && !sectionIds.has(s.sectionId)) s.sectionId = null; });
+  const subjectIds = new Set(DB.subjects.map(s=>s.id));
+  const beforeTopics = DB.topics.length;
+  DB.topics = DB.topics.filter(t=>subjectIds.has(t.subjectId));
+  const topicIds = new Set(DB.topics.map(t=>t.id));
+  const beforeSubtopics = DB.subtopics.length;
+  DB.subtopics = DB.subtopics.filter(st=>topicIds.has(st.topicId));
+  const subtopicIds = new Set(DB.subtopics.map(s=>s.id));
+  const beforeRevisions = DB.revisions.length;
+  DB.revisions = DB.revisions.filter(r=>subjectIds.has(r.subjectId) && topicIds.has(r.topicId) && (!r.subtopicId || subtopicIds.has(r.subtopicId)));
+  const beforeLogs = DB.studyLogs.length;
+  DB.studyLogs = DB.studyLogs.filter(l=>subjectIds.has(l.subjectId));
+  DB.studyLogs.forEach(l=>{
+    if(l.topicId && !topicIds.has(l.topicId)) l.topicId = '';
+    if(l.topicIds) l.topicIds = l.topicIds.filter(id=>topicIds.has(id));
+    if(l.subtopicIds) l.subtopicIds = l.subtopicIds.filter(id=>subtopicIds.has(id));
+  });
+  const beforeTT = DB.timetable.length;
+  DB.timetable = DB.timetable.filter(x=>subjectIds.has(x.subjectId));
+  const beforeCT = DB.chapterTimetable.length;
+  DB.chapterTimetable = DB.chapterTimetable.filter(x=>subjectIds.has(x.subjectId));
+  const beforeMocks = DB.mockTests.length;
+  DB.mockTests = DB.mockTests.filter(m=>examIds.has(m.examId));
+  DB.mockTests.forEach(m=>{ if(m.subjectMarks) m.subjectMarks = m.subjectMarks.filter(sm=>subjectIds.has(sm.subjectId)); });
+  const removed = (beforeSections-DB.sections.length) + (beforeSubjects-DB.subjects.length) + (beforeTopics-DB.topics.length) + (beforeSubtopics-DB.subtopics.length) + (beforeRevisions-DB.revisions.length) + (beforeLogs-DB.studyLogs.length) + (beforeTT-DB.timetable.length) + (beforeCT-DB.chapterTimetable.length) + (beforeMocks-DB.mockTests.length);
+  save(); renderMain();
+  toast(removed>0 ? `સાફ થયું — ${removed} જૂના રેકોર્ડ કાઢ્યા 🧹` : 'બધું પહેલેથી ચોખ્ખું છે ✅');
 }
 function exportBackup(){
   const blob = new Blob([JSON.stringify(DB,null,2)], {type:'application/json'});
