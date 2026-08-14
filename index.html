@@ -1239,7 +1239,9 @@ function completeTopicWithRule(id, customRule){
   t.completedDate = todayStr();
   generateRevisions(t, customRule);
   save(); closeSheet(); renderMain();
-  toast(customRule ? 'ટોપિક પૂર્ણ! કસ્ટમ રિવિઝન જનરેટ થઈ 🔁' : 'ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁');
+  const nextLabel = nextRevisionLabel(t.id, null);
+  const base = customRule ? 'ટોપિક પૂર્ણ! કસ્ટમ રિવિઝન જનરેટ થઈ 🔁' : 'ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁';
+  toast(nextLabel ? `${base} · આગામી: ${nextLabel}` : base);
 }
 function openCustomRevisionForm(entityType, id){
   const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
@@ -1417,6 +1419,16 @@ function revisionStageLabel(stage){
   const startDays = (rule.startDays && rule.startDays.length) ? rule.startDays : [1,3,7];
   const weekDayLabel = {sun:'રવિ',mon:'સોમ',tue:'મંગળ',wed:'બુધ',thu:'ગુરુ',fri:'શુક્ર',sat:'શનિ'}[rule.weekDay] || 'રવિ';
   return stage<=startDays.length ? `Day+${startDays[stage-1]}` : `${weekDayLabel} રિવિઝન #${stage-startDays.length}`;
+}
+function nextRevisionLabel(topicId, subtopicId, excludeId){
+  const list = DB.revisions.filter(r=>{
+    if(r.status!=='pending') return false;
+    if(excludeId && r.id===excludeId) return false;
+    return subtopicId ? r.subtopicId===subtopicId : (r.topicId===topicId && !r.subtopicId);
+  });
+  if(!list.length) return '';
+  const next = [...list].sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
+  return `${revisionStageLabel(next.stage)} — ${formatDate(next.dueDate)}`;
 }
 function starRatingHTML(topicId, level){
   level = level||0;
@@ -1619,7 +1631,9 @@ function completeSubtopicWithRule(id, customRule){
   generateSubtopicRevisions(st, customRule);
   save(); renderMain();
   openTopicRevisionForm(st.topicId);
-  toast(customRule ? 'સબ-ટોપિક પૂર્ણ! કસ્ટમ રિવિઝન જનરેટ થઈ 🔁' : 'સબ-ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁');
+  const nextLabel = nextRevisionLabel(st.topicId, st.id);
+  const base = customRule ? 'સબ-ટોપિક પૂર્ણ! કસ્ટમ રિવિઝન જનરેટ થઈ 🔁' : 'સબ-ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁';
+  toast(nextLabel ? `${base} · આગામી: ${nextLabel}` : base);
 }
 function deleteSubtopic(id){
   if(!confirm('આ સબ-ટોપિક ડિલીટ કરવું છે?'))return;
@@ -1878,7 +1892,10 @@ function toggleRevisionStatus(id){
   } else {
     if(!confirm('આ રિવિઝન પૂર્ણ કરવું છે?')) return;
     r.status='completed'; r.completedDate=todayStr();
-    save(); renderMain(); toast('રિવિઝન પૂર્ણ 🎉');
+    save(); renderMain();
+    const doneLabel = `✓ ${revisionStageLabel(r.stage)} રિવિઝન પૂર્ણ — ${formatDate(r.dueDate)}`;
+    const nextLabel = nextRevisionLabel(r.topicId, r.subtopicId);
+    toast(nextLabel ? `${doneLabel} · આગામી: ${nextLabel}` : doneLabel);
   }
 }
 function deleteRevision(id){
