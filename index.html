@@ -596,15 +596,6 @@ function renderDashboard(){
      ${streakInfo.todayDone ? `<span class="badge badge-success">આજે ✓</span>` : `<span class="badge badge-warning">આજે હજુ બાકી</span>`}
    </div>
 
-   ${(function(){
-     const fest = upcomingFestival();
-     if(!fest) return '';
-     return `<div class="item cursor-pointer" style="border:1px solid var(--border); border-radius:14px; padding:12px 16px; margin-bottom:14px; background:var(--surface);" onclick="calSelectedDate='${fest.date}'; showTab('calendar');">
-       <span>🎉 આગામી તહેવાર: <b>${esc(fest.name)}</b></span>
-       <span class="badge badge-primary">${fest.daysLeft===0?'આજે':fest.daysLeft+' દિવસ બાકી'}</span>
-     </div>`;
-   })()}
-
    ${dashboardNowCard()}
 
    <div class="stat-grid">
@@ -1916,47 +1907,6 @@ function deleteRevision(id){
 
 /* ===================== GOALS ===================== */
 /* ===================== CALENDAR ===================== */
-const FESTIVALS_2026 = [
-  {date:'2026-01-14', name:'ઉત્તરાયણ (મકરસંક્રાંતિ)'},
-  {date:'2026-01-26', name:'પ્રજાસત્તાક દિન'},
-  {date:'2026-02-15', name:'મહાશિવરાત્રી'},
-  {date:'2026-03-03', name:'હોળી'},
-  {date:'2026-03-04', name:'ધુળેટી'},
-  {date:'2026-03-19', name:'ગુડી પડવો / ચૈત્રી નવરાત્રી શરૂ'},
-  {date:'2026-03-27', name:'રામ નવમી'},
-  {date:'2026-04-02', name:'હનુમાન જયંતિ'},
-  {date:'2026-04-14', name:'બૈસાખી / આંબેડકર જયંતિ'},
-  {date:'2026-04-19', name:'અક્ષય તૃતીયા'},
-  {date:'2026-05-01', name:'બુદ્ધ પૂર્ણિમા'},
-  {date:'2026-07-29', name:'ગુરુ પૂર્ણિમા'},
-  {date:'2026-08-15', name:'સ્વતંત્રતા દિન'},
-  {date:'2026-08-17', name:'નાગ પંચમી'},
-  {date:'2026-08-28', name:'રક્ષાબંધન'},
-  {date:'2026-09-04', name:'જન્માષ્ટમી'},
-  {date:'2026-09-14', name:'ગણેશ ચતુર્થી'},
-  {date:'2026-09-24', name:'અનંત ચતુર્દશી (ગણેશ વિસર્જન)'},
-  {date:'2026-10-02', name:'ગાંધી જયંતિ'},
-  {date:'2026-10-12', name:'શારદીય નવરાત્રી શરૂ'},
-  {date:'2026-10-20', name:'દશેરા (વિજયાદશમી)'},
-  {date:'2026-11-06', name:'ધનતેરસ'},
-  {date:'2026-11-07', name:'કાળી ચૌદસ'},
-  {date:'2026-11-08', name:'દિવાળી (લક્ષ્મી પૂજા)'},
-  {date:'2026-11-09', name:'બેસતું વર્ષ (ગુજરાતી નવું વર્ષ)'},
-  {date:'2026-11-10', name:'ભાઈ બીજ'},
-  {date:'2026-12-25', name:'ક્રિસમસ'}
-];
-function festivalForDate(dateStr){
-  const f = FESTIVALS_2026.find(x=>x.date===dateStr);
-  return f ? f.name : null;
-}
-function upcomingFestival(){
-  const today = todayStr();
-  const upcoming = FESTIVALS_2026.filter(f=>f.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
-  if(!upcoming.length) return null;
-  const f = upcoming[0];
-  const days = Math.round((new Date(f.date+'T00:00:00') - new Date(today+'T00:00:00')) / 86400000);
-  return {...f, daysLeft: days};
-}
 function renderCalendar(){
   const firstDay = new Date(calYear, calMonth, 1);
   const startWeekday = firstDay.getDay();
@@ -1970,9 +1920,7 @@ function renderCalendar(){
     const dots = dotsForDate(dateStr);
     const isToday = dateStr===todayStr();
     const isSelected = dateStr===calSelDate && !isToday;
-    const isFestival = !!festivalForDate(dateStr);
     cells += `<div class="cal-cell ${isToday?'today':''} ${isSelected?'selected':''}" onclick="calSelectedDate='${dateStr}'; renderMain();">
-      ${isFestival?'<span style="position:absolute; top:1px; right:3px; font-size:9px;">🎉</span>':''}
       <span>${d}</span>
       <div class="cal-dots-row">
         ${dots.hasStudy?'<div class="cal-dot cal-dot-blue"></div>':''}
@@ -2001,7 +1949,6 @@ function renderCalendar(){
        <h3>${formatDate(sel)}</h3>
        ${calMode==='study'?`<button class="btn btn-sm btn-primary" onclick="openStudyForm(null,'${sel}')">+ ઉમેરો</button>`:''}
      </div>
-     ${festivalForDate(sel)?`<div class="ink-dim fs-125 mb-6">🎉 ${esc(festivalForDate(sel))}</div>`:''}
      <div style="display:flex; gap:8px; margin-bottom:10px;">
        <button class="btn btn-sm ${calMode==='study'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='study'; renderMain();">અભ્યાસ 📖</button>
        <button class="btn btn-sm ${calMode==='revision'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='revision'; renderMain();">રિવિઝન 🔁</button>
