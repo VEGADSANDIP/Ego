@@ -569,6 +569,7 @@ function renderDashboard(){
   const todayStudyList = studyLogsForActiveExam().filter(l=>l.date===today);
   const latestMock = [...mockTestsForActiveExam()].sort((a,b)=>b.date.localeCompare(a.date))[0];
   const weak = computeWeakSubjects(exam.id);
+  const projection = computeSyllabusProjection(exam.id);
   const inProgressTopics = topics.filter(t=>t.status==='studying');
   const importantPendingTopics = topics.filter(t=>(t.importance||0)>0 && t.status!=='completed').sort((a,b)=>(b.importance||0)-(a.importance||0));
 
@@ -607,6 +608,16 @@ function renderDashboard(){
 
    ${inProgressTopics.length ? card('ચાલુ ટોપિક 🟡 <span class="ink-dim fw-400">(ટેપ કરી ચેપ્ટર જુઓ)</span>', `<div class="scroll-list-sm">${inProgressTopics.map(t=>dashboardTopicRow(t)).join('')}</div>`) : ''}
 
+   ${projection ? (projection.projectedDate ? (function(){
+     const onTime = projection.projectedDate <= exam.date;
+     return `<div class="card">
+       <div class="card-title">📉 Syllabus અંદાજ</div>
+       <div class="item cursor-default"><span>હાલની ઝડપ</span><b>${projection.pace.toFixed(1)} ટોપિક/દિવસ</b></div>
+       <div class="item cursor-default"><span>અંદાજિત પૂર્ણ તારીખ</span><b style="color:${onTime?'var(--success)':'var(--danger)'};">${formatDate(projection.projectedDate)}</b></div>
+       <div class="ink-dim fs-12 mt-8">${onTime ? '✅ સારું ચાલી રહ્યું છે — સમયસર પૂરું થશે.' : `⚠️ આ ઝડપે પરીક્ષા (${formatDate(exam.date)}) પહેલા syllabus પૂરો નહીં થાય — ${projection.remaining} ટોપિક બાકી છે.`}</div>
+     </div>`;
+   })() : card('📉 Syllabus અંદાજ', `<div class="ink-dim fs-12">છેલ્લા 14 દિવસમાં કોઈ ટોપિક પૂર્ણ નથી કર્યું — અંદાજ કાઢી શકાતો નથી. અભ્યાસ ચાલુ કરો!</div>`)) : ''}
+
    ${importantPendingTopics.length ? card('⭐ મહત્વના બાકી ટોપિક <span class="ink-dim fw-400">(પેપર એનાલિસિસ પ્રમાણે)</span>', `<div class="scroll-list-sm">${importantPendingTopics.map(t=>dashboardImportantTopicRow(t)).join('')}</div>`) : ''}
 
    ${overdueRevisionList.length ? `<div class="card">     <div class="card-title">ઓવરડ્યુ રિવિઝન ⏰ <span class="ink-dim fw-400">(ટેપ કરી કેલેન્ડરમાં જુઓ)</span></div>
@@ -627,6 +638,25 @@ function renderDashboard(){
 
    ${latestMock ? card('છેલ્લો મોક ટેસ્ટ 📝', mockSummaryRow(latestMock)) : ''}
   `;
+}
+function computeSyllabusProjection(examId){
+  const subs = examSubjects(examId).map(s=>s.id);
+  const topics = DB.topics.filter(t=>subs.includes(t.subjectId));
+  const total = topics.length;
+  const completed = topics.filter(t=>t.status==='completed' && t.completedDate);
+  const remaining = total - completed.length;
+  if(total===0 || remaining<=0) return null;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-14);
+  const off = cutoff.getTimezoneOffset();
+  const cutoffStr = new Date(cutoff.getTime()-off*60000).toISOString().slice(0,10);
+  const recentCount = completed.filter(t=>t.completedDate>=cutoffStr).length;
+  const pace = recentCount / 14;
+  if(pace<=0) return {remaining, pace:0, projectedDate:null};
+  const daysNeeded = Math.ceil(remaining / pace);
+  const projected = new Date(); projected.setDate(projected.getDate()+daysNeeded);
+  const poff = projected.getTimezoneOffset();
+  const projectedDate = new Date(projected.getTime()-poff*60000).toISOString().slice(0,10);
+  return {remaining, pace, daysNeeded, projectedDate};
 }
 function computeWeakSubjects(examId){
   const subs = examSubjects(examId);
@@ -1165,7 +1195,7 @@ function topicRow(t){
       </div>
       ${starRatingHTML(t.id, t.importance)}
       <div class="mt-8 cursor-pointer" onclick="openTopicNoteForm('${t.id}')">
-        <span class="ink-dim fs-12">📅 ${t.importanceNote ? esc(t.importanceNote) : 'નોંધ ઉમેરો (કયા વર્ષમાં પુછાયું)'}</span>
+        <span class="ink-dim fs-12">📅 ${t.importanceNote ? esc(t.importanceNote) : 'નોંધ ઉમેરો (કયા વર્ષમાં પુછાયું)'}${t.quickNotes ? ' · 📝' : ''}</span>
       </div>
     </div>
   </div>`;
@@ -1479,9 +1509,11 @@ function openTopicNoteForm(id){
   const t = DB.topics.find(x=>x.id===id);
   if(!t) return;
   openSheet(`
-    <h3>નોંધ — કયા વર્ષોમાં પુછાયું</h3>
-    <div class="ink-dim fs-12 mb-6">પેપર એનાલિસિસ માટે — દા.ત. 2024, 2021, 2018</div>
+    <h3>નોંધ</h3>
+    <div class="ink-dim fs-12 mb-6">કયા વર્ષોમાં પુછાયું — પેપર એનાલિસિસ માટે</div>
     <div class="field"><input type="text" id="f_importance_note" value="${t.importanceNote?esc(t.importanceNote):''}" placeholder="2024, 2021, 2018"></div>
+    <div class="ink-dim fs-12 mb-6">📝 ફોર્મ્યુલા / મુખ્ય મુદ્દા (Quick Notes)</div>
+    <div class="field"><textarea id="f_quick_notes" rows="5" placeholder="છેલ્લી ઘડીના revision માટે ટૂંકા points/ફોર્મ્યુલા લખો">${t.quickNotes?esc(t.quickNotes):''}</textarea></div>
     <div class="sheet-actions">
       <button class="btn btn-primary btn-block" onclick="saveTopicNote('${id}')">સેવ કરો</button>
     </div>
@@ -1491,6 +1523,7 @@ function saveTopicNote(id){
   const t = DB.topics.find(x=>x.id===id);
   if(!t) return;
   t.importanceNote = val('f_importance_note');
+  t.quickNotes = val('f_quick_notes');
   save(); closeSheet(); renderMain(); toast('સેવ થયું');
 }
 function openTopicSubtopicManageForm(topicId){
@@ -2519,7 +2552,13 @@ function renderSettings(){
      ${(('Notification' in window) && Notification.permission==='default') ? `<button class="btn btn-primary btn-block" onclick="requestNotificationPermission()">🔔 નોટિફિકેશન ચાલુ કરો</button>` : ''}
      ${(('Notification' in window) && Notification.permission==='granted') ? `<button class="btn btn-secondary btn-block" onclick="showAppNotification('ટેસ્ટ ✅','આ એક ટેસ્ટ નોટિફિકેશન છે','test')">ટેસ્ટ નોટિફિકેશન મોકલો</button>` : ''}
    `)}
-   ${card('ટૂલ્સ', `<button class="btn btn-secondary btn-block" onclick="showTab('timetable')">📋 મારું ટાઈમટેબલ</button>`)}
+   ${card('ટૂલ્સ', `
+     <button class="btn btn-secondary btn-block mb-6" onclick="showTab('timetable')">📋 મારું ટાઈમટેબલ</button>
+     <button class="btn btn-secondary btn-block mb-6" onclick="openMasterChecklist()">🔀 માસ્ટર ચેપ્ટર લિસ્ટ</button>
+     <button class="btn btn-secondary btn-block mb-6" onclick="openSelfQuiz()">🧠 સેલ્ફ-ક્વિઝ (યાદ છે?)</button>
+     <button class="btn btn-secondary btn-block mb-6" onclick="openGlobalSearch()">🔍 બધે શોધો</button>
+     <button class="btn btn-secondary btn-block" onclick="shareProgress()">📤 પ્રગતિ શેર કરો</button>
+   `)}
    ${card('રિવિઝન નિયમ ⚙️', `
      <div class="field"><label>શરૂઆતના દિવસો (કોમાથી અલગ કરો)</label><input type="text" id="f_rule_days" value="${(rule.startDays||[1,3,7]).join(',')}" placeholder="દા.ત. 1,3,7"></div>
      <div class="field"><label>કયો વાર કમ્પલસરી?</label><select id="f_rule_weekday">${weekDayOptions.map(([k,l])=>`<option value="${k}" ${rule.weekDay===k?'selected':''}>${l}</option>`).join('')}</select></div>
@@ -2553,6 +2592,140 @@ function applyTheme(){
   document.documentElement.setAttribute('data-theme', theme);
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if(metaTheme) metaTheme.setAttribute('content', theme==='dark' ? '#1A1A1A' : '#FFFFFF');
+}
+let selfQuizQueue = [];
+let selfQuizIndex = 0;
+let selfQuizStats = {remembered:0, forgot:0};
+function openSelfQuiz(){
+  const exam = getActiveExam();
+  if(!exam){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
+  const subIds = examSubjects(exam.id).map(s=>s.id);
+  const completed = DB.topics.filter(t=>subIds.includes(t.subjectId) && t.status==='completed');
+  if(completed.length<1){ toast('હજુ કોઈ ટોપિક પૂર્ણ નથી — પહેલા થોડા ટોપિક પૂર્ણ કરો','error'); return; }
+  selfQuizQueue = [...completed].sort(()=>Math.random()-0.5).slice(0, Math.min(10, completed.length));
+  selfQuizIndex = 0;
+  selfQuizStats = {remembered:0, forgot:0};
+  renderSelfQuizCard();
+}
+function renderSelfQuizCard(){
+  if(selfQuizIndex>=selfQuizQueue.length){
+    openSheet(`
+      <h3>🧠 સેલ્ફ-ક્વિઝ પૂરી!</h3>
+      <div class="card" style="margin-top:10px;">
+        <div class="item cursor-default"><span>✓ યાદ છે</span><b style="color:var(--success);">${selfQuizStats.remembered}</b></div>
+        <div class="item cursor-default"><span>✗ ભૂલી ગયો</span><b style="color:var(--danger);">${selfQuizStats.forgot}</b></div>
+      </div>
+      <button class="btn btn-primary btn-block mt-8" onclick="openSelfQuiz()">🔁 ફરી રમો</button>
+    `);
+    return;
+  }
+  const t = selfQuizQueue[selfQuizIndex];
+  const s = DB.subjects.find(x=>x.id===t.subjectId);
+  openSheet(`
+    <h3>🧠 સેલ્ફ-ક્વિઝ (${selfQuizIndex+1}/${selfQuizQueue.length})</h3>
+    <div class="ink-dim fs-12 mb-6">${s?esc(s.name):''}</div>
+    <div class="card" style="text-align:center; padding:28px 16px; margin-bottom:14px;">
+      <b style="font-size:18px;">${esc(t.name)}</b>
+    </div>
+    <div class="ink-dim fs-12 mb-6" style="text-align:center;">આ ટોપિકનું content તને યાદ છે?</div>
+    <div class="flex-gap-6">
+      <button class="btn btn-danger flex-1" onclick="selfQuizAnswer(false)">✗ ભૂલી ગયો</button>
+      <button class="btn btn-primary flex-1" onclick="selfQuizAnswer(true)">✓ યાદ છે</button>
+    </div>
+  `);
+}
+function selfQuizAnswer(remembered){
+  if(remembered) selfQuizStats.remembered++; else selfQuizStats.forgot++;
+  selfQuizIndex++;
+  renderSelfQuizCard();
+}
+function openGlobalSearch(){
+  const exam = getActiveExam();
+  if(!exam){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
+  openSheet(`
+    <h3>🔍 બધે શોધો</h3>
+    <input type="text" id="globalSearchInput" placeholder="વિષય, ચેપ્ટર, સબ-ટોપિક, નોંધ..." oninput="runGlobalSearch()" class="mb-6" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:14px;" autofocus>
+    <div id="globalSearchResults" class="scroll-list"><div class="ink-dim fs-12">ટાઈપ કરવાનું શરૂ કરો...</div></div>
+  `);
+}
+function runGlobalSearch(){
+  const q = (val('globalSearchInput')||'').trim().toLowerCase();
+  const wrap = document.getElementById('globalSearchResults');
+  if(!wrap) return;
+  if(q.length<2){ wrap.innerHTML = '<div class="ink-dim fs-12">ઓછામાં ઓછા 2 અક્ષર ટાઈપ કરો...</div>'; return; }
+  const exam = getActiveExam();
+  if(!exam){ wrap.innerHTML=''; return; }
+  const subIds = examSubjects(exam.id).map(s=>s.id);
+  const results = [];
+  DB.subjects.filter(s=>subIds.includes(s.id) && s.name.toLowerCase().includes(q)).forEach(s=>{
+    results.push({type:'વિષય', label:s.name, sub:'', onclick:`closeSheet(); topicDetailId='${s.id}'; sectionDetailId=${s.sectionId?`'${s.sectionId}'`:'null'}; showTab('exams');`});
+  });
+  DB.topics.filter(t=>subIds.includes(t.subjectId)).forEach(t=>{
+    const s = DB.subjects.find(x=>x.id===t.subjectId);
+    const matchName = t.name.toLowerCase().includes(q);
+    const matchNote = (t.importanceNote||'').toLowerCase().includes(q) || (t.quickNotes||'').toLowerCase().includes(q);
+    if(matchName || matchNote){
+      results.push({type:'ચેપ્ટર', label:t.name, sub:(s?s.name:'')+(matchNote&&!matchName?' · નોંધમાં મળ્યું':''), onclick:`closeSheet(); navigateToSubjectTopics('${t.subjectId}','${t.id}');`});
+    }
+  });
+  DB.subtopics.filter(st=>{
+    const t = DB.topics.find(x=>x.id===st.topicId);
+    return t && subIds.includes(t.subjectId) && st.name.toLowerCase().includes(q);
+  }).forEach(st=>{
+    const t = DB.topics.find(x=>x.id===st.topicId);
+    const s = t ? DB.subjects.find(x=>x.id===t.subjectId) : null;
+    results.push({type:'સબ-ટોપિક', label:st.name, sub:(t?t.name:'')+' · '+(s?s.name:''), onclick:`closeSheet(); navigateToSubjectTopics('${t.subjectId}','${t.id}');`});
+  });
+  if(!results.length){ wrap.innerHTML = '<div class="ink-dim fs-12">કંઈ ના મળ્યું</div>'; return; }
+  wrap.innerHTML = results.slice(0,50).map(r=>`<div class="item" onclick="${r.onclick}">
+    <span class="flex-col"><b>${esc(r.label)}</b><span class="ink-dim fs-12">${esc(r.sub)}</span></span>
+    <span class="badge badge-grey">${r.type}</span>
+  </div>`).join('');
+}
+function shareProgress(){
+  const exam = getActiveExam();
+  if(!exam){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
+  const subs = examSubjects(exam.id);
+  const subIds = subs.map(s=>s.id);
+  const topics = DB.topics.filter(t=>subIds.includes(t.subjectId));
+  const total = topics.length;
+  const done = topics.filter(t=>t.status==='completed').length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  const daysLeft = examDaysLeft(exam.date);
+  const text = `📚 ${exam.name} — મારી પ્રગતિ\n\n✅ ${pct}% પૂર્ણ\n📘 ${done}/${total} ટોપિક\n📂 ${subs.length} વિષય\n📅 પરીક્ષા: ${formatDate(exam.date)}${daysLeft>=0?` (${daysLeft} દિવસ બાકી)`:''}\n\n— ExamPath થી`;
+  if(navigator.share){
+    navigator.share({title:'મારી પ્રગતિ', text: text}).catch(()=>{});
+  } else if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>toast('Clipboard માં કોપી થયું 📋 — હવે WhatsApp વગેરેમાં પેસ્ટ કરો')).catch(()=>toast('કોપી ના થયું','error'));
+  } else {
+    toast('Share સપોર્ટેડ નથી','error');
+  }
+}
+function openMasterChecklist(){
+  const exam = getActiveExam();
+  if(!exam){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
+  const subIds = examSubjects(exam.id).map(s=>s.id);
+  const topics = DB.topics.filter(t=>subIds.includes(t.subjectId)).slice().sort((a,b)=>(b.importance||0)-(a.importance||0) || a.name.localeCompare(b.name));
+  const done = topics.filter(t=>t.status==='completed').length;
+  openSheet(`
+    <h3>🔀 માસ્ટર ચેપ્ટર લિસ્ટ</h3>
+    <div class="ink-dim fs-12 mb-6">બધા વિષયના બધા ચેપ્ટર ⭐ મહત્વ પ્રમાણે — ${done}/${topics.length} પૂર્ણ</div>
+    <input type="text" id="masterChecklistSearch" placeholder="🔍 શોધો..." oninput="filterListBySearch('masterChecklistSearch','masterChecklistWrap')" class="mb-6" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
+    <div id="masterChecklistWrap" class="scroll-list">${topics.length?topics.map(t=>masterChecklistRow(t)).join(''):'<div class="ink-dim fs-12">કોઈ ટોપિક નથી</div>'}</div>
+  `);
+}
+function masterChecklistRow(t){
+  const s = DB.subjects.find(x=>x.id===t.subjectId);
+  const cls = t.status==='completed' ? 'badge-success' : (t.status==='studying' ? 'badge-warning' : 'badge-grey');
+  const label = t.status==='completed' ? 'પૂર્ણ 🟢' : (t.status==='studying' ? 'ચાલુ 🟡' : 'શરૂ નથી 🔴');
+  const stars = topicImportanceStars(t.importance);
+  return `<div class="item" data-search="${esc((t.name+' '+(s?s.name:'')).toLowerCase())}" onclick="closeSheet(); navigateToSubjectTopics('${t.subjectId}','${t.id}');">
+    <span class="flex-col">
+      <b>${esc(t.name)}</b>
+      <span class="ink-dim fs-12">${s?esc(s.name):''}${stars?' · '+stars:''}</span>
+    </span>
+    <span class="badge ${cls}">${label}</span>
+  </div>`;
 }
 function cleanOrphanedData(){
   if(!confirm('ડિલીટ થયેલા વિષય/ટોપિક સાથે જોડાયેલો જૂનો, છૂટો પડેલો ડેટા સાફ કરવો છે? (સ્ટડી લોગ, રિવિઝન, ટાઈમટેબલ, મોક ટેસ્ટના ભાગ વગેરેમાંથી)')) return;
