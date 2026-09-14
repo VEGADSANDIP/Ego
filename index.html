@@ -1302,6 +1302,18 @@ function generateRevisionsFromDates(topicId, subjectId, subtopicId, dates){
     DB.revisions.push(entry);
   });
 }
+function addAutoStudyLog(subjectId, topicId, subtopicId){
+  DB.studyLogs.push({
+    id: uid(),
+    date: todayStr(),
+    subjectId,
+    chapters: '',
+    notes: '',
+    topicId: topicId || '',
+    topicIds: topicId ? [topicId] : [],
+    subtopicIds: subtopicId ? [subtopicId] : []
+  });
+}
 function confirmRevisionPicker(){
   if(!revisionPickerEntity) return;
   const {entityType, id} = revisionPickerEntity;
@@ -1313,6 +1325,7 @@ function confirmRevisionPicker(){
     t.status = 'completed';
     t.completedDate = todayStr();
     generateRevisionsFromDates(t.id, t.subjectId, null, dates);
+    addAutoStudyLog(t.subjectId, t.id, null);
     save(); closeSheet(); renderMain();
     const nextLabel = nextRevisionLabel(t.id, null);
     toast(nextLabel ? `ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁 · આગામી: ${nextLabel}` : `ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁`);
@@ -1322,6 +1335,7 @@ function confirmRevisionPicker(){
     st.completed = true;
     st.completedDate = todayStr();
     generateRevisionsFromDates(st.topicId, st.subjectId, st.id, dates);
+    addAutoStudyLog(st.subjectId, st.topicId, st.id);
     save(); renderMain();
     openTopicRevisionForm(st.topicId);
     const nextLabel = nextRevisionLabel(st.topicId, st.id);
@@ -1951,7 +1965,6 @@ function renderCalendar(){
    <div style="margin-top:16px;">
      <div class="section-header" style="margin-top:0;">
        <h3>${formatDate(sel)}</h3>
-       ${calMode==='study'?`<button class="btn btn-sm btn-primary" onclick="openStudyForm(null,'${sel}')">+ ઉમેરો</button>`:''}
      </div>
      <div style="display:flex; gap:8px; margin-bottom:10px;">
        <button class="btn btn-sm ${calMode==='study'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='study'; renderMain();">અભ્યાસ 📖</button>
@@ -2009,30 +2022,13 @@ function calendarDayDetailHTML(dateStr){
   const activeIds = activeExamSubjectIds();
   if(calMode==='study'){
     const logs = DB.studyLogs.filter(l=>l.date===dateStr && activeIds.includes(l.subjectId));
-    const loggedSubIds = new Set(logs.map(l=>l.subjectId));
-    const exam = getActiveExam();
-    const suggestions = exam ? timetableSuggestionsForDate(exam.id, dateStr).filter(sg=>!loggedSubIds.has(sg.subjectId)) : [];
-    const suggWrapId = 'ttsugg_'+dateStr;
-    const suggExpand = isAccordionOpen(suggWrapId);
-    const suggBodyHTML = suggestions.map(sg=>`<div class="item" onclick="openStudyForm(null,'${dateStr}',{subjectId:'${sg.subjectId}',topicId:${sg.current?`'${sg.current.id}'`:'null'}})">
-      <span style="flex:1; min-width:0; padding-right:10px;">${esc(sg.subjectName)}${sg.current?` <span class="ink-dim">· ${esc(sg.current.name)}</span>`:''}</span>
-      <span class="btn btn-sm btn-primary" style="flex-shrink:0; white-space:nowrap;">▶️ શરૂ કરો</span>
-    </div>`).join('');
-    const suggestionsHTML = suggestions.length ? `<div class="card">${renderAccordionBlock(
-      suggWrapId,
-      `<span class="ink-dim fw-700 fs-125">📋 ટાઈમટેબલ પ્રમાણે (${suggestions.length})</span>`,
-      '',
-      suggBodyHTML,
-      suggExpand,
-      {wrapperClass:'', headerStyle:'border:none; padding:0;', bodyClass:'mt-8', bodyStyle:''}
-    )}</div>` : '';
     const bySubject = {};
     logs.forEach(l=>{
       if(!bySubject[l.subjectId]) bySubject[l.subjectId] = {entries:[]};
       bySubject[l.subjectId].entries.push(l);
     });
     const subjectIds = sortSubjectIdsByTimetable(Object.keys(bySubject), dateStr);
-    if(!subjectIds.length) return suggestionsHTML + emptyRow('આ દિવસે કોઈ અભ્યાસ નથી');
+    if(!subjectIds.length) return emptyRow('આ દિવસે કોઈ અભ્યાસ નથી');
     const subjectCardHTML = (sid)=>{
       const grouped = groupStudyLogsByChapter(bySubject[sid].entries);
       return `<div class="card">
@@ -2043,7 +2039,7 @@ function calendarDayDetailHTML(dateStr){
         <div class="mt-8">${grouped.freeform.map(it=>`<div class="item" onclick="openStudyForm('${it.logId}')"><span>${esc(it.label)}</span></div>`).join('')}</div>
       </div>`;
     };
-    return suggestionsHTML + renderSectionGroups(groupSubjectIdsBySection(subjectIds), subjectCardHTML);
+    return renderSectionGroups(groupSubjectIdsBySection(subjectIds), subjectCardHTML);
   }
   const revs = revisionsForActiveExam().filter(r=>r.dueDate===dateStr);
   const bySubject = {};
@@ -2219,20 +2215,6 @@ function dashboardNowCard(){
     </div>` : `<div class="mt-8"><span class="badge badge-success">બધા ટોપિક પૂર્ણ 🎉</span></div>`}
     ${revTopicName ? `<div style="margin-top:6px; display:flex; align-items:center; justify-content:space-between; gap:6px;"><span style="font-size:13px;">${esc(revTopicName)}</span><span class="badge badge-danger">🔁 રિવિઝન</span></div>` : ''}
   </div>`;
-}
-function timetableSuggestionsForDate(examId, dateStr){
-  const diffDays = Math.round((new Date(dateStr+'T00:00:00') - new Date(todayStr()+'T00:00:00')) / 86400000);
-  if(diffDays > 6) return [];
-  const day = dayKeyForDate(dateStr);
-  const subIds = new Set();
-  timetableForDay(examId, day).forEach(b=>subIds.add(b.subjectId));
-  chapterTimetableForDay(examId, day).forEach(e=>subIds.add(e.subjectId));
-  return Array.from(subIds).map(sid=>{
-    const s = DB.subjects.find(x=>x.id===sid);
-    if(!s) return null;
-    const current = currentOrNextTopic(sid);
-    return {subjectId:sid, subjectName:s.name, current};
-  }).filter(Boolean);
 }
 function dayKeyForDate(dateStr){
   const map = ['sun','mon','tue','wed','thu','fri','sat'];
