@@ -199,6 +199,7 @@ canvas{width:100%; display:block;}
 .cal-cell.today{border:2px solid var(--primary);}
 .cal-cell.selected{background:var(--success); color:#fff;}
 .cal-cell.selected .cal-dot{background:#fff !important;}
+.cal-cell.past-disabled{opacity:.32; cursor:default;}
 .cal-dot{width:5px; height:5px; border-radius:99px; background:var(--accent); margin-top:2px;}
 .cal-dots-row{display:flex; gap:3px; margin-top:2px; justify-content:center;}
 .cal-dots-row .cal-dot{margin-top:0;}
@@ -1199,7 +1200,7 @@ function cycleTopicStatus(id){
     }
   }
   if(!hasSubtopics && next==='completed'){
-    openCompleteTopicSheet(id);
+    openRevisionCalendarSheet('topic', id);
     return;
   }
   let msg = `સ્ટેટસ "${labels[t.status]}" માંથી "${labels[next]}" કરવું છે?`;
@@ -1221,83 +1222,111 @@ function cycleTopicStatus(id){
   }
   save(); renderMain();
 }
-function openCompleteTopicSheet(id){
-  const t = DB.topics.find(x=>x.id===id);
-  if(!t) return;
-  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
-  openSheet(`
-    <h3>ટોપિક પૂર્ણ કરવું છે?</h3>
-    <div class="ink-dim fs-12 mb-6">${esc(t.name)}</div>
-    <button class="btn btn-primary btn-block mb-6" onclick="completeTopicWithRule('${id}')">✓ પૂર્ણ કરો — ડિફૉલ્ટ રિવિઝન (${(rule.startDays||[1,3,7]).join(',')} દિવસ...)</button>
-    <button class="btn btn-secondary btn-block" onclick="openCustomRevisionForm('topic','${id}')">✨ કસ્ટમ પેટર્ન સેટ કરો</button>
-  `);
+let revisionPickerDates = new Set();
+let revisionPickerEntity = null;
+function toLocalISODate(d){
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime()-off*60000);
+  return local.toISOString().slice(0,10);
 }
-function completeTopicWithRule(id, customRule){
-  const t = DB.topics.find(x=>x.id===id);
-  if(!t) return;
-  t.status = 'completed';
-  t.completedDate = todayStr();
-  generateRevisions(t, customRule);
-  save(); closeSheet(); renderMain();
-  const nextLabel = nextRevisionLabel(t.id, null);
-  const base = customRule ? 'ટોપિક પૂર્ણ! કસ્ટમ રિવિઝન જનરેટ થઈ 🔁' : 'ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁';
-  toast(nextLabel ? `${base} · આગામી: ${nextLabel}` : base);
-}
-function openCustomRevisionForm(entityType, id){
-  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
-  const weekDayOptions = [['sun','રવિવાર'],['mon','સોમવાર'],['tue','મંગળવાર'],['wed','બુધવાર'],['thu','ગુરુવાર'],['fri','શુક્રવાર'],['sat','શનિવાર']];
-  openSheet(`
-    <h3>✨ કસ્ટમ રિવિઝન પેટર્ન</h3>
-    <div class="ink-dim fs-12 mb-6">ફક્ત આ એક ટોપિક/સબ-ટોપિક પૂરતું — Settings નો ડિફૉલ્ટ નિયમ બદલાશે નહીં</div>
-    <div class="field"><label>શરૂઆતના દિવસો (કોમાથી અલગ કરો)</label><input type="text" id="f_custom_days" value="${(rule.startDays||[1,3,7]).join(',')}" placeholder="દા.ત. 1,3,7"></div>
-    <div class="field"><label>કયો વાર કમ્પલસરી?</label><select id="f_custom_weekday">${weekDayOptions.map(([k,l])=>`<option value="${k}" ${rule.weekDay===k?'selected':''}>${l}</option>`).join('')}</select></div>
-    <div class="field"><label>કેટલી વાર (સપ્તાહ) સુધી?</label><input type="number" id="f_custom_count" value="${rule.weeklyCount!=null?rule.weeklyCount:8}"></div>
-    <button class="btn btn-primary btn-block" onclick="saveCustomRevisionForm('${entityType}','${id}')">પૂર્ણ કરો ને રિવિઝન સેટ કરો</button>
-  `);
-}
-function saveCustomRevisionForm(entityType, id){
-  const daysRaw = val('f_custom_days');
-  const startDays = daysRaw.split(',').map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n) && n>0).sort((a,b)=>a-b);
-  const weekDay = val('f_custom_weekday') || 'sun';
-  const weeklyCount = Math.max(0, parseInt(val('f_custom_count'),10) || 0);
-  if(!startDays.length){ toast('ઓછામાં ઓછો એક દિવસ ભરો','error'); return; }
-  const customRule = {startDays, weekDay, weeklyCount};
-  if(entityType==='topic') completeTopicWithRule(id, customRule);
-  else completeSubtopicWithRule(id, customRule);
-}
-function generateRevisionsForEntity(topicId, subjectId, subtopicId, customRule){
-  if(subtopicId) DB.revisions = DB.revisions.filter(r=>r.subtopicId!==subtopicId);
-  else DB.revisions = DB.revisions.filter(r=>r.topicId!==topicId);
+function computeDefaultRevisionDates(rule){
   const base = new Date(todayStr()+'T00:00:00');
-  const rule = customRule || DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
   const startDays = (rule.startDays && rule.startDays.length) ? rule.startDays : [1,3,7];
   const weekDayNum = {sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6}[rule.weekDay] ?? 0;
   const weeklyCount = rule.weeklyCount>=0 ? rule.weeklyCount : 8;
-  const dates = [];
+  const dates = new Set();
   startDays.forEach(d=>{
     const due = new Date(base); due.setDate(due.getDate()+Number(d));
-    dates.push(due);
+    dates.add(toLocalISODate(due));
   });
   const lastStartDay = Math.max(...startDays);
   let cursor = new Date(base); cursor.setDate(cursor.getDate()+lastStartDay+1);
   while(cursor.getDay()!==weekDayNum){ cursor.setDate(cursor.getDate()+1); }
   for(let i=0;i<weeklyCount;i++){
-    dates.push(new Date(cursor));
+    dates.add(toLocalISODate(cursor));
     cursor = new Date(cursor); cursor.setDate(cursor.getDate()+7);
   }
+  return dates;
+}
+function openRevisionCalendarSheet(entityType, id){
+  revisionPickerEntity = {entityType, id};
+  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
+  revisionPickerDates = computeDefaultRevisionDates(rule);
+  const name = entityType==='topic' ? (DB.topics.find(x=>x.id===id)||{}).name : (DB.subtopics.find(x=>x.id===id)||{}).name;
+  openSheet(`
+    <h3>રિવિઝન ક્યારે કરવું છે?</h3>
+    <div class="ink-dim fs-12 mb-6">${esc(name||'')}</div>
+    <div class="ink-dim fs-12 mb-6">કેલેન્ડરમાં જે-જે તારીખે રિવિઝન કરવું હોય ત્યાં ટેપ કરી ✓ કરો (થોડી તારીખ પહેલેથી પસંદ કરેલી છે — બદલી શકાય)</div>
+    <div id="revisionPickerCal">${renderRevisionPickerCalendar()}</div>
+    <div class="sheet-actions" style="margin-top:14px;">
+      <button class="btn btn-primary btn-block" onclick="confirmRevisionPicker()">✓ પૂર્ણ કરો</button>
+    </div>
+  `);
+}
+function renderRevisionPickerCalendar(){
+  const today = new Date(todayStr()+'T00:00:00');
+  const startSun = new Date(today); startSun.setDate(startSun.getDate()-startSun.getDay());
+  const weeks = 6;
+  const dowLabels = ['ર','સો','મં','બુ','ગુ','શુ','શ'];
+  let html = `<div class="cal-grid" style="margin-bottom:4px;">${dowLabels.map(d=>`<div class="ink-dim" style="text-align:center; font-size:11px; font-weight:700;">${d}</div>`).join('')}</div>`;
+  for(let w=0; w<weeks; w++){
+    html += `<div class="cal-grid" style="margin-bottom:4px;">`;
+    for(let d=0; d<7; d++){
+      const cellDate = new Date(startSun); cellDate.setDate(cellDate.getDate()+w*7+d);
+      const ds = toLocalISODate(cellDate);
+      const isPast = ds < todayStr();
+      const isToday = ds === todayStr();
+      const isSelected = revisionPickerDates.has(ds);
+      const cls = ['cal-cell'];
+      if(isToday) cls.push('today');
+      if(isSelected) cls.push('selected');
+      if(isPast) cls.push('past-disabled');
+      html += `<div class="${cls.join(' ')}" ${isPast?'':`onclick="toggleRevisionPickerDate('${ds}')"`}><span>${cellDate.getDate()}</span></div>`;
+    }
+    html += `</div>`;
+  }
+  return html;
+}
+function toggleRevisionPickerDate(ds){
+  if(revisionPickerDates.has(ds)) revisionPickerDates.delete(ds);
+  else revisionPickerDates.add(ds);
+  const el = document.getElementById('revisionPickerCal');
+  if(el) el.innerHTML = renderRevisionPickerCalendar();
+}
+function generateRevisionsFromDates(topicId, subjectId, subtopicId, dates){
+  if(subtopicId) DB.revisions = DB.revisions.filter(r=>r.subtopicId!==subtopicId);
+  else DB.revisions = DB.revisions.filter(r=>r.topicId!==topicId);
   dates.forEach((due,idx)=>{
-    const off = due.getTimezoneOffset();
-    const local = new Date(due.getTime()-off*60000);
-    const entry = {id:uid(), topicId, subjectId, dueDate: local.toISOString().slice(0,10), status:'pending', stage: idx+1};
+    const entry = {id:uid(), topicId, subjectId, dueDate: due, status:'pending', stage: idx+1};
     if(subtopicId) entry.subtopicId = subtopicId;
     DB.revisions.push(entry);
   });
 }
-function generateRevisions(topic, customRule){
-  generateRevisionsForEntity(topic.id, topic.subjectId, null, customRule);
-}
-function generateSubtopicRevisions(subtopic, customRule){
-  generateRevisionsForEntity(subtopic.topicId, subtopic.subjectId, subtopic.id, customRule);
+function confirmRevisionPicker(){
+  if(!revisionPickerEntity) return;
+  const {entityType, id} = revisionPickerEntity;
+  const dates = Array.from(revisionPickerDates).sort();
+  if(!dates.length){ toast('ઓછામાં ઓછી એક તારીખ પસંદ કરો','error'); return; }
+  if(entityType==='topic'){
+    const t = DB.topics.find(x=>x.id===id);
+    if(!t) return;
+    t.status = 'completed';
+    t.completedDate = todayStr();
+    generateRevisionsFromDates(t.id, t.subjectId, null, dates);
+    save(); closeSheet(); renderMain();
+    const nextLabel = nextRevisionLabel(t.id, null);
+    toast(nextLabel ? `ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁 · આગામી: ${nextLabel}` : `ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁`);
+  } else {
+    const st = DB.subtopics.find(x=>x.id===id);
+    if(!st) return;
+    st.completed = true;
+    st.completedDate = todayStr();
+    generateRevisionsFromDates(st.topicId, st.subjectId, st.id, dates);
+    save(); renderMain();
+    openTopicRevisionForm(st.topicId);
+    const nextLabel = nextRevisionLabel(st.topicId, st.id);
+    toast(nextLabel ? `સબ-ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁 · આગામી: ${nextLabel}` : `સબ-ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁`);
+  }
 }
 function openExamForm(id){
   const e = id ? DB.exams.find(x=>x.id===id) : null;
@@ -1415,10 +1444,7 @@ function deleteSubject(id){
   save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
 }
 function revisionStageLabel(stage){
-  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun'};
-  const startDays = (rule.startDays && rule.startDays.length) ? rule.startDays : [1,3,7];
-  const weekDayLabel = {sun:'રવિ',mon:'સોમ',tue:'મંગળ',wed:'બુધ',thu:'ગુરુ',fri:'શુક્ર',sat:'શનિ'}[rule.weekDay] || 'રવિ';
-  return stage<=startDays.length ? `Day+${startDays[stage-1]}` : `${weekDayLabel} રિવિઝન #${stage-startDays.length}`;
+  return `રિવિઝન #${stage}`;
 }
 function nextRevisionLabel(topicId, subtopicId, excludeId){
   const list = DB.revisions.filter(r=>{
@@ -1610,30 +1636,8 @@ function toggleSubtopicComplete(id){
     openTopicRevisionForm(st.topicId);
     toast('સ્ટેટસ બદલાયું');
   } else {
-    openCompleteSubtopicSheet(id);
+    openRevisionCalendarSheet('subtopic', id);
   }
-}
-function openCompleteSubtopicSheet(id){
-  const st = DB.subtopics.find(x=>x.id===id);
-  if(!st) return;
-  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
-  openSheet(`
-    <h3>સબ-ટોપિક પૂર્ણ કરવું છે?</h3>
-    <div class="ink-dim fs-12 mb-6">${esc(st.name)}</div>
-    <button class="btn btn-primary btn-block mb-6" onclick="completeSubtopicWithRule('${id}')">✓ પૂર્ણ કરો — ડિફૉલ્ટ રિવિઝન (${(rule.startDays||[1,3,7]).join(',')} દિવસ...)</button>
-    <button class="btn btn-secondary btn-block" onclick="openCustomRevisionForm('subtopic','${id}')">✨ કસ્ટમ પેટર્ન સેટ કરો</button>
-  `);
-}
-function completeSubtopicWithRule(id, customRule){
-  const st = DB.subtopics.find(x=>x.id===id);
-  if(!st) return;
-  st.completed=true; st.completedDate=todayStr();
-  generateSubtopicRevisions(st, customRule);
-  save(); renderMain();
-  openTopicRevisionForm(st.topicId);
-  const nextLabel = nextRevisionLabel(st.topicId, st.id);
-  const base = customRule ? 'સબ-ટોપિક પૂર્ણ! કસ્ટમ રિવિઝન જનરેટ થઈ 🔁' : 'સબ-ટોપિક પૂર્ણ! રિવિઝન ઓટો-જનરેટ થઈ 🔁';
-  toast(nextLabel ? `${base} · આગામી: ${nextLabel}` : base);
 }
 function deleteSubtopic(id){
   if(!confirm('આ સબ-ટોપિક ડિલીટ કરવું છે?'))return;
