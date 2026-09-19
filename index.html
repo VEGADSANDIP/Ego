@@ -2122,7 +2122,18 @@ function groupRevisionsByChapter(list){
     if(!byChapter[key]){ byChapter[key]=[]; order.push(key); }
     byChapter[key].push(r);
   });
-  return order.map(topicId=>({topicId, items:byChapter[topicId]}));
+  const groups = order.map(topicId=>({topicId, items:byChapter[topicId]}));
+  groups.sort((a,b)=>{
+    const doneA = DB.revisions.filter(r=>r.topicId===a.topicId && r.status==='completed').length;
+    const doneB = DB.revisions.filter(r=>r.topicId===b.topicId && r.status==='completed').length;
+    if(doneA!==doneB) return doneA-doneB;
+    const ta = DB.topics.find(x=>x.id===a.topicId);
+    const tb = DB.topics.find(x=>x.id===b.topicId);
+    const da = (ta && ta.completedDate) ? ta.completedDate : '';
+    const db = (tb && tb.completedDate) ? tb.completedDate : '';
+    return db.localeCompare(da);
+  });
+  return groups;
 }
 function revisionChapterAccordion(topicId, items){
   const t = DB.topics.find(x=>x.id===topicId);
