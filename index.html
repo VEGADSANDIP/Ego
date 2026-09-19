@@ -259,7 +259,7 @@ function defaultData(){
   return {
     exams:[], subjects:[], topics:[], revisions:[], sections:[],
     studyLogs:[], mockTests:[], timetable:[], chapterTimetable:[], subtopics:[],
-    settings:{theme:'light', brandName:'ExamPath', revisionRule:{startDays:[1,3,7], weekDay:'sun', weeklyCount:8}, sortPrefs:{sections:'default', subjects:{}, topics:{}}}
+    settings:{theme:'light', brandName:'ExamPath', sortPrefs:{sections:'default', subjects:{}, topics:{}}}
   };
 }
 function loadData(){
@@ -1224,74 +1224,75 @@ function cycleTopicStatus(id){
 }
 let revisionPickerDates = new Set();
 let revisionPickerEntity = null;
+let revisionPickerMonth = new Date().getMonth();
+let revisionPickerYear = new Date().getFullYear();
 function toLocalISODate(d){
   const off = d.getTimezoneOffset();
   const local = new Date(d.getTime()-off*60000);
   return local.toISOString().slice(0,10);
 }
-function computeDefaultRevisionDates(rule){
-  const base = new Date(todayStr()+'T00:00:00');
-  const startDays = (rule.startDays && rule.startDays.length) ? rule.startDays : [1,3,7];
-  const weekDayNum = {sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6}[rule.weekDay] ?? 0;
-  const weeklyCount = rule.weeklyCount>=0 ? rule.weeklyCount : 8;
-  const dates = new Set();
-  startDays.forEach(d=>{
-    const due = new Date(base); due.setDate(due.getDate()+Number(d));
-    dates.add(toLocalISODate(due));
-  });
-  const lastStartDay = Math.max(...startDays);
-  let cursor = new Date(base); cursor.setDate(cursor.getDate()+lastStartDay+1);
-  while(cursor.getDay()!==weekDayNum){ cursor.setDate(cursor.getDate()+1); }
-  for(let i=0;i<weeklyCount;i++){
-    dates.add(toLocalISODate(cursor));
-    cursor = new Date(cursor); cursor.setDate(cursor.getDate()+7);
-  }
-  return dates;
-}
 function openRevisionCalendarSheet(entityType, id){
   revisionPickerEntity = {entityType, id};
-  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
-  revisionPickerDates = computeDefaultRevisionDates(rule);
+  revisionPickerDates = new Set();
+  const now = new Date();
+  revisionPickerMonth = now.getMonth();
+  revisionPickerYear = now.getFullYear();
   const name = entityType==='topic' ? (DB.topics.find(x=>x.id===id)||{}).name : (DB.subtopics.find(x=>x.id===id)||{}).name;
   openSheet(`
     <h3>રિવિઝન ક્યારે કરવું છે?</h3>
     <div class="ink-dim fs-12 mb-6">${esc(name||'')}</div>
-    <div class="ink-dim fs-12 mb-6">કેલેન્ડરમાં જે-જે તારીખે રિવિઝન કરવું હોય ત્યાં ટેપ કરી ✓ કરો (થોડી તારીખ પહેલેથી પસંદ કરેલી છે — બદલી શકાય)</div>
+    <div class="ink-dim fs-12 mb-6">કેલેન્ડરમાં જે-જે તારીખે રિવિઝન કરવું હોય ત્યાં ટેપ કરી ✓ કરો. જોઈએ એટલી તારીખ પસંદ કરી શકાય — કોઈ મર્યાદા નથી, આગળના મહિનામાં પણ.</div>
     <div id="revisionPickerCal">${renderRevisionPickerCalendar()}</div>
+    <div class="ink-dim fs-12" style="margin-top:8px;" id="revisionPickerCount"></div>
     <div class="sheet-actions" style="margin-top:14px;">
       <button class="btn btn-primary btn-block" onclick="confirmRevisionPicker()">✓ પૂર્ણ કરો</button>
     </div>
   `);
+  updateRevisionPickerCount();
 }
 function renderRevisionPickerCalendar(){
-  const today = new Date(todayStr()+'T00:00:00');
-  const startSun = new Date(today); startSun.setDate(startSun.getDate()-startSun.getDay());
-  const weeks = 6;
-  const dowLabels = ['ર','સો','મં','બુ','ગુ','શુ','શ'];
-  let html = `<div class="cal-grid" style="margin-bottom:4px;">${dowLabels.map(d=>`<div class="ink-dim" style="text-align:center; font-size:11px; font-weight:700;">${d}</div>`).join('')}</div>`;
-  for(let w=0; w<weeks; w++){
-    html += `<div class="cal-grid" style="margin-bottom:4px;">`;
-    for(let d=0; d<7; d++){
-      const cellDate = new Date(startSun); cellDate.setDate(cellDate.getDate()+w*7+d);
-      const ds = toLocalISODate(cellDate);
-      const isPast = ds < todayStr();
-      const isToday = ds === todayStr();
-      const isSelected = revisionPickerDates.has(ds);
-      const cls = ['cal-cell'];
-      if(isToday) cls.push('today');
-      if(isSelected) cls.push('selected');
-      if(isPast) cls.push('past-disabled');
-      html += `<div class="${cls.join(' ')}" ${isPast?'':`onclick="toggleRevisionPickerDate('${ds}')"`}><span>${cellDate.getDate()}</span></div>`;
-    }
-    html += `</div>`;
+  const firstDay = new Date(revisionPickerYear, revisionPickerMonth, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(revisionPickerYear, revisionPickerMonth+1, 0).getDate();
+  const monthName = firstDay.toLocaleDateString('gu-IN', {month:'long', year:'numeric'});
+  const now = new Date();
+  const isCurrentMonth = (revisionPickerMonth===now.getMonth() && revisionPickerYear===now.getFullYear());
+  let cells = '';
+  for(let i=0;i<startWeekday;i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const ds = `${revisionPickerYear}-${String(revisionPickerMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isPast = ds < todayStr();
+    const isToday = ds === todayStr();
+    const isSelected = revisionPickerDates.has(ds);
+    const cls = ['cal-cell'];
+    if(isToday) cls.push('today');
+    if(isSelected) cls.push('selected');
+    if(isPast) cls.push('past-disabled');
+    cells += `<div class="${cls.join(' ')}" ${isPast?'':`onclick="toggleRevisionPickerDate('${ds}')"`}><span>${d}</span></div>`;
   }
-  return html;
+  return `
+   <div class="cal-header">
+     <button class="btn btn-sm btn-secondary" ${isCurrentMonth?'disabled':''} onclick="revisionPickerMonth--; if(revisionPickerMonth<0){revisionPickerMonth=11;revisionPickerYear--;} refreshRevisionPickerCalendar();">‹</button>
+     <b>${monthName}</b>
+     <button class="btn btn-sm btn-secondary" onclick="revisionPickerMonth++; if(revisionPickerMonth>11){revisionPickerMonth=0;revisionPickerYear++;} refreshRevisionPickerCalendar();">›</button>
+   </div>
+   <div class="cal-weekdays"><div>ર</div><div>સો</div><div>મં</div><div>બુ</div><div>ગુ</div><div>શુ</div><div>શ</div></div>
+   <div class="cal-grid">${cells}</div>
+  `;
+}
+function refreshRevisionPickerCalendar(){
+  const el = document.getElementById('revisionPickerCal');
+  if(el) el.innerHTML = renderRevisionPickerCalendar();
+}
+function updateRevisionPickerCount(){
+  const el = document.getElementById('revisionPickerCount');
+  if(el) el.textContent = `કુલ પસંદ કરેલી તારીખો: ${revisionPickerDates.size}`;
 }
 function toggleRevisionPickerDate(ds){
   if(revisionPickerDates.has(ds)) revisionPickerDates.delete(ds);
   else revisionPickerDates.add(ds);
-  const el = document.getElementById('revisionPickerCal');
-  if(el) el.innerHTML = renderRevisionPickerCalendar();
+  refreshRevisionPickerCalendar();
+  updateRevisionPickerCount();
 }
 function generateRevisionsFromDates(topicId, subjectId, subtopicId, dates){
   if(subtopicId) DB.revisions = DB.revisions.filter(r=>r.subtopicId!==subtopicId);
@@ -2494,8 +2495,6 @@ function deleteTimetableBlock(id){
 /* ===================== SETTINGS ===================== */
 function renderSettings(){
   const theme = DB.settings.theme;
-  const rule = DB.settings.revisionRule || {startDays:[1,3,7], weekDay:'sun', weeklyCount:8};
-  const weekDayOptions = [['sun','રવિવાર'],['mon','સોમવાર'],['tue','મંગળવાર'],['wed','બુધવાર'],['thu','ગુરુવાર'],['fri','શુક્રવાર'],['sat','શનિવાર']];
   return `
    <h2>સેટિંગ્સ ⚙️</h2>
    ${card('થીમ', `<div class="item cursor-default"><span>ડાર્ક મોડ</span><label class="switch"><input type="checkbox" ${theme==='dark'?'checked':''} onchange="toggleTheme(this.checked)"><span class="slider"></span></label></div>`)}
@@ -2506,13 +2505,6 @@ function renderSettings(){
      ${(('Notification' in window) && Notification.permission==='granted') ? `<button class="btn btn-secondary btn-block" onclick="showAppNotification('ટેસ્ટ ✅','આ એક ટેસ્ટ નોટિફિકેશન છે','test')">ટેસ્ટ નોટિફિકેશન મોકલો</button>` : ''}
    `)}
    ${card('ટૂલ્સ', `<button class="btn btn-secondary btn-block" onclick="showTab('timetable')">📋 મારું ટાઈમટેબલ</button>`)}
-   ${card('રિવિઝન નિયમ ⚙️', `
-     <div class="field"><label>શરૂઆતના દિવસો (કોમાથી અલગ કરો)</label><input type="text" id="f_rule_days" value="${(rule.startDays||[1,3,7]).join(',')}" placeholder="દા.ત. 1,3,7"></div>
-     <div class="field"><label>કયો વાર કમ્પલસરી?</label><select id="f_rule_weekday">${weekDayOptions.map(([k,l])=>`<option value="${k}" ${rule.weekDay===k?'selected':''}>${l}</option>`).join('')}</select></div>
-     <div class="field"><label>કેટલી વાર (સપ્તાહ) સુધી?</label><input type="number" id="f_rule_count" value="${rule.weeklyCount!=null?rule.weeklyCount:8}"></div>
-     <div class="ink-dim" style="font-size:11.5px; margin-bottom:10px;">શરૂઆતના દિવસો પૂરા થયા પછી, ઉપર પસંદ કરેલા વારે દર અઠવાડિયે, ઉપર આપેલી સંખ્યા સુધી રિવિઝન બનશે. આ ફેરફાર હવે પછી "પૂર્ણ" થતા ટોપિકને જ લાગુ પડશે, જૂના રિવિઝન બદલાશે નહીં.</div>
-     <button class="btn btn-primary btn-block" onclick="saveRevisionRule()">સેવ કરો</button>
-   `)}
    ${card('ડેટા', `
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="exportBackup()">⬇️ બેકઅપ એક્સપોર્ટ કરો</button>
      <label class="btn btn-secondary btn-block" style="margin-bottom:8px;display:block;text-align:center;">⬆️ બેકઅપ ઇમ્પોર્ટ કરો<input type="file" accept="application/json" style="display:none" onchange="importBackup(event)"></label>
@@ -2522,16 +2514,6 @@ function renderSettings(){
    `)}
    ${card('વિશે', `<div class="ink-dim" style="font-size:13px;line-height:1.7;">ExamPath — સંપૂર્ણ ઓફલાઈન સ્ટડી ટ્રેકર.<br>તમામ ડેટા ફક્ત તમારા મોબાઈલમાં (બ્રાઉઝર સ્ટોરેજ) સેવ થાય છે — ક્યાંય ઈન્ટરનેટ પર મોકલવામાં આવતો નથી. નિયમિત બેકઅપ એક્સપોર્ટ કરવાની ભલામણ છે.</div>`)}
   `;
-}
-function saveRevisionRule(){
-  const daysRaw = val('f_rule_days');
-  const startDays = daysRaw.split(',').map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n) && n>0).sort((a,b)=>a-b);
-  const weekDay = val('f_rule_weekday') || 'sun';
-  const weeklyCount = Math.max(0, parseInt(val('f_rule_count'),10) || 0);
-  if(!startDays.length){ toast('ઓછામાં ઓછો એક દિવસ ભરો','error'); return; }
-  DB.settings.revisionRule = {startDays, weekDay, weeklyCount};
-  save();
-  toast('રિવિઝન નિયમ સેવ થયો');
 }
 function toggleTheme(isDark){ DB.settings.theme = isDark ? 'dark' : 'light'; save(); applyTheme(); }
 function applyTheme(){
