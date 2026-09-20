@@ -2163,6 +2163,20 @@ function isAccordionOpen(wrapId){ return openAccordionIds.has(wrapId); }
 function toggleAccordion(wrapId, caretEl){
   const el = document.getElementById(wrapId);
   if(!el) return;
+  const willOpen = el.classList.contains('hidden');
+  if(willOpen){
+    openAccordionIds.forEach(otherId=>{
+      if(otherId===wrapId) return;
+      const otherEl = document.getElementById(otherId);
+      if(otherEl){
+        otherEl.classList.add('hidden');
+        const otherHeader = otherEl.previousElementSibling;
+        const otherCaret = otherHeader ? otherHeader.querySelector('.accordion-caret') : null;
+        if(otherCaret) otherCaret.textContent = '▼';
+      }
+    });
+    openAccordionIds.clear();
+  }
   const nowHidden = el.classList.toggle('hidden');
   if(nowHidden) openAccordionIds.delete(wrapId); else openAccordionIds.add(wrapId);
   if(caretEl) caretEl.textContent = nowHidden ? '▼' : '▲';
