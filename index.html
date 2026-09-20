@@ -1238,10 +1238,12 @@ function openRevisionCalendarSheet(entityType, id){
   revisionPickerMonth = now.getMonth();
   revisionPickerYear = now.getFullYear();
   const name = entityType==='topic' ? (DB.topics.find(x=>x.id===id)||{}).name : (DB.subtopics.find(x=>x.id===id)||{}).name;
+  const exam = getActiveExam();
+  const limitLine = exam && exam.date ? `પરીક્ષાની તારીખ (${formatDate(exam.date)}) સુધી જ રિવિઝન સેટ કરી શકાશે.` : 'જોઈએ એટલી તારીખ પસંદ કરી શકાય — કોઈ મર્યાદા નથી, આગળના મહિનામાં પણ.';
   openSheet(`
     <h3>રિવિઝન ક્યારે કરવું છે?</h3>
     <div class="ink-dim fs-12 mb-6">${esc(name||'')}</div>
-    <div class="ink-dim fs-12 mb-6">કેલેન્ડરમાં જે-જે તારીખે રિવિઝન કરવું હોય ત્યાં ટેપ કરી ✓ કરો. જોઈએ એટલી તારીખ પસંદ કરી શકાય — કોઈ મર્યાદા નથી, આગળના મહિનામાં પણ.</div>
+    <div class="ink-dim fs-12 mb-6">કેલેન્ડરમાં જે-જે તારીખે રિવિઝન કરવું હોય ત્યાં ટેપ કરી ✓ કરો. ${limitLine}</div>
     <div id="revisionPickerCal">${renderRevisionPickerCalendar()}</div>
     <div class="ink-dim fs-12" style="margin-top:8px;" id="revisionPickerCount"></div>
     <div class="sheet-actions" style="margin-top:14px;">
@@ -1257,24 +1259,34 @@ function renderRevisionPickerCalendar(){
   const monthName = firstDay.toLocaleDateString('gu-IN', {month:'long', year:'numeric'});
   const now = new Date();
   const isCurrentMonth = (revisionPickerMonth===now.getMonth() && revisionPickerYear===now.getFullYear());
+  const exam = getActiveExam();
+  const examDate = (exam && exam.date) ? exam.date : null;
+  let atOrBeyondExamMonth = false;
+  if(examDate){
+    const [examYear, examMonthRaw] = examDate.split('-').map(Number);
+    const examMonth = examMonthRaw-1;
+    atOrBeyondExamMonth = (revisionPickerYear>examYear) || (revisionPickerYear===examYear && revisionPickerMonth>=examMonth);
+  }
   let cells = '';
   for(let i=0;i<startWeekday;i++) cells += `<div class="cal-cell empty"></div>`;
   for(let d=1; d<=daysInMonth; d++){
     const ds = `${revisionPickerYear}-${String(revisionPickerMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isPast = ds < todayStr();
+    const isAfterExam = examDate ? (ds > examDate) : false;
+    const isDisabled = isPast || isAfterExam;
     const isToday = ds === todayStr();
     const isSelected = revisionPickerDates.has(ds);
     const cls = ['cal-cell'];
     if(isToday) cls.push('today');
     if(isSelected) cls.push('selected');
-    if(isPast) cls.push('past-disabled');
-    cells += `<div class="${cls.join(' ')}" ${isPast?'':`onclick="toggleRevisionPickerDate('${ds}')"`}><span>${d}</span></div>`;
+    if(isDisabled) cls.push('past-disabled');
+    cells += `<div class="${cls.join(' ')}" ${isDisabled?'':`onclick="toggleRevisionPickerDate('${ds}')"`}><span>${d}</span></div>`;
   }
   return `
    <div class="cal-header">
      <button class="btn btn-sm btn-secondary" ${isCurrentMonth?'disabled':''} onclick="revisionPickerMonth--; if(revisionPickerMonth<0){revisionPickerMonth=11;revisionPickerYear--;} refreshRevisionPickerCalendar();">‹</button>
      <b>${monthName}</b>
-     <button class="btn btn-sm btn-secondary" onclick="revisionPickerMonth++; if(revisionPickerMonth>11){revisionPickerMonth=0;revisionPickerYear++;} refreshRevisionPickerCalendar();">›</button>
+     <button class="btn btn-sm btn-secondary" ${atOrBeyondExamMonth?'disabled':''} onclick="revisionPickerMonth++; if(revisionPickerMonth>11){revisionPickerMonth=0;revisionPickerYear++;} refreshRevisionPickerCalendar();">›</button>
    </div>
    <div class="cal-weekdays"><div>ર</div><div>સો</div><div>મં</div><div>બુ</div><div>ગુ</div><div>શુ</div><div>શ</div></div>
    <div class="cal-grid">${cells}</div>
