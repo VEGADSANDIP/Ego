@@ -200,6 +200,7 @@ canvas{width:100%; display:block;}
 .cal-cell.selected{background:var(--success); color:#fff;}
 .cal-cell.selected .cal-dot{background:#fff !important;}
 .cal-cell.past-disabled{opacity:.32; cursor:default;}
+.cal-cell.locked{background:var(--success); opacity:.55; color:#fff; cursor:default;}
 .cal-dot{width:5px; height:5px; border-radius:99px; background:var(--accent); margin-top:2px;}
 .cal-dots-row{display:flex; gap:3px; margin-top:2px; justify-content:center;}
 .cal-dots-row .cal-dot{margin-top:0;}
@@ -1223,6 +1224,7 @@ function cycleTopicStatus(id){
   save(); renderMain();
 }
 let revisionPickerDates = new Set();
+let revisionPickerCompletedDates = new Set();
 let revisionPickerEntity = null;
 let revisionPickerMonth = new Date().getMonth();
 let revisionPickerYear = new Date().getFullYear();
@@ -1234,6 +1236,7 @@ function toLocalISODate(d){
 function openRevisionCalendarSheet(entityType, id){
   revisionPickerEntity = {entityType, id};
   revisionPickerDates = new Set();
+  revisionPickerCompletedDates = new Set();
   const now = new Date();
   revisionPickerMonth = now.getMonth();
   revisionPickerYear = now.getFullYear();
@@ -1248,6 +1251,31 @@ function openRevisionCalendarSheet(entityType, id){
     <div class="ink-dim fs-12" style="margin-top:8px;" id="revisionPickerCount"></div>
     <div class="sheet-actions" style="margin-top:14px;">
       <button class="btn btn-primary btn-block" onclick="confirmRevisionPicker()">✓ પૂર્ણ કરો</button>
+    </div>
+  `);
+  updateRevisionPickerCount();
+}
+function openManageRevisionDatesSheet(entityType, id){
+  revisionPickerEntity = {entityType, id, mode:'manage'};
+  const existing = entityType==='topic'
+    ? DB.revisions.filter(r=>r.topicId===id && !r.subtopicId)
+    : DB.revisions.filter(r=>r.subtopicId===id);
+  revisionPickerDates = new Set(existing.filter(r=>r.status==='pending').map(r=>r.dueDate));
+  revisionPickerCompletedDates = new Set(existing.filter(r=>r.status==='completed').map(r=>r.dueDate));
+  const now = new Date();
+  revisionPickerMonth = now.getMonth();
+  revisionPickerYear = now.getFullYear();
+  const name = entityType==='topic' ? (DB.topics.find(x=>x.id===id)||{}).name : (DB.subtopics.find(x=>x.id===id)||{}).name;
+  const exam = getActiveExam();
+  const limitLine = exam && exam.date ? `પરીક્ષાની તારીખ (${formatDate(exam.date)}) સુધી.` : '';
+  openSheet(`
+    <h3>રિવિઝન તારીખ મેનેજ કરો</h3>
+    <div class="ink-dim fs-12 mb-6">${esc(name||'')}</div>
+    <div class="ink-dim fs-12 mb-6"><span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--success);opacity:.55;display:inline-block;"></span> પૂર્ણ થયેલ (બદલી ના શકાય)</span> — બાકીની (લીલી) તારીખો પર ટેપ કરી ઉમેરો કે કાઢી શકો છો. ${limitLine}</div>
+    <div id="revisionPickerCal">${renderRevisionPickerCalendar()}</div>
+    <div class="ink-dim fs-12" style="margin-top:8px;" id="revisionPickerCount"></div>
+    <div class="sheet-actions" style="margin-top:14px;">
+      <button class="btn btn-primary btn-block" onclick="confirmRevisionPicker()">✓ સેવ કરો</button>
     </div>
   `);
   updateRevisionPickerCount();
@@ -1273,14 +1301,17 @@ function renderRevisionPickerCalendar(){
     const ds = `${revisionPickerYear}-${String(revisionPickerMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isPast = ds < todayStr();
     const isAfterExam = examDate ? (ds > examDate) : false;
-    const isDisabled = isPast || isAfterExam;
+    const isCompleted = revisionPickerCompletedDates.has(ds);
+    const isDisabled = (isPast || isAfterExam) && !isCompleted;
     const isToday = ds === todayStr();
     const isSelected = revisionPickerDates.has(ds);
     const cls = ['cal-cell'];
     if(isToday) cls.push('today');
-    if(isSelected) cls.push('selected');
+    if(isCompleted) cls.push('locked');
+    else if(isSelected) cls.push('selected');
     if(isDisabled) cls.push('past-disabled');
-    cells += `<div class="${cls.join(' ')}" ${isDisabled?'':`onclick="toggleRevisionPickerDate('${ds}')"`}><span>${d}</span></div>`;
+    const clickable = !isDisabled && !isCompleted;
+    cells += `<div class="${cls.join(' ')}" ${clickable?`onclick="toggleRevisionPickerDate('${ds}')"`:''}><span>${d}</span></div>`;
   }
   return `
    <div class="cal-header">
@@ -1301,6 +1332,7 @@ function updateRevisionPickerCount(){
   if(el) el.textContent = `કુલ પસંદ કરેલી તારીખો: ${revisionPickerDates.size}`;
 }
 function toggleRevisionPickerDate(ds){
+  if(revisionPickerCompletedDates.has(ds)) return;
   if(revisionPickerDates.has(ds)) revisionPickerDates.delete(ds);
   else revisionPickerDates.add(ds);
   refreshRevisionPickerCalendar();
@@ -1331,8 +1363,7 @@ function confirmRevisionPicker(){
   if(!revisionPickerEntity) return;
   const {entityType, id, mode} = revisionPickerEntity;
   const dates = Array.from(revisionPickerDates).sort();
-  if(!dates.length){ toast('ઓછામાં ઓછી એક તારીખ પસંદ કરો','error'); return; }
-  if(mode==='append'){
+  if(mode==='manage'){
     let topicId, subjectId, subtopicId=null;
     if(entityType==='topic'){
       const t = DB.topics.find(x=>x.id===id);
@@ -1343,12 +1374,27 @@ function confirmRevisionPicker(){
       if(!st) return;
       topicId=st.topicId; subjectId=st.subjectId; subtopicId=st.id;
     }
-    appendRevisionDates(topicId, subjectId, subtopicId, dates);
+    const existing = subtopicId ? DB.revisions.filter(r=>r.subtopicId===subtopicId) : DB.revisions.filter(r=>r.topicId===topicId && !r.subtopicId);
+    const existingPending = existing.filter(r=>r.status==='pending');
+    const keepDates = new Set(dates);
+    const toRemoveIds = existingPending.filter(r=>!keepDates.has(r.dueDate)).map(r=>r.id);
+    DB.revisions = DB.revisions.filter(r=>!toRemoveIds.includes(r.id));
+    const stillExistingDates = new Set(DB.revisions.filter(r=> subtopicId ? r.subtopicId===subtopicId : (r.topicId===topicId && !r.subtopicId)).map(r=>r.dueDate));
+    let maxStage = existing.reduce((m,r)=>Math.max(m, r.stage||0), 0);
+    dates.forEach(due=>{
+      if(stillExistingDates.has(due)) return;
+      maxStage++;
+      const entry = {id:uid(), topicId, subjectId, dueDate:due, status:'pending', stage:maxStage};
+      if(subtopicId) entry.subtopicId = subtopicId;
+      DB.revisions.push(entry);
+      stillExistingDates.add(due);
+    });
     save(); closeSheet();
     openTopicRevisionForm(topicId);
-    toast(`${dates.length} નવી રિવિઝન તારીખ ઉમેરાઈ 🔁`);
+    toast('રિવિઝન તારીખો અપડેટ થઈ 🔁');
     return;
   }
+  if(!dates.length){ toast('ઓછામાં ઓછી એક તારીખ પસંદ કરો','error'); return; }
   if(entityType==='topic'){
     const t = DB.topics.find(x=>x.id===id);
     if(!t) return;
@@ -1612,12 +1658,9 @@ function openTopicRevisionForm(topicId){
     const revs = DB.revisions.filter(r=>r.topicId===t.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
     const rowsHTML = revs.length ? revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;">
       <span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span>
-      <span style="display:flex; align-items:center; gap:6px;">
-        ${r.status==='pending' ? `<button class="btn btn-sm btn-secondary" onclick="editRevisionDate('${r.id}')">✎</button>` : ''}
-        <span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}" onclick="toggleRevisionStatus('${r.id}'); openTopicRevisionForm('${topicId}');">${r.status==='completed'?'પૂર્ણ ✓':'બાકી'}</span>
-      </span>
+      <span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}" onclick="toggleRevisionStatus('${r.id}'); openTopicRevisionForm('${topicId}');">${r.status==='completed'?'પૂર્ણ ✓':'બાકી'}</span>
     </div>`).join('') : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — ચેપ્ટર પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
-    bodyHTML = rowsHTML + (t.status==='completed' ? `<button class="btn btn-secondary btn-block mt-8" onclick="openAddMoreRevisionsSheet('topic','${t.id}')">+ વધુ રિવિઝન તારીખ ઉમેરો</button>` : '');
+    bodyHTML = rowsHTML + (t.status==='completed' ? `<button class="btn btn-secondary btn-block mt-8" onclick="openManageRevisionDatesSheet('topic','${t.id}')">✎ રિવિઝન તારીખ મેનેજ કરો</button>` : '');
   } else {
     bodyHTML = subtopicsForTopic(t.id).map(st=>subtopicRevisionRow(st)).join('');
   }
@@ -1625,66 +1668,6 @@ function openTopicRevisionForm(topicId){
     <h3>🔁 રિવિઝન — ${esc(t.name)}</h3>
     ${bodyHTML}
   `);
-}
-function editRevisionDate(id){
-  const r = DB.revisions.find(x=>x.id===id);
-  if(!r || r.status==='completed') return;
-  const exam = getActiveExam();
-  const maxAttr = (exam && exam.date) ? ` max="${exam.date}"` : '';
-  openSheet(`
-    <h3>રિવિઝન તારીખ બદલો</h3>
-    <div class="field"><label>નવી તારીખ</label><input type="date" id="f_edit_revdate" value="${r.dueDate}" min="${todayStr()}"${maxAttr}></div>
-    <div class="sheet-actions">
-      <button class="btn btn-primary btn-block" onclick="saveEditedRevisionDate('${id}')">સેવ કરો</button>
-    </div>
-  `);
-}
-function saveEditedRevisionDate(id){
-  const r = DB.revisions.find(x=>x.id===id);
-  if(!r) return;
-  const newDate = val('f_edit_revdate');
-  if(!newDate){ toast('તારીખ પસંદ કરો','error'); return; }
-  if(newDate < todayStr()){ toast('પસાર થઈ ગયેલી તારીખ ના ચાલે','error'); return; }
-  const exam = getActiveExam();
-  if(exam && exam.date && newDate > exam.date){ toast('પરીક્ષાની તારીખ પછીની તારીખ ના ચાલે','error'); return; }
-  r.dueDate = newDate;
-  save();
-  if(r.subtopicId){ const st=DB.subtopics.find(x=>x.id===r.subtopicId); openTopicRevisionForm(st?st.topicId:r.topicId); }
-  else openTopicRevisionForm(r.topicId);
-  toast('તારીખ બદલાઈ');
-}
-function openAddMoreRevisionsSheet(entityType, id){
-  revisionPickerEntity = {entityType, id, mode:'append'};
-  revisionPickerDates = new Set();
-  const now = new Date();
-  revisionPickerMonth = now.getMonth();
-  revisionPickerYear = now.getFullYear();
-  const name = entityType==='topic' ? (DB.topics.find(x=>x.id===id)||{}).name : (DB.subtopics.find(x=>x.id===id)||{}).name;
-  const exam = getActiveExam();
-  const limitLine = exam && exam.date ? `પરીક્ષાની તારીખ (${formatDate(exam.date)}) સુધી જ રિવિઝન સેટ કરી શકાશે.` : 'જોઈએ એટલી તારીખ પસંદ કરી શકાય.';
-  openSheet(`
-    <h3>વધુ રિવિઝન તારીખ ઉમેરો</h3>
-    <div class="ink-dim fs-12 mb-6">${esc(name||'')}</div>
-    <div class="ink-dim fs-12 mb-6">જે-જે વધારાની તારીખે રિવિઝન કરવું હોય ત્યાં ટેપ કરી ✓ કરો. ${limitLine}</div>
-    <div id="revisionPickerCal">${renderRevisionPickerCalendar()}</div>
-    <div class="ink-dim fs-12" style="margin-top:8px;" id="revisionPickerCount"></div>
-    <div class="sheet-actions" style="margin-top:14px;">
-      <button class="btn btn-primary btn-block" onclick="confirmRevisionPicker()">✓ ઉમેરો</button>
-    </div>
-  `);
-  updateRevisionPickerCount();
-}
-function appendRevisionDates(topicId, subjectId, subtopicId, dates){
-  const existing = subtopicId ? DB.revisions.filter(r=>r.subtopicId===subtopicId) : DB.revisions.filter(r=>r.topicId===topicId && !r.subtopicId);
-  const existingDates = new Set(existing.map(r=>r.dueDate));
-  let maxStage = existing.reduce((m,r)=>Math.max(m, r.stage||0), 0);
-  dates.forEach(due=>{
-    if(existingDates.has(due)) return;
-    maxStage++;
-    const entry = {id:uid(), topicId, subjectId, dueDate:due, status:'pending', stage:maxStage};
-    if(subtopicId) entry.subtopicId = subtopicId;
-    DB.revisions.push(entry);
-  });
 }
 function subtopicRevisionRow(st){
   const revs = DB.revisions.filter(r=>r.subtopicId===st.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
@@ -1695,12 +1678,9 @@ function subtopicRevisionRow(st){
   const badgeHTML = `<span class="badge ${st.completed?'badge-success':'badge-grey'}" onclick="event.stopPropagation(); toggleSubtopicComplete('${st.id}')">${st.completed?'પૂર્ણ 🟢':'બાકી 🔴'}</span>${revs.length ? `<span class="badge badge-warning">${doneCount}/${revs.length}</span>` : ''}`;
   const rowsHTML = revs.length ? `<div class="ink-dim fs-12 mt-8 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;">
     <span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span>
-    <span style="display:flex; align-items:center; gap:6px;">
-      ${r.status==='pending' ? `<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); editRevisionDate('${r.id}')">✎</button>` : ''}
-      <span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span>
-    </span>
+    <span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span>
   </div>`).join('')}` : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — સબ-ટોપિક પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
-  const bodyHTML = rowsHTML + (st.completed ? `<button class="btn btn-secondary btn-block mt-8" onclick="event.stopPropagation(); openAddMoreRevisionsSheet('subtopic','${st.id}')">+ વધુ રિવિઝન તારીખ ઉમેરો</button>` : '');
+  const bodyHTML = rowsHTML + (st.completed ? `<button class="btn btn-secondary btn-block mt-8" onclick="event.stopPropagation(); openManageRevisionDatesSheet('subtopic','${st.id}')">✎ રિવિઝન તારીખ મેનેજ કરો</button>` : '');
   return renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, shouldExpand, {gap:6});
 }
 function addSingleSubtopic(topicId){
