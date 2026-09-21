@@ -1329,9 +1329,26 @@ function addAutoStudyLog(subjectId, topicId, subtopicId){
 }
 function confirmRevisionPicker(){
   if(!revisionPickerEntity) return;
-  const {entityType, id} = revisionPickerEntity;
+  const {entityType, id, mode} = revisionPickerEntity;
   const dates = Array.from(revisionPickerDates).sort();
   if(!dates.length){ toast('ઓછામાં ઓછી એક તારીખ પસંદ કરો','error'); return; }
+  if(mode==='append'){
+    let topicId, subjectId, subtopicId=null;
+    if(entityType==='topic'){
+      const t = DB.topics.find(x=>x.id===id);
+      if(!t) return;
+      topicId=t.id; subjectId=t.subjectId;
+    } else {
+      const st = DB.subtopics.find(x=>x.id===id);
+      if(!st) return;
+      topicId=st.topicId; subjectId=st.subjectId; subtopicId=st.id;
+    }
+    appendRevisionDates(topicId, subjectId, subtopicId, dates);
+    save(); closeSheet();
+    openTopicRevisionForm(topicId);
+    toast(`${dates.length} નવી રિવિઝન તારીખ ઉમેરાઈ 🔁`);
+    return;
+  }
   if(entityType==='topic'){
     const t = DB.topics.find(x=>x.id===id);
     if(!t) return;
@@ -1593,7 +1610,14 @@ function openTopicRevisionForm(topicId){
   let bodyHTML = '';
   if(!hasSubtopics){
     const revs = DB.revisions.filter(r=>r.topicId===t.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-    bodyHTML = revs.length ? revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}" onclick="toggleRevisionStatus('${r.id}'); openTopicRevisionForm('${topicId}');">${r.status==='completed'?'પૂર્ણ ✓':'બાકી'}</span></div>`).join('') : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — ચેપ્ટર પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
+    const rowsHTML = revs.length ? revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;">
+      <span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span>
+      <span style="display:flex; align-items:center; gap:6px;">
+        ${r.status==='pending' ? `<button class="btn btn-sm btn-secondary" onclick="editRevisionDate('${r.id}')">✎</button>` : ''}
+        <span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}" onclick="toggleRevisionStatus('${r.id}'); openTopicRevisionForm('${topicId}');">${r.status==='completed'?'પૂર્ણ ✓':'બાકી'}</span>
+      </span>
+    </div>`).join('') : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — ચેપ્ટર પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
+    bodyHTML = rowsHTML + (t.status==='completed' ? `<button class="btn btn-secondary btn-block mt-8" onclick="openAddMoreRevisionsSheet('topic','${t.id}')">+ વધુ રિવિઝન તારીખ ઉમેરો</button>` : '');
   } else {
     bodyHTML = subtopicsForTopic(t.id).map(st=>subtopicRevisionRow(st)).join('');
   }
@@ -1602,6 +1626,66 @@ function openTopicRevisionForm(topicId){
     ${bodyHTML}
   `);
 }
+function editRevisionDate(id){
+  const r = DB.revisions.find(x=>x.id===id);
+  if(!r || r.status==='completed') return;
+  const exam = getActiveExam();
+  const maxAttr = (exam && exam.date) ? ` max="${exam.date}"` : '';
+  openSheet(`
+    <h3>રિવિઝન તારીખ બદલો</h3>
+    <div class="field"><label>નવી તારીખ</label><input type="date" id="f_edit_revdate" value="${r.dueDate}" min="${todayStr()}"${maxAttr}></div>
+    <div class="sheet-actions">
+      <button class="btn btn-primary btn-block" onclick="saveEditedRevisionDate('${id}')">સેવ કરો</button>
+    </div>
+  `);
+}
+function saveEditedRevisionDate(id){
+  const r = DB.revisions.find(x=>x.id===id);
+  if(!r) return;
+  const newDate = val('f_edit_revdate');
+  if(!newDate){ toast('તારીખ પસંદ કરો','error'); return; }
+  if(newDate < todayStr()){ toast('પસાર થઈ ગયેલી તારીખ ના ચાલે','error'); return; }
+  const exam = getActiveExam();
+  if(exam && exam.date && newDate > exam.date){ toast('પરીક્ષાની તારીખ પછીની તારીખ ના ચાલે','error'); return; }
+  r.dueDate = newDate;
+  save();
+  if(r.subtopicId){ const st=DB.subtopics.find(x=>x.id===r.subtopicId); openTopicRevisionForm(st?st.topicId:r.topicId); }
+  else openTopicRevisionForm(r.topicId);
+  toast('તારીખ બદલાઈ');
+}
+function openAddMoreRevisionsSheet(entityType, id){
+  revisionPickerEntity = {entityType, id, mode:'append'};
+  revisionPickerDates = new Set();
+  const now = new Date();
+  revisionPickerMonth = now.getMonth();
+  revisionPickerYear = now.getFullYear();
+  const name = entityType==='topic' ? (DB.topics.find(x=>x.id===id)||{}).name : (DB.subtopics.find(x=>x.id===id)||{}).name;
+  const exam = getActiveExam();
+  const limitLine = exam && exam.date ? `પરીક્ષાની તારીખ (${formatDate(exam.date)}) સુધી જ રિવિઝન સેટ કરી શકાશે.` : 'જોઈએ એટલી તારીખ પસંદ કરી શકાય.';
+  openSheet(`
+    <h3>વધુ રિવિઝન તારીખ ઉમેરો</h3>
+    <div class="ink-dim fs-12 mb-6">${esc(name||'')}</div>
+    <div class="ink-dim fs-12 mb-6">જે-જે વધારાની તારીખે રિવિઝન કરવું હોય ત્યાં ટેપ કરી ✓ કરો. ${limitLine}</div>
+    <div id="revisionPickerCal">${renderRevisionPickerCalendar()}</div>
+    <div class="ink-dim fs-12" style="margin-top:8px;" id="revisionPickerCount"></div>
+    <div class="sheet-actions" style="margin-top:14px;">
+      <button class="btn btn-primary btn-block" onclick="confirmRevisionPicker()">✓ ઉમેરો</button>
+    </div>
+  `);
+  updateRevisionPickerCount();
+}
+function appendRevisionDates(topicId, subjectId, subtopicId, dates){
+  const existing = subtopicId ? DB.revisions.filter(r=>r.subtopicId===subtopicId) : DB.revisions.filter(r=>r.topicId===topicId && !r.subtopicId);
+  const existingDates = new Set(existing.map(r=>r.dueDate));
+  let maxStage = existing.reduce((m,r)=>Math.max(m, r.stage||0), 0);
+  dates.forEach(due=>{
+    if(existingDates.has(due)) return;
+    maxStage++;
+    const entry = {id:uid(), topicId, subjectId, dueDate:due, status:'pending', stage:maxStage};
+    if(subtopicId) entry.subtopicId = subtopicId;
+    DB.revisions.push(entry);
+  });
+}
 function subtopicRevisionRow(st){
   const revs = DB.revisions.filter(r=>r.subtopicId===st.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
   const doneCount = revs.filter(r=>r.status==='completed').length;
@@ -1609,7 +1693,14 @@ function subtopicRevisionRow(st){
   const shouldExpand = isAccordionOpen(wrapId);
   const headerHTML = `<span style="flex:1; padding-right:6px;">${esc(st.name)}</span>`;
   const badgeHTML = `<span class="badge ${st.completed?'badge-success':'badge-grey'}" onclick="event.stopPropagation(); toggleSubtopicComplete('${st.id}')">${st.completed?'પૂર્ણ 🟢':'બાકી 🔴'}</span>${revs.length ? `<span class="badge badge-warning">${doneCount}/${revs.length}</span>` : ''}`;
-  const bodyHTML = revs.length ? `<div class="ink-dim fs-12 mt-8 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;"><span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span><span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span></div>`).join('')}` : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — સબ-ટોપિક પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
+  const rowsHTML = revs.length ? `<div class="ink-dim fs-12 mt-8 mb-6">🔁 રિવિઝન શેડ્યુલ:</div>${revs.map(r=>`<div class="item cursor-default" style="padding:6px 0;">
+    <span>${revisionStageLabel(r.stage)} — ${formatDate(r.dueDate)}</span>
+    <span style="display:flex; align-items:center; gap:6px;">
+      ${r.status==='pending' ? `<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); editRevisionDate('${r.id}')">✎</button>` : ''}
+      <span class="badge ${r.status==='completed'?'badge-success':'badge-warning'}">${r.status==='completed'?'પૂર્ણ':'બાકી'}</span>
+    </span>
+  </div>`).join('')}` : `<div class="ink-dim fs-12" style="padding:8px 2px;">રિવિઝન હજુ જનરેટ નથી થયું — સબ-ટોપિક પૂર્ણ કરો ત્યારે ઓટો-જનરેટ થશે</div>`;
+  const bodyHTML = rowsHTML + (st.completed ? `<button class="btn btn-secondary btn-block mt-8" onclick="event.stopPropagation(); openAddMoreRevisionsSheet('subtopic','${st.id}')">+ વધુ રિવિઝન તારીખ ઉમેરો</button>` : '');
   return renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, shouldExpand, {gap:6});
 }
 function addSingleSubtopic(topicId){
