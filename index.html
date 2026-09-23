@@ -58,7 +58,6 @@ input, textarea{
 .cursor-default{cursor:default;} .cursor-pointer{cursor:pointer;} .item-static{border:none;padding:0;cursor:default;}
 .fs-12{font-size:12px;} .fs-125{font-size:12.5px;} .fw-400{font-weight:400;} .fw-700{font-weight:700;}
 .flex-1{flex:1;} .flex-col{display:flex; flex-direction:column;} .flex-gap-4{display:flex; gap:4px;} .flex-gap-6{display:flex; gap:6px;}
-.section-group-label{margin:0 2px 6px 2px;}
 h1,h2,h3{margin:0 0 8px 0; letter-spacing:-0.02em; font-weight:800;}
 h2{font-size:19px;}
 h3{font-size:15px;}
@@ -2089,25 +2088,32 @@ function sortSubjectIdsByTimetable(subjectIds, dateStr){
   });
 }
 function groupSubjectIdsBySection(subjectIds){
-  const groups = [];
-  const groupIndex = {};
+  const exam = getActiveExam();
+  const sections = exam ? examSections(exam.id) : [];
+  const bySection = {};
+  const ungrouped = [];
   subjectIds.forEach(sid=>{
     const subj = DB.subjects.find(x=>x.id===sid);
     const secId = subj && subj.sectionId ? subj.sectionId : null;
-    const key = secId || '__none__';
-    if(!(key in groupIndex)){
-      groupIndex[key] = groups.length;
-      groups.push({sec: secId?DB.sections.find(x=>x.id===secId):null, subjectIds:[]});
-    }
-    groups[groupIndex[key]].subjectIds.push(sid);
+    if(secId){ (bySection[secId] = bySection[secId]||[]).push(sid); }
+    else ungrouped.push(sid);
   });
+  const groups = [];
+  sections.forEach(sec=>{
+    if(bySection[sec.id] && bySection[sec.id].length) groups.push({sec, subjectIds: bySection[sec.id]});
+  });
+  if(ungrouped.length) groups.push({sec:null, subjectIds: ungrouped});
   return groups;
 }
 function renderSectionGroups(groups, subjectCardHTML){
   return groups.map(g=>{
     const cards = g.subjectIds.map(sid=>subjectCardHTML(sid)).join('');
-    if(g.sec) return `<div class="mt-14"><div class="ink-dim fw-700 fs-125 section-group-label">📂 ${esc(g.sec.name)}</div>${cards}</div>`;
-    return cards;
+    if(!g.sec) return cards;
+    const wrapId = 'secacc_'+g.sec.id+'_'+calMode;
+    const shouldExpand = isAccordionOpen(wrapId);
+    const headerHTML = `<span class="ink-dim fw-700 fs-125">📂 ${esc(g.sec.name)}</span>`;
+    const badgeHTML = `<span class="badge badge-primary">${g.subjectIds.length}</span>`;
+    return `<div class="mt-14">${renderAccordionBlock(wrapId, headerHTML, badgeHTML, cards, shouldExpand, {headerStyle:'border:none; padding:4px 2px;', bodyStyle:'padding-left:0;'})}</div>`;
   }).join('');
 }
 function calendarDayDetailHTML(dateStr){
