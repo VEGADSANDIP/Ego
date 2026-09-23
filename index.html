@@ -2006,6 +2006,14 @@ function deleteRevision(id){
   save(); renderMain();
   toast('ડિલીટ થયું');
 }
+function completeAllRevisionsForSubject(subjectId, dateStr){
+  const revs = revisionsForActiveExam().filter(r=>r.dueDate===dateStr && (r.subjectId||'unknown')===subjectId && r.status==='pending');
+  if(!revs.length) return;
+  if(!confirm(`આ સબ્જેક્ટના આજના બધા (${revs.length}) ટોપિકનું રિવિઝન પૂર્ણ કરવું છે?`)) return;
+  revs.forEach(r=>{ r.status='completed'; r.completedDate=todayStr(); });
+  save(); renderMain();
+  toast(`${revs.length} રિવિઝન પૂર્ણ 🎉`);
+}
 
 /* ===================== GOALS ===================== */
 /* ===================== CALENDAR ===================== */
@@ -2138,9 +2146,11 @@ function calendarDayDetailHTML(dateStr){
   } else {
     const subjectCardHTML = (sid)=>{
       const chapterGroups = groupRevisionsByChapter(bySubject[sid]);
+      const pendingCount = bySubject[sid].filter(r=>r.status==='pending').length;
       return `<div class="card">
         <div class="item item-static">
           <b>${esc(subjectName(sid))}</b>
+          ${pendingCount>0 ? `<button class="btn btn-sm btn-primary" onclick="completeAllRevisionsForSubject('${sid}','${dateStr}')">✓ બધા પૂર્ણ કરો</button>` : ''}
         </div>
         ${chapterGroups.map(g=>revisionChapterAccordion(g.topicId, g.items)).join('')}
       </div>`;
