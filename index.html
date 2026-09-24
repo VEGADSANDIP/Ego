@@ -200,6 +200,8 @@ canvas{width:100%; display:block;}
 .cal-cell.selected .cal-dot{background:#fff !important;}
 .cal-cell.past-disabled{opacity:.32; cursor:default;}
 .cal-cell.locked{background:var(--success); opacity:.55; color:#fff; cursor:default;}
+.cal-rev-count{font-size:8.5px; font-weight:700; color:var(--ink-dim); line-height:1; margin-top:1px;}
+.cal-rev-count.high{color:var(--danger);}
 .cal-dot{width:5px; height:5px; border-radius:99px; background:var(--accent); margin-top:2px;}
 .cal-dots-row{display:flex; gap:3px; margin-top:2px; justify-content:center;}
 .cal-dots-row .cal-dot{margin-top:0;}
@@ -1279,6 +1281,21 @@ function openManageRevisionDatesSheet(entityType, id){
   `);
   updateRevisionPickerCount();
 }
+function revisionPickerSubjectId(){
+  if(!revisionPickerEntity) return null;
+  const {entityType, id} = revisionPickerEntity;
+  if(entityType==='topic'){ const t=DB.topics.find(x=>x.id===id); return t?t.subjectId:null; }
+  const st = DB.subtopics.find(x=>x.id===id);
+  return st?st.subjectId:null;
+}
+function revisionPickerOwnRevisionIds(){
+  if(!revisionPickerEntity) return new Set();
+  const {entityType, id} = revisionPickerEntity;
+  const list = entityType==='topic'
+    ? DB.revisions.filter(r=>r.topicId===id && !r.subtopicId)
+    : DB.revisions.filter(r=>r.subtopicId===id);
+  return new Set(list.map(r=>r.id));
+}
 function renderRevisionPickerCalendar(){
   const firstDay = new Date(revisionPickerYear, revisionPickerMonth, 1);
   const startWeekday = firstDay.getDay();
@@ -1288,6 +1305,9 @@ function renderRevisionPickerCalendar(){
   const isCurrentMonth = (revisionPickerMonth===now.getMonth() && revisionPickerYear===now.getFullYear());
   const exam = getActiveExam();
   const examDate = (exam && exam.date) ? exam.date : null;
+  const subjectId = revisionPickerSubjectId();
+  const ownIds = revisionPickerOwnRevisionIds();
+  const pendingRevs = DB.revisions.filter(r=>r.status==='pending' && !ownIds.has(r.id));
   let atOrBeyondExamMonth = false;
   if(examDate){
     const [examYear, examMonthRaw] = examDate.split('-').map(Number);
@@ -1310,9 +1330,14 @@ function renderRevisionPickerCalendar(){
     else if(isSelected) cls.push('selected');
     if(isDisabled) cls.push('past-disabled');
     const clickable = !isDisabled && !isCompleted;
-    cells += `<div class="${cls.join(' ')}" ${clickable?`onclick="toggleRevisionPickerDate('${ds}')"`:''}><span>${d}</span></div>`;
+    const dayRevs = pendingRevs.filter(r=>r.dueDate===ds);
+    const totalCount = dayRevs.length;
+    const subjCount = subjectId ? dayRevs.filter(r=>r.subjectId===subjectId).length : 0;
+    const countHTML = totalCount>0 ? `<span class="cal-rev-count${totalCount>8?' high':''}">${subjCount}·${totalCount}</span>` : '';
+    cells += `<div class="${cls.join(' ')}" ${clickable?`onclick="toggleRevisionPickerDate('${ds}')"`:''}><span>${d}</span>${countHTML}</div>`;
   }
   return `
+   <div class="ink-dim fs-12 mb-6">તારીખ નીચે: [આ સબ્જેક્ટના] · [કુલ] બાકી રિવિઝન</div>
    <div class="cal-header">
      <button class="btn btn-sm btn-secondary" ${isCurrentMonth?'disabled':''} onclick="revisionPickerMonth--; if(revisionPickerMonth<0){revisionPickerMonth=11;revisionPickerYear--;} refreshRevisionPickerCalendar();">‹</button>
      <b>${monthName}</b>
