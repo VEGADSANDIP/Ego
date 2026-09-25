@@ -201,12 +201,12 @@ canvas{width:100%; display:block;}
 .cal-cell.locked{background:var(--success); opacity:.55; color:#fff; cursor:default;}
 .cal-rev-count{font-size:8.5px; font-weight:700; color:var(--ink-dim); line-height:1; margin-top:1px;}
 .cal-rev-count.high{color:var(--danger);}
-.cal-nums-row{display:flex; gap:3px; margin-top:2px; justify-content:center;}
-.cal-num{font-size:9px; font-weight:800; line-height:1; padding:1px 3px; border-radius:5px; color:#fff;}
-.cal-num-blue{background:#3B82F6;}
-.cal-num-yellow{background:var(--accent); color:#1a1a1a;}
-.cal-num-red{background:var(--danger);}
-.cal-cell.selected .cal-num{background:#fff; color:var(--success);}
+.cal-nums-row{font-size:9.5px; font-weight:800; line-height:1; margin-top:3px; letter-spacing:-0.2px; white-space:nowrap;}
+.cal-num-blue{color:#3B82F6;}
+.cal-num-yellow{color:var(--accent);}
+.cal-num-red{color:var(--danger);}
+.cal-num-sep{color:var(--ink-dim); font-weight:600; margin:0 1px;}
+.cal-cell.selected .cal-num-blue, .cal-cell.selected .cal-num-yellow, .cal-cell.selected .cal-num-red, .cal-cell.selected .cal-num-sep{color:#fff; opacity:.9;}
 
 .scroll-list{max-height:340px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
 .scroll-list-sm{max-height:230px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
@@ -2065,8 +2065,9 @@ function renderCalendar(){
     cells += `<div class="cal-cell ${isToday?'today':''} ${isSelected?'selected':''}" onclick="calSelectedDate='${dateStr}'; renderMain();">
       <span>${d}</span>
       <div class="cal-nums-row">
-        ${dots.studyCount>0?`<span class="cal-num cal-num-blue">${dots.studyCount}</span>`:''}
-        ${dots.pendingCount>0?`<span class="cal-num ${dots.isOverdue?'cal-num-red':'cal-num-yellow'}">${dots.pendingCount}</span>`:''}
+        ${dots.studyCount>0?`<span class="cal-num-blue">${dots.studyCount}</span>`:''}
+        ${dots.studyCount>0 && dots.pendingCount>0?'<span class="cal-num-sep">·</span>':''}
+        ${dots.pendingCount>0?`<span class="${dots.isOverdue?'cal-num-red':'cal-num-yellow'}">${dots.pendingCount}</span>`:''}
       </div>
     </div>`;
   }
