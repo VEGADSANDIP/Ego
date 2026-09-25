@@ -808,6 +808,15 @@ function renderExamDetail(examId){
      </div>
    </div>
    ${sections.length ? `${filterSortToolbarHTML('sections','sectionSearchInput','filterSectionsList')}<div class="subject-list" id="sectionsListWrap">${sortSectionsList(sections).map(sec=>sectionSlideCard(sec)).join('')}</div>` : emptyRow('કોઈ વિભાગ ઉમેર્યો નથી')}
+   ${(()=>{
+     const ungrouped = DB.subjects.filter(s=>s.examId===examId && !s.sectionId);
+     if(!ungrouped.length) return '';
+     return `<div class="section-header mb-6 mt-14">
+       <h3>કોઈ વિભાગ વગરના વિષય</h3>
+       <span class="flex-gap-6"><button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${examId}')">+ વિષય</button></span>
+     </div>
+     ${subjectListHTML(ungrouped, 'none')}`;
+   })()}
   `;
 }
 const SORT_OPTIONS = {
