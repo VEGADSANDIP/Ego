@@ -197,17 +197,16 @@ canvas{width:100%; display:block;}
 .cal-cell.empty{background:transparent; box-shadow:none; cursor:default;}
 .cal-cell.today{border:2px solid var(--primary);}
 .cal-cell.selected{background:var(--success); color:#fff;}
-.cal-cell.selected .cal-dot{background:#fff !important;}
 .cal-cell.past-disabled{opacity:.32; cursor:default;}
 .cal-cell.locked{background:var(--success); opacity:.55; color:#fff; cursor:default;}
 .cal-rev-count{font-size:8.5px; font-weight:700; color:var(--ink-dim); line-height:1; margin-top:1px;}
 .cal-rev-count.high{color:var(--danger);}
-.cal-dot{width:5px; height:5px; border-radius:99px; background:var(--accent); margin-top:2px;}
-.cal-dots-row{display:flex; gap:3px; margin-top:2px; justify-content:center;}
-.cal-dots-row .cal-dot{margin-top:0;}
-.cal-dot-blue{background:#3B82F6 !important;}
-.cal-dot-yellow{background:var(--accent) !important;}
-.cal-dot-red{background:var(--danger) !important;}
+.cal-nums-row{display:flex; gap:3px; margin-top:2px; justify-content:center;}
+.cal-num{font-size:9px; font-weight:800; line-height:1; padding:1px 3px; border-radius:5px; color:#fff;}
+.cal-num-blue{background:#3B82F6;}
+.cal-num-yellow{background:var(--accent); color:#1a1a1a;}
+.cal-num-red{background:var(--danger);}
+.cal-cell.selected .cal-num{background:#fff; color:var(--success);}
 
 .scroll-list{max-height:340px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
 .scroll-list-sm{max-height:230px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
@@ -2065,10 +2064,9 @@ function renderCalendar(){
     const isSelected = dateStr===calSelDate && !isToday;
     cells += `<div class="cal-cell ${isToday?'today':''} ${isSelected?'selected':''}" onclick="calSelectedDate='${dateStr}'; renderMain();">
       <span>${d}</span>
-      <div class="cal-dots-row">
-        ${dots.hasStudy?'<div class="cal-dot cal-dot-blue"></div>':''}
-        ${dots.hasRevisionDue?'<div class="cal-dot cal-dot-yellow"></div>':''}
-        ${dots.hasOverdueRevision?'<div class="cal-dot cal-dot-red"></div>':''}
+      <div class="cal-nums-row">
+        ${dots.studyCount>0?`<span class="cal-num cal-num-blue">${dots.studyCount}</span>`:''}
+        ${dots.pendingCount>0?`<span class="cal-num ${dots.isOverdue?'cal-num-red':'cal-num-yellow'}">${dots.pendingCount}</span>`:''}
       </div>
     </div>`;
   }
@@ -2100,12 +2098,12 @@ function renderCalendar(){
   `;
 }
 function dotsForDate(dateStr){
-  const hasStudy = studyLogsForActiveExam().some(l=>l.date===dateStr);
+  const studyCount = studyLogsForActiveExam().filter(l=>l.date===dateStr).length;
   const dueRevisions = revisionsForActiveExam().filter(r=>r.dueDate===dateStr);
-  const hasRevisionDue = dueRevisions.length>0;
+  const pendingCount = dueRevisions.filter(r=>r.status==='pending').length;
   const today = todayStr();
-  const hasOverdueRevision = dateStr<today && dueRevisions.some(r=>r.status==='pending');
-  return {hasStudy, hasRevisionDue, hasOverdueRevision};
+  const isOverdue = dateStr<today && pendingCount>0;
+  return {studyCount, pendingCount, isOverdue};
 }
 function sortSubjectIdsByTimetable(subjectIds, dateStr){
   const exam = getActiveExam();
