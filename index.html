@@ -2285,17 +2285,17 @@ function toggleAccordion(wrapId, caretEl){
   if(!el) return;
   const willOpen = el.classList.contains('hidden');
   if(willOpen){
-    openAccordionIds.forEach(otherId=>{
+    Array.from(openAccordionIds).forEach(otherId=>{
       if(otherId===wrapId) return;
       const otherEl = document.getElementById(otherId);
-      if(otherEl){
+      if(otherEl && !otherEl.contains(el)){
         otherEl.classList.add('hidden');
         const otherHeader = otherEl.previousElementSibling;
         const otherCaret = otherHeader ? otherHeader.querySelector('.accordion-caret') : null;
         if(otherCaret) otherCaret.textContent = '▼';
+        openAccordionIds.delete(otherId);
       }
     });
-    openAccordionIds.clear();
   }
   const nowHidden = el.classList.toggle('hidden');
   if(nowHidden) openAccordionIds.delete(wrapId); else openAccordionIds.add(wrapId);
