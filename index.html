@@ -97,13 +97,24 @@ a{color:inherit;}
 .ring-stat b{font-size:16px;}
 .ring-stat span{opacity:0.85;}
 
-.hero-pager{display:grid; perspective:1400px; margin-bottom:6px; touch-action:pan-y; user-select:none;}
-.hero-page{grid-area:1/1; backface-visibility:hidden; opacity:0; z-index:1; pointer-events:none; margin-bottom:0; will-change:transform;}
-.hero-page.top{opacity:1; z-index:2; pointer-events:auto;}
-.hero-page.under{opacity:1; z-index:1;}
-.hero-page.flipping{transition:transform .7s cubic-bezier(.45,.05,.25,1), box-shadow .7s ease;}
-.hero-page.hero-rev{background:linear-gradient(145deg,#6A2C91,#2A1458);}
-[data-theme="dark"] .hero-page.hero-rev{background:linear-gradient(145deg,#5B2A86,#0A0A0A);}
+.book{position:relative; perspective:1700px; touch-action:pan-y; user-select:none; -webkit-user-select:none; margin-bottom:6px;}
+.book-sizer{display:grid; visibility:hidden; pointer-events:none;}
+.book-sizer>.hero-card{grid-area:1/1; margin:0;}
+.bk-half{position:absolute; top:0; bottom:0; width:50%; overflow:hidden;}
+.bk-L{left:0;} .bk-R{left:50%;}
+.bk-in{position:absolute; top:0; bottom:0; width:200%;}
+.bk-L .bk-in, .bk-face.bk-fl .bk-in{left:0;}
+.bk-R .bk-in, .bk-face.bk-fr .bk-in{left:-100%;}
+.bk-in>.hero-card{height:100%; margin:0; box-sizing:border-box;}
+.hero-card.hero-rev{background:linear-gradient(145deg,#6A2C91,#2A1458);}
+[data-theme="dark"] .hero-card.hero-rev{background:linear-gradient(145deg,#5B2A86,#0A0A0A);}
+.bk-leaf{position:absolute; top:0; bottom:0; width:50%; z-index:3; transform-style:preserve-3d; will-change:transform;}
+.bk-leaf.right{left:50%; transform-origin:left center;}
+.bk-leaf.left{left:0; transform-origin:right center;}
+.bk-leaf.anim{transition:transform .45s cubic-bezier(.3,.7,.3,1);}
+.bk-face{position:absolute; inset:0; overflow:hidden; backface-visibility:hidden; -webkit-backface-visibility:hidden;}
+.bk-face.back{transform:rotateY(180deg);}
+.bk-shade{position:absolute; inset:0; background:#000; opacity:0; pointer-events:none;}
 .hero-dots{display:flex; justify-content:center; gap:7px; margin:2px 0 12px;}
 .hero-dots i{width:7px; height:7px; border-radius:50%; background:var(--ink); opacity:.25; transition:all .3s;}
 .hero-dots i.on{opacity:.9; width:18px; border-radius:4px;}
@@ -421,15 +432,14 @@ function heroRingColor(pct){
   return getVar('--danger');
 }
 function ringSVG(pct, ids, label){
-  ids = ids || {circle:'heroRingCircle', text:'heroRingPercentText'};
   label = label || 'પૂર્ણ';
   const r=54, c=2*Math.PI*r;
   const offset = c - (pct/100)*c;
   const color = heroRingColor(pct);
   return `<svg width="130" height="130" viewBox="0 0 130 130" class="ring-svg">
     <circle cx="65" cy="65" r="${r}" stroke="rgba(255,255,255,0.2)" stroke-width="10" fill="none"/>
-    <circle id="${ids.circle}" class="ring-progress-hero" cx="65" cy="65" r="${r}" stroke="${color}" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c}" data-offset="${offset}" data-target="${pct}" transform="rotate(-90 65 65)"/>
-    <text id="${ids.text}" x="65" y="60" text-anchor="middle" font-size="24" font-weight="800" fill="#fff">0%</text>
+    <circle class="ring-progress-hero hr-circle" cx="65" cy="65" r="${r}" stroke="${color}" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c}" data-offset="${offset}" data-target="${pct}" transform="rotate(-90 65 65)"/>
+    <text class="hr-text" data-target="${pct}" x="65" y="60" text-anchor="middle" font-size="24" font-weight="800" fill="#fff">0%</text>
     <text x="65" y="80" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.85)">${label}</text>
   </svg>`;
 }
@@ -592,9 +602,7 @@ function renderDashboard(){
   const revPct = revTotal ? Math.round(revDone/revTotal*100) : 0;
   const revPending = revTotal-revDone;
 
-  return `
-   <div class="hero-pager" id="heroPager" ontouchstart="heroTouchStart(event)" ontouchend="heroTouchEnd(event)">
-   <div class="hero-card hero-page ${heroPage===0?'top':''}">
+  const heroCard0 = `<div class="hero-card">
      <div class="hero-top">
        <div>
          <div class="hero-exam-name">${esc(exam.name)}</div>
@@ -605,13 +613,13 @@ function renderDashboard(){
      <div class="hero-ring-row">
        ${ringSVG(pct)}
        <div class="hero-ring-stats">
-         <div class="ring-stat"><span>દિવસ બાકી</span><b id="heroDaysLeft" data-target="${daysLeft}" style="color:${daysLeft>=0?daysLeftColor(daysLeft):'#fff'};">${daysLeft>=0?0:'પૂર્ણ'}</b></div>
-         <div class="ring-stat"><span>ટોપિક પૂર્ણ</span><b><span id="heroTopicsCompleted" data-target="${completed}">0</span>/${total}</b></div>
-         <div class="ring-stat"><span>વિષયો</span><b id="heroSubjectsCount" data-target="${subs.length}">0</b></div>
+         <div class="ring-stat"><span>દિવસ બાકી</span><b class="${daysLeft>=0?'hero-count':''}" data-target="${daysLeft}" style="color:${daysLeft>=0?daysLeftColor(daysLeft):'#fff'};">${daysLeft>=0?0:'પૂર્ણ'}</b></div>
+         <div class="ring-stat"><span>ટોપિક પૂર્ણ</span><b><span class="hero-count" data-target="${completed}">0</span>/${total}</b></div>
+         <div class="ring-stat"><span>વિષયો</span><b class="hero-count" data-target="${subs.length}">0</b></div>
        </div>
      </div>
-   </div>
-   <div class="hero-card hero-page hero-rev ${heroPage===1?'top':''}">
+   </div>`;
+  const heroCard1 = `<div class="hero-card hero-rev">
      <div class="hero-top">
        <div>
          <div class="hero-exam-name">🔁 રિવિઝન</div>
@@ -620,14 +628,21 @@ function renderDashboard(){
        <button class="btn btn-sm" onclick="showTab('calendar');">કેલેન્ડર</button>
      </div>
      <div class="hero-ring-row">
-       ${ringSVG(revPct, {circle:'heroRevRingCircle', text:'heroRevRingPercentText'}, 'રિવિઝન')}
+       ${ringSVG(revPct, null, 'રિવિઝન')}
        <div class="hero-ring-stats">
          <div class="ring-stat"><span>રિવિઝન પૂર્ણ</span><b><span class="hero-count" data-target="${revDone}">0</span>/${revTotal}</b></div>
          <div class="ring-stat"><span>બાકી</span><b class="hero-count" data-target="${revPending}">0</b></div>
          <div class="ring-stat"><span>ઓવરડ્યુ</span><b class="hero-count" data-target="${overdueRevisions}" style="color:${overdueRevisions?'#FF8A80':'#fff'};">0</b></div>
        </div>
      </div>
-   </div>
+   </div>`;
+  heroCards = [heroCard0, heroCard1];
+
+  return `
+   <div class="book" id="heroBook" onpointerdown="heroPointerDown(event)" onpointermove="heroPointerMove(event)" onpointerup="heroPointerUp(event)" onpointercancel="heroPointerUp(event,true)">
+     <div class="book-sizer" aria-hidden="true">${heroCard0}${heroCard1}</div>
+     <div class="bk-half bk-L" id="bkL"><div class="bk-in">${heroCards[heroPage]}</div></div>
+     <div class="bk-half bk-R" id="bkR"><div class="bk-in">${heroCards[heroPage]}</div></div>
    </div>
    <div class="hero-dots" id="heroDots"><i class="${heroPage===0?'on':''}" onclick="heroGo(0)"></i><i class="${heroPage===1?'on':''}" onclick="heroGo(1)"></i></div>
 
@@ -2805,66 +2820,106 @@ function confirmResetAllData(){
 }
 
 /* ===================== AFTER-RENDER CHART HOOKS ===================== */
-let heroPage = 0, heroTouchX = null, heroTouchY = null;
-let heroBusy = false;
-function heroDots(){ document.querySelectorAll('#heroDots i').forEach((d,k)=>d.classList.toggle('on', k===heroPage)); }
-function heroFlip(dir){ /* dir -1: ડાબી સ્વાઇપ (પાનું ડાબી ધારે ફરે), +1: જમણી સ્વાઇપ (જમણી ધારે ફરે) */
-  const pager = document.getElementById('heroPager');
-  if(!pager || heroBusy) return;
-  const pages = pager.querySelectorAll('.hero-page');
-  const top = pages[heroPage], under = pages[1-heroPage];
-  heroBusy = true;
-  under.classList.add('under');
-  top.style.transformOrigin = dir<0 ? 'left center' : 'right center';
-  top.classList.add('flipping');
-  top.style.boxShadow = (dir<0?'14px':'-14px')+' 0 30px rgba(0,0,0,.5)';
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    top.style.transform = 'rotateY('+(dir<0?-100:100)+'deg)';
-  }));
-  setTimeout(()=>{
-    top.classList.remove('flipping','top');
-    top.style.transform=''; top.style.boxShadow=''; top.style.transformOrigin='';
-    under.classList.remove('under'); under.classList.add('top');
-    heroPage = 1-heroPage; heroDots(); heroBusy=false;
-  }, 720);
+let heroPage = 0, heroCards = ['',''], heroDrag = null, heroBusy = false;
+function heroDotsUpdate(){ document.querySelectorAll('#heroDots i').forEach((d,k)=>d.classList.toggle('on', k===heroPage)); }
+function heroSetFinal(root){ /* સીધી અંતિમ કિંમતો (એનિમેશન વગર) */
+  root.querySelectorAll('.hr-circle').forEach(c=>{ c.style.transition='none'; c.style.strokeDashoffset=c.dataset.offset; });
+  root.querySelectorAll('.hr-text').forEach(t=>{ t.textContent = t.dataset.target+'%'; });
+  root.querySelectorAll('.hero-count').forEach(e=>{ e.textContent = e.dataset.target; });
 }
-function heroGo(i){ if(i!==heroPage) heroFlip(i>heroPage?-1:1); }
-function heroTouchStart(e){ const t=e.changedTouches[0]; heroTouchX=t.clientX; heroTouchY=t.clientY; }
-function heroTouchEnd(e){
-  if(heroTouchX===null) return;
-  const t=e.changedTouches[0]; const dx=t.clientX-heroTouchX, dy=t.clientY-heroTouchY;
-  heroTouchX=null;
-  if(Math.abs(dx)<40 || Math.abs(dx)<Math.abs(dy)*1.3) return;
-  heroFlip(dx<0 ? -1 : 1);
+function heroHalfHTML(card){ return '<div class="bk-in">'+card+'</div>'; }
+function heroSetHalves(cardIdx){
+  const L=document.getElementById('bkL'), R=document.getElementById('bkR');
+  if(!L||!R) return;
+  L.innerHTML = heroHalfHTML(heroCards[cardIdx]); R.innerHTML = heroHalfHTML(heroCards[cardIdx]);
+  heroSetFinal(L); heroSetFinal(R);
+}
+function heroMakeLeaf(dir){
+  /* dir<0: જમણું અડધું પાનું ડાબી તરફ ફરે; dir>0: ડાબું અડધું પાનું જમણી તરફ ફરે */
+  const book = document.getElementById('heroBook');
+  const cur = heroCards[heroPage], other = heroCards[1-heroPage];
+  const leaf = document.createElement('div');
+  leaf.className = 'bk-leaf ' + (dir<0 ? 'right' : 'left');
+  const frontCls = dir<0 ? 'bk-fr' : 'bk-fl';
+  const backCls  = dir<0 ? 'bk-fl' : 'bk-fr';
+  leaf.innerHTML =
+    '<div class="bk-face front '+frontCls+'"><div class="bk-in">'+cur+'</div><div class="bk-shade"></div></div>'+
+    '<div class="bk-face back '+backCls+'"><div class="bk-in">'+other+'</div><div class="bk-shade"></div></div>';
+  book.appendChild(leaf);
+  heroSetFinal(leaf);
+  /* નીચે દેખાતું અડધું પાનું = બીજું કાર્ડ */
+  const L=document.getElementById('bkL'), R=document.getElementById('bkR');
+  const under = dir<0 ? R : L;
+  under.innerHTML = heroHalfHTML(other); heroSetFinal(under);
+  return leaf;
+}
+function heroSetAngle(leaf, dir, a){
+  leaf.style.transform = 'rotateY('+(dir<0?-a:a)+'deg)';
+  const f = leaf.querySelector('.front .bk-shade'), b = leaf.querySelector('.back .bk-shade');
+  if(f) f.style.opacity = a<90 ? (a/90*0.45).toFixed(3) : 0;
+  if(b) b.style.opacity = a>90 ? ((180-a)/90*0.45).toFixed(3) : 0.45;
+  leaf.style.filter = 'drop-shadow('+(dir<0?'-':'')+'6px 0 10px rgba(0,0,0,'+(Math.sin(a*Math.PI/180)*0.35).toFixed(3)+'))';
+}
+function heroFinish(leaf, dir, complete){
+  leaf.classList.add('anim');
+  requestAnimationFrame(()=>heroSetAngle(leaf, dir, complete?180:0));
+  heroBusy = true;
+  setTimeout(()=>{
+    if(complete){ heroPage = 1-heroPage; heroDotsUpdate(); }
+    heroSetHalves(heroPage);
+    leaf.remove();
+    heroBusy = false; heroDrag = null;
+  }, 480);
+}
+function heroGo(i){
+  if(i===heroPage || heroBusy || heroDrag) return;
+  const dir = i>heroPage ? -1 : 1;
+  const leaf = heroMakeLeaf(dir);
+  heroSetAngle(leaf, dir, 0);
+  leaf.getBoundingClientRect();
+  heroFinish(leaf, dir, true);
+}
+function heroPointerDown(e){
+  if(heroBusy || (e.pointerType==='mouse' && e.button!==0)) return;
+  const book = document.getElementById('heroBook');
+  heroDrag = {x:e.clientX, y:e.clientY, dir:0, leaf:null, id:e.pointerId, w:book.getBoundingClientRect().width, lastX:e.clientX, lastT:performance.now(), v:0, angle:0};
+}
+function heroPointerMove(e){
+  const d = heroDrag; if(!d || d.id!==e.pointerId || heroBusy) return;
+  const dx = e.clientX - d.x, dy = e.clientY - d.y;
+  if(!d.dir){
+    if(Math.abs(dx) < 8) return;
+    if(Math.abs(dy) > Math.abs(dx)) { heroDrag = null; return; }
+    d.dir = dx<0 ? -1 : 1;
+    d.leaf = heroMakeLeaf(d.dir);
+    try{ document.getElementById('heroBook').setPointerCapture(e.pointerId); }catch(_){}
+  }
+  const proj = Math.max(0, dx * (d.dir<0 ? -1 : 1));
+  d.angle = Math.min(180, proj / (d.w*0.85) * 180);
+  const now = performance.now();
+  d.v = (e.clientX - d.lastX) / Math.max(1, now - d.lastT) * (d.dir<0 ? -1 : 1);
+  d.lastX = e.clientX; d.lastT = now;
+  heroSetAngle(d.leaf, d.dir, d.angle);
+}
+function heroPointerUp(e, cancelled){
+  const d = heroDrag; if(!d || d.id!==e.pointerId) return;
+  if(!d.dir){ heroDrag = null; return; }
+  const complete = !cancelled && (d.angle > 60 || (d.v > 0.5 && d.angle > 15));
+  heroFinish(d.leaf, d.dir, complete);
 }
 function animateDashboardHero(){
-  const ringCircle = document.getElementById('heroRingCircle');
-  if(!ringCircle) return;
-  const ringText = document.getElementById('heroRingPercentText');
-  const daysEl = document.getElementById('heroDaysLeft');
-  const topicsEl = document.getElementById('heroTopicsCompleted');
-  const subsEl = document.getElementById('heroSubjectsCount');
-  const pctTarget = Number(ringCircle.dataset.target||0);
-  const daysTarget = daysEl ? Number(daysEl.dataset.target) : null;
-  const topicsTarget = topicsEl ? Number(topicsEl.dataset.target||0) : 0;
-  const subsTarget = subsEl ? Number(subsEl.dataset.target||0) : 0;
+  const circles = Array.from(document.querySelectorAll('#heroBook .bk-half .hr-circle'));
+  if(!circles.length) return;
+  const texts = Array.from(document.querySelectorAll('#heroBook .bk-half .hr-text'));
+  const counts = Array.from(document.querySelectorAll('#heroBook .bk-half .hero-count'));
   const duration = 1200;
-  requestAnimationFrame(()=>{ ringCircle.style.strokeDashoffset = ringCircle.dataset.offset; });
-  const revCircle = document.getElementById('heroRevRingCircle');
-  const revText = document.getElementById('heroRevRingPercentText');
-  const revTarget = revCircle ? Number(revCircle.dataset.target||0) : 0;
-  if(revCircle) requestAnimationFrame(()=>{ revCircle.style.strokeDashoffset = revCircle.dataset.offset; });
-  const countEls = Array.from(document.querySelectorAll('.hero-count'));
+  requestAnimationFrame(()=>{ circles.forEach(c=>{ c.style.strokeDashoffset = c.dataset.offset; }); });
   const startTime = performance.now();
   function tick(now){
     const progress = Math.min(1, (now-startTime)/duration);
     const eased = 1 - Math.pow(1-progress, 3);
-    if(ringText) ringText.textContent = Math.round(pctTarget*eased) + '%';
-    if(revText) revText.textContent = Math.round(revTarget*eased) + '%';
-    countEls.forEach(el=>{ el.textContent = Math.round(Number(el.dataset.target||0)*eased); });
-    if(topicsEl) topicsEl.textContent = Math.round(topicsTarget*eased);
-    if(subsEl) subsEl.textContent = Math.round(subsTarget*eased);
-    if(daysEl && daysTarget!==null && daysTarget>=0) daysEl.textContent = Math.round(daysTarget*eased);
+    texts.forEach(t=>{ t.textContent = Math.round(Number(t.dataset.target||0)*eased)+'%'; });
+    counts.forEach(el=>{ el.textContent = Math.round(Number(el.dataset.target||0)*eased); });
     if(progress<1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
