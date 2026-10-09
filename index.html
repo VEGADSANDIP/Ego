@@ -2858,7 +2858,7 @@ function heroSetAngle(leaf, dir, a){
   const f = leaf.querySelector('.front .bk-shade'), b = leaf.querySelector('.back .bk-shade');
   if(f) f.style.opacity = a<90 ? (a/90*0.45).toFixed(3) : 0;
   if(b) b.style.opacity = a>90 ? ((180-a)/90*0.45).toFixed(3) : 0.45;
-  leaf.style.filter = 'drop-shadow('+(dir<0?'-':'')+'6px 0 10px rgba(0,0,0,'+(Math.sin(a*Math.PI/180)*0.35).toFixed(3)+'))';
+  leaf.style.boxShadow = (dir<0?'-':'')+'8px 0 18px rgba(0,0,0,'+(Math.sin(a*Math.PI/180)*0.35).toFixed(3)+')';
 }
 function heroFinish(leaf, dir, complete){
   leaf.classList.add('anim');
