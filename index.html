@@ -1014,17 +1014,17 @@ function subjectSlideCard(s){
       ${progressCardHeader(pct, esc(s.name), edit)}
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
         <div class="subject-mini-stat"><b>${topics.length}</b><span>કુલ ચેપ્ટર</span></div>
+        <div class="subject-mini-stat"><b>${completed}</b><span>પૂર્ણ ચેપ્ટર</span></div>
         <div class="subject-mini-stat"><b>${topics.length-completed}</b><span>બાકી ચેપ્ટર</span></div>
-        <div class="subject-mini-stat" style="background:${pctColor(pct)}22;"><b style="color:${pctColor(pct)};">${pct}%</b><span>પૂર્ણ</span></div>
       </div>
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો → · રિવિઝન માટે સ્વાઇપ કરો</div>
   </div>`;
   const back = `<div class="card cursor-pointer" onclick="${nav}">
-      ${progressCardHeader(revPct, '🔁 '+esc(s.name), edit)}
+      ${progressCardHeader(revPct, esc(s.name), edit)}
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
         <div class="subject-mini-stat"><b>${revs.length}</b><span>કુલ રિવિઝન</span></div>
+        <div class="subject-mini-stat"><b>${revDone}</b><span>પૂર્ણ રિવિઝન</span></div>
         <div class="subject-mini-stat"><b>${revs.length-revDone}</b><span>બાકી રિવિઝન</span></div>
-        <div class="subject-mini-stat" style="background:${pctColor(revPct)}22;"><b style="color:${pctColor(revPct)};">${revPct}%</b><span>પૂર્ણ</span></div>
       </div>
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો → · ટોપિક માટે સ્વાઇપ કરો</div>
   </div>`;
