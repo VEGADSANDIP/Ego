@@ -99,13 +99,15 @@ a{color:inherit;}
 
 .book{position:relative; perspective:1700px; touch-action:pan-y; user-select:none; -webkit-user-select:none; margin-bottom:6px;}
 .book-sizer{display:grid; visibility:hidden; pointer-events:none;}
-.book-sizer>.hero-card{grid-area:1/1; margin:0;}
+.book-sizer>*{grid-area:1/1; margin:0;}
 .bk-half{position:absolute; top:0; bottom:0; width:50%; overflow:hidden;}
 .bk-L{left:0;} .bk-R{left:50%;}
 .bk-in{position:absolute; top:0; bottom:0; width:200%;}
 .bk-L .bk-in, .bk-face.bk-fl .bk-in{left:0;}
 .bk-R .bk-in, .bk-face.bk-fr .bk-in{left:-100%;}
-.bk-in>.hero-card{height:100%; margin:0; box-sizing:border-box;}
+.bk-in>.hero-card, .bk-in>.card{height:100%; margin:0; box-sizing:border-box;}
+.book-card{margin-bottom:0;}
+.sub-book-wrap .hero-dots{margin:4px 0 14px;}
 .hero-card.hero-rev{background:linear-gradient(145deg,#6A2C91,#2A1458);}
 [data-theme="dark"] .hero-card.hero-rev{background:linear-gradient(145deg,#5B2A86,#0A0A0A);}
 .bk-leaf{position:absolute; top:0; bottom:0; width:50%; z-index:3; transform-style:preserve-3d; will-change:transform;}
@@ -636,15 +638,10 @@ function renderDashboard(){
        </div>
      </div>
    </div>`;
-  heroCards = [heroCard0, heroCard1];
+  const heroBookMarkup = bookHTML('hero', [heroCard0, heroCard1]);
 
   return `
-   <div class="book" id="heroBook" onpointerdown="heroPointerDown(event)" onpointermove="heroPointerMove(event)" onpointerup="heroPointerUp(event)" onpointercancel="heroPointerUp(event,true)">
-     <div class="book-sizer" aria-hidden="true">${heroCard0}${heroCard1}</div>
-     <div class="bk-half bk-L" id="bkL"><div class="bk-in">${heroCards[heroPage]}</div></div>
-     <div class="bk-half bk-R" id="bkR"><div class="bk-in">${heroCards[heroPage]}</div></div>
-   </div>
-   <div class="hero-dots" id="heroDots"><i class="${heroPage===0?'on':''}" onclick="heroGo(0)"></i><i class="${heroPage===1?'on':''}" onclick="heroGo(1)"></i></div>
+   ${heroBookMarkup}
 
    <div class="card" style="display:flex; align-items:center; justify-content:space-between;">
      <span>🔥 <b>${streakInfo.streak}</b> દિવસ સતત અભ્યાસ</span>
@@ -1011,15 +1008,27 @@ function subjectSlideCard(s){
   const revs = DB.revisions.filter(r=>r.subjectId===s.id);
   const revDone = revs.filter(r=>r.status==='completed').length;
   const revPct = revs.length ? Math.round(revDone/revs.length*100) : 0;
-  return `<div class="card cursor-pointer" data-search="${esc(s.name.toLowerCase())}" onclick="topicDetailId='${s.id}'; renderMain();">
-      ${progressCardHeader(pct, esc(s.name), `openSubjectForm('${s.id}','${s.examId}')`)}
+  const nav = `if(bookClickOK()){ topicDetailId='${s.id}'; renderMain(); }`;
+  const edit = `openSubjectForm('${s.id}','${s.examId}')`;
+  const front = `<div class="card cursor-pointer" onclick="${nav}">
+      ${progressCardHeader(pct, esc(s.name), edit)}
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
         <div class="subject-mini-stat"><b>${topics.length}</b><span>કુલ ચેપ્ટર</span></div>
         <div class="subject-mini-stat"><b>${topics.length-completed}</b><span>બાકી ચેપ્ટર</span></div>
-        <div class="subject-mini-stat" style="background:${pctColor(revPct)}22;"><b style="color:${pctColor(revPct)};">${revPct}%</b><span>રિવિઝન</span></div>
+        <div class="subject-mini-stat" style="background:${pctColor(pct)}22;"><b style="color:${pctColor(pct)};">${pct}%</b><span>પૂર્ણ</span></div>
       </div>
-      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો →</div>
+      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો → · રિવિઝન માટે સ્વાઇપ કરો</div>
   </div>`;
+  const back = `<div class="card cursor-pointer" onclick="${nav}">
+      ${progressCardHeader(revPct, '🔁 '+esc(s.name), edit)}
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
+        <div class="subject-mini-stat"><b>${revs.length}</b><span>કુલ રિવિઝન</span></div>
+        <div class="subject-mini-stat"><b>${revs.length-revDone}</b><span>બાકી રિવિઝન</span></div>
+        <div class="subject-mini-stat" style="background:${pctColor(revPct)}22;"><b style="color:${pctColor(revPct)};">${revPct}%</b><span>પૂર્ણ</span></div>
+      </div>
+      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો → · ટોપિક માટે સ્વાઇપ કરો</div>
+  </div>`;
+  return `<div class="sub-book-wrap" data-search="${esc(s.name.toLowerCase())}">${bookHTML('sub_'+s.id, [front, back], 'book-card')}</div>`;
 }
 function pctColor(pct){
   if(pct>=70) return getVar('--success');
@@ -2820,24 +2829,42 @@ function confirmResetAllData(){
 }
 
 /* ===================== AFTER-RENDER CHART HOOKS ===================== */
-let heroPage = 0, heroCards = ['',''], heroDrag = null, heroBusy = false;
-function heroDotsUpdate(){ document.querySelectorAll('#heroDots i').forEach((d,k)=>d.classList.toggle('on', k===heroPage)); }
-function heroSetFinal(root){ /* સીધી અંતિમ કિંમતો (એનિમેશન વગર) */
-  root.querySelectorAll('.hr-circle').forEach(c=>{ c.style.transition='none'; c.style.strokeDashoffset=c.dataset.offset; });
+const BOOKS = {};
+let bookClickBlockUntil = 0;
+function bookClickOK(){ return Date.now() > bookClickBlockUntil; }
+function bookHTML(bid, pages, extraCls){
+  const prev = BOOKS[bid];
+  const i = prev ? Math.min(prev.i, pages.length-1) : 0;
+  BOOKS[bid] = {pages, i, drag:null, busy:false};
+  return `<div class="book ${extraCls||''}" id="bk_${bid}" data-bid="${bid}" onpointerdown="bookDown(event)" onpointermove="bookMove(event)" onpointerup="bookUp(event)" onpointercancel="bookUp(event,true)">
+     <div class="book-sizer" aria-hidden="true">${pages.join('')}</div>
+     <div class="bk-half bk-L"><div class="bk-in">${pages[i]}</div></div>
+     <div class="bk-half bk-R"><div class="bk-in">${pages[i]}</div></div>
+   </div>
+   <div class="hero-dots" id="bkd_${bid}">${pages.map((_,k)=>`<i class="${k===i?'on':''}" onclick="bookGo('${bid}',${k})"></i>`).join('')}</div>`;
+}
+function bookDotsUpdate(bid){
+  const st = BOOKS[bid];
+  document.querySelectorAll('#bkd_'+bid+' i').forEach((d,k)=>d.classList.toggle('on', k===st.i));
+}
+function bookSetFinal(root){ /* સીધી અંતિમ કિંમતો (એનિમેશન વગર) */
+  root.querySelectorAll('.hr-circle, .ring-progress').forEach(c=>{ c.style.transition='none'; c.style.strokeDashoffset=c.dataset.offset; });
   root.querySelectorAll('.hr-text').forEach(t=>{ t.textContent = t.dataset.target+'%'; });
   root.querySelectorAll('.hero-count').forEach(e=>{ e.textContent = e.dataset.target; });
 }
-function heroHalfHTML(card){ return '<div class="bk-in">'+card+'</div>'; }
-function heroSetHalves(cardIdx){
-  const L=document.getElementById('bkL'), R=document.getElementById('bkR');
-  if(!L||!R) return;
-  L.innerHTML = heroHalfHTML(heroCards[cardIdx]); R.innerHTML = heroHalfHTML(heroCards[cardIdx]);
-  heroSetFinal(L); heroSetFinal(R);
+function bookHalfHTML(card){ return '<div class="bk-in">'+card+'</div>'; }
+function bookSetHalves(bid){
+  const el = document.getElementById('bk_'+bid); if(!el) return;
+  const st = BOOKS[bid];
+  const L = el.querySelector('.bk-L'), R = el.querySelector('.bk-R');
+  L.innerHTML = bookHalfHTML(st.pages[st.i]); R.innerHTML = bookHalfHTML(st.pages[st.i]);
+  bookSetFinal(L); bookSetFinal(R);
 }
-function heroMakeLeaf(dir){
+function bookMakeLeaf(bid, dir, target){
   /* dir<0: જમણું અડધું પાનું ડાબી તરફ ફરે; dir>0: ડાબું અડધું પાનું જમણી તરફ ફરે */
-  const book = document.getElementById('heroBook');
-  const cur = heroCards[heroPage], other = heroCards[1-heroPage];
+  const el = document.getElementById('bk_'+bid);
+  const st = BOOKS[bid];
+  const cur = st.pages[st.i], other = st.pages[target];
   const leaf = document.createElement('div');
   leaf.className = 'bk-leaf ' + (dir<0 ? 'right' : 'left');
   const frontCls = dir<0 ? 'bk-fr' : 'bk-fl';
@@ -2845,73 +2872,77 @@ function heroMakeLeaf(dir){
   leaf.innerHTML =
     '<div class="bk-face front '+frontCls+'"><div class="bk-in">'+cur+'</div><div class="bk-shade"></div></div>'+
     '<div class="bk-face back '+backCls+'"><div class="bk-in">'+other+'</div><div class="bk-shade"></div></div>';
-  book.appendChild(leaf);
-  heroSetFinal(leaf);
-  /* નીચે દેખાતું અડધું પાનું = બીજું કાર્ડ */
-  const L=document.getElementById('bkL'), R=document.getElementById('bkR');
-  const under = dir<0 ? R : L;
-  under.innerHTML = heroHalfHTML(other); heroSetFinal(under);
+  el.appendChild(leaf);
+  bookSetFinal(leaf);
+  const under = el.querySelector(dir<0 ? '.bk-R' : '.bk-L');
+  under.innerHTML = bookHalfHTML(other); bookSetFinal(under);
   return leaf;
 }
-function heroSetAngle(leaf, dir, a){
+function bookSetAngle(leaf, dir, a){
   leaf.style.transform = 'rotateY('+(dir<0?-a:a)+'deg)';
   const f = leaf.querySelector('.front .bk-shade'), b = leaf.querySelector('.back .bk-shade');
-  if(f) f.style.opacity = a<90 ? (a/90*0.45).toFixed(3) : 0;
-  if(b) b.style.opacity = a>90 ? ((180-a)/90*0.45).toFixed(3) : 0.45;
+  if(f) f.style.opacity = a<90 ? (a/90*0.3).toFixed(3) : 0;
+  if(b) b.style.opacity = a>90 ? ((180-a)/90*0.3).toFixed(3) : 0.3;
   leaf.style.boxShadow = (dir<0?'-':'')+'8px 0 18px rgba(0,0,0,'+(Math.sin(a*Math.PI/180)*0.35).toFixed(3)+')';
 }
-function heroFinish(leaf, dir, complete){
+function bookFinish(bid, leaf, dir, target, complete){
+  const st = BOOKS[bid];
   leaf.classList.add('anim');
-  requestAnimationFrame(()=>heroSetAngle(leaf, dir, complete?180:0));
-  heroBusy = true;
+  requestAnimationFrame(()=>bookSetAngle(leaf, dir, complete?180:0));
+  st.busy = true;
   setTimeout(()=>{
-    if(complete){ heroPage = 1-heroPage; heroDotsUpdate(); }
-    heroSetHalves(heroPage);
+    if(complete){ st.i = target; bookDotsUpdate(bid); }
+    bookSetHalves(bid);
     leaf.remove();
-    heroBusy = false; heroDrag = null;
+    st.busy = false; st.drag = null;
   }, 480);
 }
-function heroGo(i){
-  if(i===heroPage || heroBusy || heroDrag) return;
-  const dir = i>heroPage ? -1 : 1;
-  const leaf = heroMakeLeaf(dir);
-  heroSetAngle(leaf, dir, 0);
+function bookGo(bid, k){
+  const st = BOOKS[bid]; if(!st || k===st.i || st.busy || st.drag) return;
+  const dir = k>st.i ? -1 : 1;
+  const leaf = bookMakeLeaf(bid, dir, k);
+  bookSetAngle(leaf, dir, 0);
   leaf.getBoundingClientRect();
-  heroFinish(leaf, dir, true);
+  bookFinish(bid, leaf, dir, k, true);
 }
-function heroPointerDown(e){
-  if(heroBusy || (e.pointerType==='mouse' && e.button!==0)) return;
-  const book = document.getElementById('heroBook');
-  heroDrag = {x:e.clientX, y:e.clientY, dir:0, leaf:null, id:e.pointerId, w:book.getBoundingClientRect().width, lastX:e.clientX, lastT:performance.now(), v:0, angle:0};
+function bookTarget(st, dir){ const n=st.pages.length; return dir<0 ? (st.i+1)%n : (st.i-1+n)%n; }
+function bookDown(e){
+  const el = e.currentTarget, st = BOOKS[el.dataset.bid];
+  if(!st || st.busy || st.pages.length<2 || (e.pointerType==='mouse' && e.button!==0)) return;
+  st.drag = {x:e.clientX, y:e.clientY, dir:0, leaf:null, id:e.pointerId, w:el.getBoundingClientRect().width, lastX:e.clientX, lastT:performance.now(), v:0, angle:0, target:0};
 }
-function heroPointerMove(e){
-  const d = heroDrag; if(!d || d.id!==e.pointerId || heroBusy) return;
+function bookMove(e){
+  const el = e.currentTarget, bid = el.dataset.bid, st = BOOKS[bid]; if(!st) return;
+  const d = st.drag; if(!d || d.id!==e.pointerId || st.busy) return;
   const dx = e.clientX - d.x, dy = e.clientY - d.y;
   if(!d.dir){
     if(Math.abs(dx) < 8) return;
-    if(Math.abs(dy) > Math.abs(dx)) { heroDrag = null; return; }
+    if(Math.abs(dy) > Math.abs(dx)) { st.drag = null; return; }
     d.dir = dx<0 ? -1 : 1;
-    d.leaf = heroMakeLeaf(d.dir);
-    try{ document.getElementById('heroBook').setPointerCapture(e.pointerId); }catch(_){}
+    d.target = bookTarget(st, d.dir);
+    d.leaf = bookMakeLeaf(bid, d.dir, d.target);
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
   }
   const proj = Math.max(0, dx * (d.dir<0 ? -1 : 1));
   d.angle = Math.min(180, proj / (d.w*0.85) * 180);
   const now = performance.now();
   d.v = (e.clientX - d.lastX) / Math.max(1, now - d.lastT) * (d.dir<0 ? -1 : 1);
   d.lastX = e.clientX; d.lastT = now;
-  heroSetAngle(d.leaf, d.dir, d.angle);
+  bookSetAngle(d.leaf, d.dir, d.angle);
 }
-function heroPointerUp(e, cancelled){
-  const d = heroDrag; if(!d || d.id!==e.pointerId) return;
-  if(!d.dir){ heroDrag = null; return; }
+function bookUp(e, cancelled){
+  const el = e.currentTarget, bid = el.dataset.bid, st = BOOKS[bid]; if(!st) return;
+  const d = st.drag; if(!d || d.id!==e.pointerId) return;
+  if(!d.dir){ st.drag = null; return; }
+  bookClickBlockUntil = Date.now() + 450;
   const complete = !cancelled && (d.angle > 60 || (d.v > 0.5 && d.angle > 15));
-  heroFinish(d.leaf, d.dir, complete);
+  bookFinish(bid, d.leaf, d.dir, d.target, complete);
 }
 function animateDashboardHero(){
-  const circles = Array.from(document.querySelectorAll('#heroBook .bk-half .hr-circle'));
+  const circles = Array.from(document.querySelectorAll('#bk_hero .bk-half .hr-circle'));
   if(!circles.length) return;
-  const texts = Array.from(document.querySelectorAll('#heroBook .bk-half .hr-text'));
-  const counts = Array.from(document.querySelectorAll('#heroBook .bk-half .hero-count'));
+  const texts = Array.from(document.querySelectorAll('#bk_hero .bk-half .hr-text'));
+  const counts = Array.from(document.querySelectorAll('#bk_hero .bk-half .hero-count'));
   const duration = 1200;
   requestAnimationFrame(()=>{ circles.forEach(c=>{ c.style.strokeDashoffset = c.dataset.offset; }); });
   const startTime = performance.now();
