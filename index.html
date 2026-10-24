@@ -120,6 +120,39 @@ a{color:inherit;}
 .hero-dots{display:flex; justify-content:center; gap:7px; margin:2px 0 12px;}
 .hero-dots i{width:7px; height:7px; border-radius:50%; background:var(--ink); opacity:.25; transition:all .3s;}
 .hero-dots i.on{opacity:.9; width:18px; border-radius:4px;}
+.seg{display:flex; background:var(--surface2); border-radius:12px; padding:4px; gap:4px; margin-bottom:14px;}
+.seg button{flex:1; border:none; background:transparent; color:var(--ink-dim); padding:10px 6px; border-radius:9px; font-weight:700; font-size:13.5px; font-family:inherit;}
+.seg button.on{background:var(--surface); color:var(--ink); box-shadow:var(--shadow);}
+.mq-crumb{font-size:12.5px; color:var(--ink-dim); margin:2px 0 10px; word-break:break-word;}
+.mq-row{display:flex; align-items:center; gap:12px;}
+.mq-ico{font-size:28px; flex-shrink:0;}
+.mq-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+.mq-actions .btn{flex:1; min-width:0; white-space:nowrap;}
+.mq-topbar{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;}
+.mq-bar{height:6px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-bottom:14px;}
+.mq-bar i{display:block; height:100%; background:var(--primary); border-radius:4px; transition:width .3s;}
+.mq-q{font-size:17px; font-weight:700; line-height:1.6; margin:4px 0 14px; white-space:pre-wrap;}
+.mq-opt{display:flex; align-items:flex-start; gap:12px; width:100%; text-align:left; background:var(--surface); color:var(--ink); border:1.5px solid var(--border); border-radius:14px; padding:13px 14px; margin-bottom:10px; font-size:15.5px; font-family:inherit; line-height:1.5;}
+.mq-opt .ltr{flex-shrink:0; width:28px; height:28px; border-radius:50%; background:var(--surface2); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;}
+.mq-opt.sel{border-color:var(--primary); background:color-mix(in srgb, var(--primary) 12%, transparent);}
+.mq-opt.sel .ltr{background:var(--primary); color:#fff;}
+.mq-opt.ok{border-color:var(--success); background:color-mix(in srgb, var(--success) 14%, transparent);}
+.mq-opt.ok .ltr{background:var(--success); color:#fff;}
+.mq-opt.bad{border-color:var(--danger); background:color-mix(in srgb, var(--danger) 14%, transparent);}
+.mq-opt.bad .ltr{background:var(--danger); color:#fff;}
+.mq-nav{display:flex; gap:10px; margin-top:6px;}
+.mq-nav .btn{flex:1;}
+.mq-pal{display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin:12px 0;}
+.mq-pal button{border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:10px; padding:10px 0; font-weight:700; font-family:inherit;}
+.mq-pal button.done{background:var(--primary); color:#fff; border-color:var(--primary);}
+.mq-pal button.cur{outline:2px solid var(--warning);}
+.mq-pal button.ok{background:var(--success); color:#fff; border-color:var(--success);}
+.mq-pal button.bad{background:var(--danger); color:#fff; border-color:var(--danger);}
+.mq-readcard{margin-bottom:12px;}
+.mq-readcard .mq-q{font-size:15.5px; margin-bottom:10px;}
+.mq-readcard .mq-opt{padding:9px 12px; margin-bottom:6px; font-size:14.5px;}
+.mq-stat{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:14px 0;}
+.mq-ta{width:100%; min-height:190px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--ink); font-size:14px; font-family:inherit; resize:vertical;}
 .stat-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:6px;}
 .stat-card{background:var(--surface); border-radius:14px; padding:12px 14px; box-shadow:var(--shadow);}
 .stat-icon{font-size:18px;}
@@ -282,7 +315,7 @@ const STORAGE_KEY = 'examPathData_v1';
 function defaultData(){
   return {
     exams:[], subjects:[], topics:[], revisions:[], sections:[],
-    studyLogs:[], mockTests:[], timetable:[], chapterTimetable:[], subtopics:[],
+    studyLogs:[], mockTests:[], timetable:[], chapterTimetable:[], subtopics:[], qfolders:[], qtests:[],
     settings:{theme:'light', brandName:'ExamPath', sortPrefs:{sections:'default', subjects:{}, topics:{}}}
   };
 }
@@ -1551,6 +1584,8 @@ function deleteExam(id){
   DB.subjects = DB.subjects.filter(s=>s.examId!==id);
   DB.sections = DB.sections.filter(x=>x.examId!==id);
   DB.mockTests = DB.mockTests.filter(m=>m.examId!==id);
+  DB.qfolders = (DB.qfolders||[]).filter(f=>f.examId!==id);
+  DB.qtests = (DB.qtests||[]).filter(t=>t.examId!==id);
   DB.exams = DB.exams.filter(x=>x.id!==id);
   if(DB.exams.length && !DB.exams.find(x=>x.active)) DB.exams[0].active=true;
   examDetailId=null;
@@ -1868,7 +1903,7 @@ function saveBulkTopics(subjectId){
 }
 
 /* ===================== MOCK TESTS ===================== */
-function renderMock(){
+function renderMockScores(){
   const tests = [...mockTestsForActiveExam()].sort((a,b)=>b.date.localeCompare(a.date));
   return `
    <div class="section-header"><h2 class="m-0">મોક ટેસ્ટ 📝</h2><button class="btn btn-primary btn-sm" onclick="openMockForm(null)">+ નવો</button></div>
@@ -2828,6 +2863,396 @@ function confirmResetAllData(){
   toast('ડેટા રીસેટ થયો');
 }
 
+
+/* ===================== MCQ ક્વિઝ ===================== */
+let mockView = 'score';
+let mqFolderId = null;
+let mqSession = null;
+let mqTimerHandle = null;
+const MQ_LET = ['A','B','C','D'];
+
+function setMockView(v){ mockView=v; renderMain(); }
+function mqExamId(){ const e=getActiveExam(); return e?e.id:null; }
+function mqFolders(parentId){ return DB.qfolders.filter(f=>f.examId===mqExamId() && (f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
+function mqTests(folderId){ return DB.qtests.filter(t=>t.examId===mqExamId() && (t.folderId||null)===(folderId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
+function mqFolderPath(id){ const out=[]; let f=DB.qfolders.find(x=>x.id===id); while(f){ out.unshift(f.name); f=DB.qfolders.find(x=>x.id===f.parentId); } return out; }
+function mqCountDeep(folderId){
+  let tests = mqTests(folderId).length, subs = mqFolders(folderId);
+  subs.forEach(f=>{ tests += mqCountDeep(f.id); });
+  return tests;
+}
+
+/* ---- ટેક્સ્ટ સુધારો ---- */
+function mqFixGujarati(t){
+  return t
+    .replace(/ર્ુાં/g,'શું')
+    .replace(/ર્બ્દ/g,'શબ્દ')
+    .replace(/ર્(?=[ાિીુૂેૈોૌંઃ]|\s|$|[,.?:;)])/g,'શ')
+    .replace(/ડ્(?=[ાિીુૂેૈોૌંઃ]|\s|$|[,.?:;)])/g,'ડ')
+    .replace(/ાં/g,'ં');
+}
+function mqClean(t, fix){
+  t = t.replace(/\s+/g,' ').trim();
+  return fix ? mqFixGujarati(t) : t;
+}
+/* ---- પાર્સર ---- */
+function mqParse(text, fix){
+  const t = (text||'').replace(/\r/g,'\n').replace(/ /g,' ');
+  const re = /(?:^|\n|\s)(\d{1,3})\s*\)\s*/g;
+  const marks = []; let exp = 1, limit = t.length, m;
+  while((m = re.exec(t))){
+    const num = +m[1];
+    if(num===exp){ marks.push({num, from:m.index, to:m.index+m[0].length}); exp++; }
+    else if(num===1 && exp>1){ limit = m.index; break; }
+  }
+  const questions = [], warnings = [];
+  marks.forEach((mk,i)=>{
+    const end = i+1<marks.length ? marks[i+1].from : limit;
+    const block = t.slice(mk.to, end);
+    const optRe = /\(\s*([A-Da-d])\s*\)/g;
+    const pos = []; let want = 0, om;
+    while((om = optRe.exec(block))){
+      if(om[1].toUpperCase()===MQ_LET[want]){ pos.push({from:om.index, to:om.index+om[0].length}); want++; if(want===4) break; }
+    }
+    if(pos.length<4){ warnings.push(mk.num); questions.push({q:mqClean(block,fix), opts:['','','',''], ans:null, star:false}); return; }
+    const q = mqClean(block.slice(0,pos[0].from), fix);
+    const opts = pos.map((p,k)=> mqClean(block.slice(p.to, k+1<4?pos[k+1].from:block.length), fix));
+    questions.push({q, opts, ans:null, star:false});
+  });
+  return {questions, warnings};
+}
+function mqParseKey(str, n){
+  const out = new Array(n).fill(null);
+  const s = (str||'').toUpperCase();
+  const pairs = [...s.matchAll(/(\d{1,3})\s*[-–.:)=]*\s*([A-D])/g)];
+  if(pairs.length && pairs.length >= n/2){
+    pairs.forEach(p=>{ const i=+p[1]-1; if(i>=0 && i<n) out[i]=MQ_LET.indexOf(p[2]); });
+    return out;
+  }
+  const chars = s.replace(/[^A-D\-]/g,'').split('');
+  chars.slice(0,n).forEach((c,i)=>{ out[i] = c==='-' ? null : MQ_LET.indexOf(c); });
+  return out;
+}
+function mqKeyString(qs){ return qs.map(q=>q.ans==null?'-':MQ_LET[q.ans]).join(''); }
+function mqQuestionsText(qs){
+  return qs.map((q,i)=>`${i+1}) ${q.q}\n(A) ${q.opts[0]}   (B) ${q.opts[1]}\n(C) ${q.opts[2]}   (D) ${q.opts[3]}`).join('\n\n');
+}
+
+/* ---- હોમ / ફોલ્ડર ---- */
+function renderMockQuiz(){
+  const exam = getActiveExam();
+  if(!exam) return emptyRow('પહેલા પરીક્ષા ઉમેરો');
+  const subs = mqFolders(mqFolderId), tests = mqTests(mqFolderId);
+  const cur = DB.qfolders.find(f=>f.id===mqFolderId);
+  const path = mqFolderPath(mqFolderId);
+  const folderCards = subs.map(f=>{
+    const nT = mqCountDeep(f.id), nF = mqFolders(f.id).length;
+    return `<div class="card cursor-pointer" onclick="mqOpenFolder('${f.id}')">
+      <div class="mq-row"><span class="mq-ico">📁</span>
+        <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">${esc(f.name)}</div>
+        <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${nT} ટેસ્ટ${nF?` · ${nF} સબફોલ્ડર`:''}</div></div>
+        <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openQFolderForm('${f.id}')">✎</button></div></div>`;
+  }).join('');
+  const testCards = tests.map(t=>{
+    const last = (t.attempts||[]).slice(-1)[0];
+    const best = (t.attempts||[]).reduce((a,x)=>Math.max(a,x.pct),0);
+    const hasKey = t.questions.some(q=>q.ans!=null);
+    return `<div class="card">
+      <div class="mq-row"><span class="mq-ico">📄</span>
+        <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">${esc(t.name)}</div>
+        <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${(t.attempts||[]).length?` · ${t.attempts.length} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div></div>
+        ${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}
+        <button class="btn btn-sm btn-secondary" onclick="openQTestForm('${t.id}')">✎</button></div>
+      ${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">છેલ્લી: ${last.correct}/${last.total} સાચા · શ્રેષ્ઠ ${best}%</div>`:''}
+      <div class="mq-actions">
+        <button class="btn btn-primary btn-sm" onclick="mqStart('${t.id}','test')">⏱ ટેસ્ટ</button>
+        <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','practice')">✍ પ્રેક્ટિસ</button>
+        <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','read')">📖 વાંચન</button>
+      </div></div>`;
+  }).join('');
+  return `
+   <div class="mq-topbar">
+     ${cur?backButtonHTML(`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`):'<span></span>'}
+     <span class="flex-gap-6">
+       <button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null)">+ ફોલ્ડર</button>
+       <button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>
+     </span>
+   </div>
+   ${path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:''}
+   ${(!subs.length && !tests.length)?emptyState('🧠', cur?'આ ફોલ્ડર ખાલી છે':'કોઈ MCQ ટેસ્ટ નથી','ફોલ્ડર બનાવો અને PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)'):folderCards+testCards}
+  `;
+}
+function mqOpenFolder(id){ mqFolderId = id||null; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
+
+function openQFolderForm(id){
+  const f = id ? DB.qfolders.find(x=>x.id===id) : null;
+  openSheet(`
+    <h3>${f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર'} 📁</h3>
+    <div class="field"><label>નામ</label><input type="text" id="f_qfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: Daily Test Series"></div>
+    <div class="sheet-actions">
+      ${f?`<button class="btn btn-danger" onclick="deleteQFolder('${f.id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveQFolder(${f?`'${f.id}'`:'null'})">સેવ કરો</button>
+    </div>`);
+}
+function saveQFolder(id){
+  const name = val('f_qfname'); if(!name){ toast('નામ લખો','error'); return; }
+  if(id){ DB.qfolders.find(x=>x.id===id).name = name; }
+  else DB.qfolders.push({id:uid(), examId:mqExamId(), parentId:mqFolderId, name});
+  save(); closeSheet(); renderMain();
+}
+function mqCollectFolderIds(id){ let ids=[id]; DB.qfolders.filter(f=>f.parentId===id).forEach(f=>{ ids = ids.concat(mqCollectFolderIds(f.id)); }); return ids; }
+function deleteQFolder(id){
+  const ids = mqCollectFolderIds(id);
+  const nT = DB.qtests.filter(t=>ids.includes(t.folderId)).length;
+  if(!confirm(`આ ફોલ્ડર, તેના સબફોલ્ડર અને ${nT} ટેસ્ટ ડિલીટ થશે. ચાલુ રાખવું છે?`)) return;
+  DB.qtests = DB.qtests.filter(t=>!ids.includes(t.folderId));
+  DB.qfolders = DB.qfolders.filter(f=>!ids.includes(f.id));
+  if(ids.includes(mqFolderId)) mqFolderId = null;
+  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+
+/* ---- ટેસ્ટ ઉમેરો / એડિટ ---- */
+function openQTestForm(id){
+  const t = id ? DB.qtests.find(x=>x.id===id) : null;
+  openSheet(`
+    <h3>${t?'ટેસ્ટ એડિટ':'નવી MCQ ટેસ્ટ'} 🧠</h3>
+    <div class="field"><label>ટેસ્ટનું નામ</label><input type="text" id="f_qtname" value="${t?esc(t.name):''}" placeholder="જેમ કે: Test 65"></div>
+    <div class="field"><label>પ્રશ્નો (PDF માંથી કોપી કરીને પેસ્ટ કરો)</label>
+      <textarea class="mq-ta" id="f_qttext" oninput="mqPreview()" placeholder="1) પ્રશ્ન...&#10;(A) ... (B) ...&#10;(C) ... (D) ...">${t?esc(mqQuestionsText(t.questions)):''}</textarea></div>
+    <div class="field"><label>જવાબ ચાવી (દા.ત. DACBBC… અથવા 1-D 2-A 3-A…)</label>
+      <input type="text" id="f_qtkey" oninput="mqPreview()" value="${t?esc(mqKeyString(t.questions)):''}" placeholder="DACBBCADBC…" style="letter-spacing:1px;"></div>
+    <label class="item cursor-pointer" style="margin-bottom:6px;"><span>ગુજરાતી અક્ષરોની સામાન્ય ભૂલો આપમેળે સુધારો</span>
+      <input type="checkbox" id="f_qtfix" ${t?'':'checked'} onchange="mqPreview()" style="width:18px;height:18px;"></label>
+    <div id="mqPreview" class="ink-dim" style="font-size:13px;margin:8px 0 4px;"></div>
+    <div class="sheet-actions">
+      ${t?`<button class="btn btn-danger" onclick="deleteQTest('${t.id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveQTest(${t?`'${t.id}'`:'null'})">સેવ કરો</button>
+    </div>`);
+  mqPreview();
+}
+function mqPreview(){
+  const el = document.getElementById('mqPreview'); if(!el) return;
+  const txt = (document.getElementById('f_qttext')||{}).value||'';
+  const fix = document.getElementById('f_qtfix').checked;
+  const nameEl = document.getElementById('f_qtname');
+  if(nameEl && !nameEl.value){ const mm = txt.match(/Test\s*[–\-]?\s*(\d+)/i); if(mm) nameEl.value = 'Test '+mm[1]; }
+  const r = mqParse(txt, fix);
+  const key = mqParseKey((document.getElementById('f_qtkey')||{}).value||'', r.questions.length);
+  const haveKey = key.filter(x=>x!=null).length;
+  el.innerHTML = r.questions.length
+    ? `✅ ${r.questions.length} પ્રશ્નો મળ્યા · જવાબ ચાવી ${haveKey}/${r.questions.length}${r.warnings.length?`<br><span style="color:var(--danger);">⚠ પ્રશ્ન ${r.warnings.join(', ')} માં 4 વિકલ્પ ન મળ્યા</span>`:''}`
+    : 'હજી કોઈ પ્રશ્ન મળ્યો નથી. "1)" થી શરૂ થતા પ્રશ્નો અને (A) (B) (C) (D) વિકલ્પો પેસ્ટ કરો.';
+}
+function saveQTest(id){
+  const name = val('f_qtname');
+  const txt = (document.getElementById('f_qttext')||{}).value||'';
+  const fix = document.getElementById('f_qtfix').checked;
+  const r = mqParse(txt, fix);
+  if(!name){ toast('ટેસ્ટનું નામ લખો','error'); return; }
+  if(!r.questions.length){ toast('કોઈ પ્રશ્ન મળ્યો નથી','error'); return; }
+  const key = mqParseKey(val('f_qtkey'), r.questions.length);
+  r.questions.forEach((q,i)=>{ q.ans = key[i]; });
+  if(id){
+    const t = DB.qtests.find(x=>x.id===id);
+    const old = t.questions;
+    r.questions.forEach((q,i)=>{ if(old[i] && old[i].star) q.star = true; });
+    t.name = name; t.questions = r.questions;
+  } else {
+    DB.qtests.push({id:uid(), examId:mqExamId(), folderId:mqFolderId, name, questions:r.questions, attempts:[], created:todayStr()});
+  }
+  save(); closeSheet(); renderMain(); toast('સેવ થયું ✅');
+}
+function deleteQTest(id){
+  if(!confirm('આ ટેસ્ટ ડિલીટ કરવી છે?')) return;
+  DB.qtests = DB.qtests.filter(t=>t.id!==id); save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+
+/* ---- ક્વિઝ સેશન ---- */
+function mqStart(testId, mode, onlyIdx){
+  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  if(mode!=='read' && !t.questions.some(q=>q.ans!=null) && mode==='practice'){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
+  const idx = onlyIdx || t.questions.map((_,i)=>i);
+  mqSession = {testId, mode, idx, pos:0, answers:{}, start:Date.now(), finished:false, showAns:true, onlyStar:false};
+  renderMain(); mqScrollTop(); mqStartTimer();
+}
+function mqScrollTop(){ document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
+function mqStartTimer(){
+  clearInterval(mqTimerHandle);
+  mqTimerHandle = setInterval(()=>{
+    const el = document.getElementById('mqTimer');
+    if(!mqSession || mqSession.finished || !el){ if(!mqSession) clearInterval(mqTimerHandle); return; }
+    const sec = Math.floor((Date.now()-mqSession.start)/1000);
+    el.textContent = String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
+  },1000);
+}
+function mqExit(force){
+  if(mqSession && !mqSession.finished && mqSession.mode!=='read' && !force && Object.keys(mqSession.answers).length){
+    if(!confirm('બહાર નીકળશો તો આ પ્રયત્ન સેવ નહીં થાય. બહાર નીકળવું છે?')) return;
+  }
+  mqSession = null; clearInterval(mqTimerHandle); renderMain(); mqScrollTop();
+}
+function mqTest(){ return DB.qtests.find(x=>x.id===mqSession.testId); }
+function renderMqSession(){
+  const S = mqSession;
+  if(S.mode==='read') return mqRenderRead();
+  if(S.finished) return mqRenderResult();
+  return mqRenderQuestion();
+}
+function mqRenderQuestion(){
+  const S = mqSession, t = mqTest(), qi = S.idx[S.pos], q = t.questions[qi];
+  const picked = S.answers[qi];
+  const practice = S.mode==='practice';
+  const locked = practice && picked!==undefined;
+  const opts = q.opts.map((o,k)=>{
+    let cls = '';
+    if(locked && q.ans!=null){ if(k===q.ans) cls='ok'; else if(k===picked) cls='bad'; }
+    else if(picked===k) cls='sel';
+    return `<button class="mq-opt ${cls}" onclick="mqPick(${k})"><span class="ltr">${MQ_LET[k]}</span><span style="flex:1;">${esc(o)}</span></button>`;
+  }).join('');
+  const total = S.idx.length;
+  const answeredN = Object.keys(S.answers).length;
+  return `
+   <div class="mq-topbar">
+     <button class="btn btn-sm btn-secondary" onclick="mqExit()">✕ બહાર</button>
+     <span style="font-weight:800;">${esc(t.name)}</span>
+     <span class="badge badge-primary" id="mqTimer">00:00</span>
+   </div>
+   <div class="mq-bar"><i style="width:${Math.round((S.pos+1)/total*100)}%"></i></div>
+   <div class="ink-dim" style="font-size:12.5px;display:flex;justify-content:space-between;">
+     <span>${S.mode==='test'?'⏱ ટેસ્ટ':'✍ પ્રેક્ટિસ'} · પ્રશ્ન ${S.pos+1}/${total}</span><span>જવાબ આપ્યા: ${answeredN}</span></div>
+   <div class="card" style="margin-top:8px;">
+     <div class="mq-q">${S.pos+1}. ${esc(q.q)}</div>
+     ${opts}
+     ${locked && q.ans==null?'<div class="ink-dim" style="font-size:12.5px;">આ પ્રશ્ન માટે જવાબ ચાવી નથી</div>':''}
+     ${locked && q.ans!=null?`<div style="font-weight:700;margin-top:4px;color:${picked===q.ans?'var(--success)':'var(--danger)'};">${picked===q.ans?'✅ સાચો જવાબ!':'❌ ખોટો — સાચો: ('+MQ_LET[q.ans]+')'}</div>`:''}
+   </div>
+   <div class="mq-nav">
+     <button class="btn btn-secondary" ${S.pos===0?'disabled':''} onclick="mqMove(-1)">◀ પાછળ</button>
+     <button class="btn btn-secondary" onclick="mqOpenPalette()">▦ ${S.pos+1}/${total}</button>
+     ${S.pos<total-1?`<button class="btn btn-primary" onclick="mqMove(1)">આગળ ▶</button>`:`<button class="btn btn-primary" onclick="mqFinish()">સમાપ્ત ✔</button>`}
+   </div>`;
+}
+function mqPick(k){
+  const S = mqSession, qi = S.idx[S.pos];
+  if(S.mode==='practice'){ if(S.answers[qi]!==undefined) return; S.answers[qi]=k; }
+  else { if(S.answers[qi]===k) delete S.answers[qi]; else S.answers[qi]=k; }
+  renderMain();
+  if(S.mode==='test'){ mqStartTimer(); }
+}
+function mqMove(d){
+  const S = mqSession; S.pos = Math.max(0, Math.min(S.idx.length-1, S.pos+d)); renderMain(); mqScrollTop();
+}
+function mqOpenPalette(){
+  const S = mqSession, t = mqTest();
+  const cells = S.idx.map((qi,p)=>{
+    const a = S.answers[qi]; let cls = a!==undefined?'done':'';
+    if(S.mode==='practice' && a!==undefined && t.questions[qi].ans!=null) cls = a===t.questions[qi].ans?'ok':'bad';
+    if(p===S.pos) cls += ' cur';
+    return `<button class="${cls}" onclick="mqGoto(${p})">${p+1}</button>`;
+  }).join('');
+  openSheet(`<h3>પ્રશ્નો</h3><div class="ink-dim" style="font-size:12.5px;">જવાબ આપ્યા: ${Object.keys(S.answers).length}/${S.idx.length}</div>
+    <div class="mq-pal">${cells}</div>
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="closeSheet(); mqFinish();">સમાપ્ત કરો ✔</button></div>`);
+}
+function mqGoto(p){ mqSession.pos = p; closeSheet(); renderMain(); mqScrollTop(); }
+function mqFinish(){
+  const S = mqSession;
+  const un = S.idx.length - Object.keys(S.answers).length;
+  if(un>0 && !confirm(`${un} પ્રશ્નો બાકી છે. છતાં સમાપ્ત કરવું છે?`)) return;
+  const t = mqTest();
+  let correct=0, wrong=0, skipped=0;
+  S.idx.forEach(qi=>{
+    const a = S.answers[qi], q = t.questions[qi];
+    if(a===undefined) skipped++; else if(q.ans!=null && a===q.ans) correct++; else if(q.ans!=null) wrong++; else skipped++;
+  });
+  const total = S.idx.length;
+  const timeSec = Math.floor((Date.now()-S.start)/1000);
+  S.result = {correct, wrong, skipped, total, pct: total?Math.round(correct/total*100):0, timeSec};
+  S.finished = true; clearInterval(mqTimerHandle);
+  if(S.idx.length===t.questions.length){
+    t.attempts = t.attempts||[];
+    t.attempts.push({id:uid(), date:todayStr(), mode:S.mode, answers:S.answers, ...S.result});
+    save();
+  }
+  renderMain(); mqScrollTop();
+}
+function mqRenderResult(){
+  const S = mqSession, t = mqTest(), r = S.result;
+  const color = pctColor(r.pct);
+  const wrongIdx = S.idx.filter(qi=>{ const a=S.answers[qi], q=t.questions[qi]; return a!==undefined && q.ans!=null && a!==q.ans; });
+  const skipIdx = S.idx.filter(qi=>S.answers[qi]===undefined);
+  const review = S.idx.map((qi,p)=>{
+    const a = S.answers[qi], q = t.questions[qi];
+    const isOk = a!==undefined && q.ans!=null && a===q.ans;
+    if(isOk) return '';
+    return `<div class="card mq-readcard"><div class="mq-q">${qi+1}. ${esc(q.q)}</div>
+      ${q.opts.map((o,k)=>`<div class="mq-opt ${k===q.ans?'ok':(k===a?'bad':'')}"><span class="ltr">${MQ_LET[k]}</span><span style="flex:1;">${esc(o)}</span></div>`).join('')}
+      <div class="ink-dim" style="font-size:12.5px;">${a===undefined?'તમે જવાબ આપ્યો નથી':'તમારો જવાબ: ('+MQ_LET[a]+')'}${q.ans!=null?' · સાચો: ('+MQ_LET[q.ans]+')':''}</div></div>`;
+  }).join('');
+  return `
+   <div class="mq-topbar"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span style="font-weight:800;">${esc(t.name)}</span><span></span></div>
+   <div class="card" style="text-align:center;">
+     <div style="font-size:44px;font-weight:900;color:${color};">${r.pct}%</div>
+     <div class="ink-dim">${r.correct} સાચા / ${r.total} પ્રશ્નો · ⏱ ${String(Math.floor(r.timeSec/60)).padStart(2,'0')}:${String(r.timeSec%60).padStart(2,'0')}</div>
+     <div class="mq-stat">
+       <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--success) 14%, transparent);"><b style="color:var(--success);">${r.correct}</b><span>સાચા</span></div>
+       <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--danger) 14%, transparent);"><b style="color:var(--danger);">${r.wrong}</b><span>ખોટા</span></div>
+       <div class="subject-mini-stat"><b>${r.skipped}</b><span>બાકી</span></div>
+     </div>
+     <div class="mq-actions">
+       <button class="btn btn-primary btn-sm" onclick="mqStart('${t.id}','test')">⏱ ફરી ટેસ્ટ</button>
+       ${(wrongIdx.length+skipIdx.length)?`<button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','practice',[${wrongIdx.concat(skipIdx).join(',')}])">🔁 ખોટા પ્રશ્નો ફરી</button>`:''}
+       <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','read')">📖 વાંચન</button>
+     </div>
+   </div>
+   ${review?`<div class="section-header"><h3>ખોટા / બાકી પ્રશ્નો</h3></div>${review}`:'<div class="card" style="text-align:center;">🎉 બધા જવાબ સાચા!</div>'}`;
+}
+function mqRenderRead(){
+  const S = mqSession, t = mqTest();
+  const list = S.idx.filter(qi=>!S.onlyStar || t.questions[qi].star);
+  const cards = list.map(qi=>{
+    const q = t.questions[qi];
+    return `<div class="card mq-readcard">
+      <div style="display:flex;gap:8px;"><div class="mq-q" style="flex:1;">${qi+1}. ${esc(q.q)}</div>
+        <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;">
+          <button class="btn btn-sm btn-secondary" onclick="mqToggleStar(${qi})">${q.star?'⭐':'☆'}</button>
+          <button class="btn btn-sm btn-secondary" onclick="openQQuestionForm(${qi})">✎</button></div></div>
+      ${q.opts.map((o,k)=>`<div class="mq-opt ${(S.showAns && k===q.ans)?'ok':''}"><span class="ltr">${S.showAns && k===q.ans?'✓':MQ_LET[k]}</span><span style="flex:1;">${esc(o)}</span></div>`).join('')}
+    </div>`;
+  }).join('');
+  return `
+   <div class="mq-topbar"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span style="font-weight:800;">📖 ${esc(t.name)}</span><span></span></div>
+   <div class="mq-actions" style="margin:0 0 12px;">
+     <button class="btn btn-sm ${S.showAns?'btn-primary':'btn-secondary'}" onclick="mqSession.showAns=!mqSession.showAns; renderMain();">${S.showAns?'🙈 જવાબ છુપાવો':'👁 જવાબ બતાવો'}</button>
+     <button class="btn btn-sm ${S.onlyStar?'btn-primary':'btn-secondary'}" onclick="mqSession.onlyStar=!mqSession.onlyStar; renderMain();">⭐ ફક્ત તારાંકિત</button>
+   </div>
+   ${cards || emptyRow('કોઈ પ્રશ્ન નથી')}`;
+}
+function mqToggleStar(qi){
+  const q = mqTest().questions[qi]; q.star = !q.star; save();
+  const y = window.scrollY; renderMain(); window.scrollTo(0,y);
+}
+function openQQuestionForm(qi){
+  const q = mqTest().questions[qi];
+  openSheet(`
+    <h3>પ્રશ્ન ${qi+1} એડિટ</h3>
+    <div class="field"><label>પ્રશ્ન</label><textarea class="mq-ta" style="min-height:90px;" id="f_qq">${esc(q.q)}</textarea></div>
+    ${MQ_LET.map((l,k)=>`<div class="field"><label>વિકલ્પ ${l}</label><input type="text" id="f_qo${k}" value="${esc(q.opts[k])}"></div>`).join('')}
+    <div class="field"><label>સાચો જવાબ</label><select id="f_qa"><option value="">— નથી —</option>${MQ_LET.map((l,k)=>`<option value="${k}" ${q.ans===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="saveQQuestion(${qi})">સેવ કરો</button></div>`);
+}
+function saveQQuestion(qi){
+  const q = mqTest().questions[qi];
+  q.q = val('f_qq'); MQ_LET.forEach((_,k)=>{ q.opts[k] = val('f_qo'+k); });
+  const a = val('f_qa'); q.ans = a===''?null:+a;
+  save(); closeSheet(); const y=window.scrollY; renderMain(); window.scrollTo(0,y);
+}
+function renderMock(){
+  if(mqSession) return renderMqSession();
+  const seg = `<div class="seg"><button class="${mockView==='score'?'on':''}" onclick="setMockView('score')">📝 મોક ગુણ</button><button class="${mockView==='quiz'?'on':''}" onclick="setMockView('quiz')">🧠 MCQ ક્વિઝ</button></div>`;
+  return seg + (mockView==='quiz' ? renderMockQuiz() : renderMockScores());
+}
+
 /* ===================== AFTER-RENDER CHART HOOKS ===================== */
 const BOOKS = {};
 let bookClickBlockUntil = 0;
@@ -2961,7 +3386,7 @@ function afterRender(tab){
   }
   if(tab==='mock'){
     const tests = [...mockTestsForActiveExam()].sort((a,b)=>a.date.localeCompare(b.date)).slice(-8);
-    if(tests.length){
+    if(tests.length && document.getElementById('chartMockTrend')){
       const labels = tests.map(m=>formatDateShort(m.date));
       const values = tests.map(m=>m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0);
       drawBarChart('chartMockTrend', labels, values, getVar('--accent'), v=>v+'%');
