@@ -2955,31 +2955,96 @@ function mqQuestionsText(qs){
 }
 
 /* ---- હોમ / ફોલ્ડર ---- */
+let mqQuery = '';
+const MQ_SORTS = [['name','નામ A→Z'],['name_desc','નામ Z→A'],['new','નવી પહેલા'],['old','જૂની પહેલા'],['unattempted','ન આપેલી પહેલા'],['attempted','આપેલી પહેલા'],['score_asc','ઓછો સ્કોર પહેલા'],['score_desc','વધુ સ્કોર પહેલા'],['rev_due','રિવિઝન બાકી પહેલા']];
+function getQSort(){ return (DB.settings && DB.settings.qSort) || 'name'; }
+function setQSort(v){ DB.settings.qSort = v; save(); renderMain(); }
+function mqSearchInput(v){
+  mqQuery = v;
+  const wrap = document.getElementById('mqListWrap'); if(!wrap) return;
+  wrap.innerHTML = mqListHTML();
+  bookSetFinal(wrap);
+}
+function mqEarliestDue(testIds){
+  const set = new Set(testIds);
+  const d = (DB.qrevs||[]).filter(r=>set.has(r.testId) && r.status==='pending').map(r=>r.dueDate).sort();
+  return d.length ? d[0] : null;
+}
+function mqTestInfo(t){
+  const att = (t.attempts||[]).length;
+  return {name:t.name, idx:DB.qtests.indexOf(t), att:att?1:0, last:att?t.attempts[att-1].pct:null, due:mqEarliestDue([t.id])};
+}
+function mqFolderInfo(f){
+  const tests = mqFolderTestsDeep(f.id);
+  const attempted = tests.filter(t=>(t.attempts||[]).length);
+  const lasts = attempted.map(t=>t.attempts[t.attempts.length-1].pct);
+  return {name:f.name, idx:DB.qfolders.indexOf(f), att:tests.length?attempted.length/tests.length:0, last:lasts.length?lasts.reduce((a,b)=>a+b,0)/lasts.length:null, due:mqEarliestDue(tests.map(t=>t.id))};
+}
+function mqCmp(mode, a, b){
+  const byName = ()=>a.name.localeCompare(b.name,'gu',{numeric:true});
+  const nullLast = (x,y,fn)=> x==null&&y==null ? 0 : (x==null?1:(y==null?-1:fn(x,y)));
+  let r = 0;
+  if(mode==='name') return byName();
+  if(mode==='name_desc') return -byName();
+  if(mode==='new') r = b.idx-a.idx;
+  else if(mode==='old') r = a.idx-b.idx;
+  else if(mode==='unattempted') r = a.att-b.att;
+  else if(mode==='attempted') r = b.att-a.att;
+  else if(mode==='score_asc') r = nullLast(a.last,b.last,(x,y)=>x-y);
+  else if(mode==='score_desc') r = nullLast(a.last,b.last,(x,y)=>y-x);
+  else if(mode==='rev_due') r = nullLast(a.due,b.due,(x,y)=>x.localeCompare(y));
+  return r || byName();
+}
+function mqTestCardHTML(t, showPath){
+  const last = (t.attempts||[]).slice(-1)[0];
+  const best = (t.attempts||[]).reduce((a,x)=>Math.max(a,x.pct),0);
+  const hasKey = t.questions.some(q=>q.ans!=null);
+  const path = showPath ? mqFolderPath(t.folderId).join(' › ') : '';
+  return `<div class="card" data-search="${esc(t.name.toLowerCase())}">
+    <div class="mq-row"><span class="mq-ico">📄</span>
+      <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">${esc(t.name)}</div>
+      ${path?`<div class="ink-dim" style="font-size:12px;">📁 ${esc(path)}</div>`:''}
+      <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${(t.attempts||[]).length?` · ${t.attempts.length} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div></div>
+      ${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}
+      <button class="btn btn-sm btn-secondary" onclick="openQTestForm('${t.id}')">✎</button></div>
+    ${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">છેલ્લી: ${last.correct}/${last.total} સાચા · શ્રેષ્ઠ ${best}%</div>`:''}
+    <div class="mq-actions">
+      <button class="btn btn-primary btn-sm" onclick="mqStart('${t.id}','test')">⏱ ટેસ્ટ</button>
+      <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','practice')">✍ પ્રેક્ટિસ</button>
+      <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','read')">📖 વાંચન</button>
+    </div>
+    ${mqRevLineHTML(t)}</div>`;
+}
+function mqListHTML(){
+  const q = (mqQuery||'').trim().toLowerCase();
+  const mode = getQSort();
+  let folders, tests;
+  if(q){
+    folders = DB.qfolders.filter(f=>f.examId===mqExamId() && f.name.toLowerCase().includes(q));
+    tests = DB.qtests.filter(t=>t.examId===mqExamId() && (t.name.toLowerCase().includes(q) || mqFolderPath(t.folderId).join(' ').toLowerCase().includes(q)));
+  } else {
+    folders = mqFolders(mqFolderId); tests = mqTests(mqFolderId);
+  }
+  folders = folders.map(f=>({f, k:mqFolderInfo(f)})).sort((a,b)=>mqCmp(mode,a.k,b.k)).map(x=>x.f);
+  tests = tests.map(t=>({t, k:mqTestInfo(t)})).sort((a,b)=>mqCmp(mode,a.k,b.k)).map(x=>x.t);
+  if(!folders.length && !tests.length){
+    if(q) return emptyRow('કોઈ ટેસ્ટ કે ફોલ્ડર મળ્યું નથી');
+    const cur = DB.qfolders.find(f=>f.id===mqFolderId);
+    return emptyState('🧠', cur?'આ ફોલ્ડર ખાલી છે':'કોઈ MCQ ટેસ્ટ નથી','ફોલ્ડર બનાવો અને PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)');
+  }
+  return folders.map(f=>mqFolderBookHTML(f)).join('') + tests.map(t=>mqTestCardHTML(t, !!q)).join('');
+}
 function renderMockQuiz(seg){
   const exam = getActiveExam();
   if(!exam) return mqSticky(seg) + emptyRow('પહેલા પરીક્ષા ઉમેરો');
-  const subs = mqFolders(mqFolderId), tests = mqTests(mqFolderId);
   const cur = DB.qfolders.find(f=>f.id===mqFolderId);
   const path = mqFolderPath(mqFolderId);
-  const folderCards = subs.map(f=>mqFolderBookHTML(f)).join('');
-  const testCards = tests.map(t=>{
-    const last = (t.attempts||[]).slice(-1)[0];
-    const best = (t.attempts||[]).reduce((a,x)=>Math.max(a,x.pct),0);
-    const hasKey = t.questions.some(q=>q.ans!=null);
-    return `<div class="card">
-      <div class="mq-row"><span class="mq-ico">📄</span>
-        <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">${esc(t.name)}</div>
-        <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${(t.attempts||[]).length?` · ${t.attempts.length} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div></div>
-        ${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}
-        <button class="btn btn-sm btn-secondary" onclick="openQTestForm('${t.id}')">✎</button></div>
-      ${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">છેલ્લી: ${last.correct}/${last.total} સાચા · શ્રેષ્ઠ ${best}%</div>`:''}
-      <div class="mq-actions">
-        <button class="btn btn-primary btn-sm" onclick="mqStart('${t.id}','test')">⏱ ટેસ્ટ</button>
-        <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','practice')">✍ પ્રેક્ટિસ</button>
-        <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','read')">📖 વાંચન</button>
-      </div>
-      ${mqRevLineHTML(t)}</div>`;
-  }).join('');
+  const cur_sort = getQSort();
+  const toolbar = `<div class="flex-gap-6">
+    <input type="text" id="mqSearchInput" value="${esc(mqQuery)}" placeholder="🔍 ટેસ્ટ શોધો..." oninput="mqSearchInput(this.value)" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
+    <select onchange="setQSort(this.value)" style="flex-shrink:0; max-width:135px; padding:8px 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit;">
+      ${MQ_SORTS.map(([v,l])=>`<option value="${v}" ${cur_sort===v?'selected':''}>${l}</option>`).join('')}
+    </select></div>`;
   return mqSticky(seg + `
    <div class="mq-topbar">
      ${cur?backButtonHTML(`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`):'<span></span>'}
@@ -2988,11 +3053,10 @@ function renderMockQuiz(seg){
        <button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>
      </span>
    </div>
-   ${path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:''}`) + `
-      ${(!subs.length && !tests.length)?emptyState('🧠', cur?'આ ફોલ્ડર ખાલી છે':'કોઈ MCQ ટેસ્ટ નથી','ફોલ્ડર બનાવો અને PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)'):folderCards+testCards}
-  `;
+   ${path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:''}
+   ${toolbar}`) + `<div id="mqListWrap">${mqListHTML()}</div>`;
 }
-function mqOpenFolder(id){ mqFolderId = id||null; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
+function mqOpenFolder(id){ mqFolderId = id||null; mqQuery = ''; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
 
 function openQFolderForm(id){
   const f = id ? DB.qfolders.find(x=>x.id===id) : null;
@@ -3276,7 +3340,7 @@ function mqAttemptsCardHTML(dateStr){
 }
 function mqGoToTest(testId){
   const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
-  mockView = 'quiz'; mqFolderId = t.folderId || null; mqSession = null;
+  mockView = 'quiz'; mqFolderId = t.folderId || null; mqSession = null; mqQuery = '';
   showTab('mock');
 }
 function qrevRowHTML(r, showDate){
