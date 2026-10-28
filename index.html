@@ -132,7 +132,10 @@ a{color:inherit;}
 .mq-topbar.mq-center{display:grid; grid-template-columns:1fr minmax(0,2fr) 1fr; gap:6px;}
 .mq-topbar.mq-center>:first-child{justify-self:start;} .mq-topbar.mq-center>:last-child{justify-self:end;}
 .mq-topbar.mq-center>.mq-title{text-align:center; font-weight:800; font-size:15.5px; line-height:1.35; word-break:break-word;}
-.mq-sticky{position:sticky; top:-14px; z-index:6; background:var(--bg); margin:-14px -14px 10px; padding:14px 14px 6px;}
+.hs-sticky{position:sticky; top:-14px; z-index:6; background:var(--bg); transition:transform .3s cubic-bezier(.4,0,.2,1), opacity .22s ease;}
+.hs-sticky.hs-hidden{transform:translateY(-125%); opacity:0; pointer-events:none;}
+.hs-mid{margin:-6px -14px 8px; padding:14px 14px 6px;}
+.mq-sticky{margin:-14px -14px 10px; padding:14px 14px 6px;}
 .mq-sticky .seg{margin-bottom:10px;} .mq-sticky .mq-topbar{margin-bottom:8px;} .mq-sticky .mq-bar{margin-bottom:8px;}
 .mq-bar{height:6px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-bottom:14px;}
 .mq-bar i{display:block; height:100%; background:var(--primary); border-radius:4px; transition:width .3s;}
@@ -889,6 +892,8 @@ function renderExamDetail(examId){
        <div class="ink-dim" style="margin-top:4px;">📅 ${formatDate(e.date)}${e.description?' · '+esc(e.description):''}</div>
        ${totalSectionMarks>0?`<div class="item item-static mt-8"><span class="ink-dim">કુલ ગુણ (બધા વિભાગ)</span><span class="badge badge-primary" style="font-weight:700;">${totalSectionMarks} ગુણ</span></div>`:''}
      </div>
+   </div>
+   <div class="hs-sticky hs-mid">
      <div class="section-header mb-6">
        <h3>વિભાગ</h3>
        <span class="flex-gap-6">
@@ -896,16 +901,16 @@ function renderExamDetail(examId){
          <button class="btn btn-sm btn-primary" onclick="openSectionForm(null,'${examId}')">+ વિભાગ</button>
        </span>
      </div>
+     ${sections.length ? filterSortToolbarHTML('sections','sectionSearchInput','filterSectionsList') : ''}
    </div>
-   ${sections.length ? `${filterSortToolbarHTML('sections','sectionSearchInput','filterSectionsList')}<div class="subject-list" id="sectionsListWrap">${sortSectionsList(sections).map(sec=>sectionSlideCard(sec)).join('')}</div>` : emptyRow('કોઈ વિભાગ ઉમેર્યો નથી')}
+   ${sections.length ? `<div class="subject-list" id="sectionsListWrap">${sortSectionsList(sections).map(sec=>sectionSlideCard(sec)).join('')}</div>` : emptyRow('કોઈ વિભાગ ઉમેર્યો નથી')}
    ${(()=>{
      const ungrouped = DB.subjects.filter(s=>s.examId===examId && !s.sectionId);
      if(!ungrouped.length) return '';
-     return `<div class="section-header mb-6 mt-14">
+     return subjectListHTML(ungrouped, 'none', `<div class="section-header mb-6 mt-14">
        <h3>કોઈ વિભાગ વગરના વિષય</h3>
        <span class="flex-gap-6"><button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${examId}')">+ વિષય</button></span>
-     </div>
-     ${subjectListHTML(ungrouped, 'none')}`;
+     </div>`);
    })()}
   `;
 }
@@ -1028,19 +1033,19 @@ function renderSectionDetail(sectionId){
        </span>
      </div>
    </div>
-   <div class="section-header mb-6">
+   ${subjectListHTML(subs, sec.id, `<div class="section-header mb-6">
      <h3>વિષયો</h3>
      <span class="flex-gap-6">
        ${subs.length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}
        <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
      </span>
-   </div>
-   ${subjectListHTML(subs, sec.id)}
+   </div>`)}
   `;
 }
-function subjectListHTML(subs, sectionKey){
-  if(!subs.length) return emptyRow('કોઈ વિષય ઉમેર્યો નથી');
-  return `${filterSortToolbarHTML('subjects','subjectSearchInput','filterSubjectsList', sectionKey)}<div class="subject-list" id="subjectsListWrap">${sortSubjectsList(subs, sectionKey).map(s=>subjectSlideCard(s)).join('')}</div>`;
+function subjectListHTML(subs, sectionKey, headerHTML){
+  headerHTML = headerHTML || '';
+  if(!subs.length) return headerHTML + emptyRow('કોઈ વિષય ઉમેર્યો નથી');
+  return `<div class="hs-sticky hs-mid">${headerHTML}${filterSortToolbarHTML('subjects','subjectSearchInput','filterSubjectsList', sectionKey)}</div><div class="subject-list" id="subjectsListWrap">${sortSubjectsList(subs, sectionKey).map(s=>subjectSlideCard(s)).join('')}</div>`;
 }
 function subjectSlideCard(s){
   const topics = subjectTopics(s.id);
@@ -1105,15 +1110,16 @@ function renderTopicDetail(subjectId){
      <div class="item item-static"><b>${esc(s.name)}</b><span class="ink-dim">${completed}/${topics.length} પૂર્ણ</span></div>
      <div class="progress-track mt-8"><div class="progress-fill" style="width:${pct}%"></div></div>
    </div>
-   <div style="margin:18px 2px 8px 2px;">
+   <div class="hs-sticky hs-mid" style="margin-top:10px;">
      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
        ${topics.length>1?`<button class="btn btn-sm btn-secondary" onclick="openTopicReorder('${s.id}')">ક્રમ બદલો</button>`:''}
        <button class="btn btn-sm btn-secondary" onclick="openBulkTopicForm('${s.id}')">+ ઘણા ટોપિક</button>
        <button class="btn btn-sm btn-primary" onclick="openTopicEditForm(null,'${s.id}')">+ ટોપિક</button>
      </div>
-     <h3 style="margin:10px 0 0 0;">બધા ટોપિક</h3>
+     <h3 style="margin:10px 0 8px 0;">બધા ટોપિક</h3>
+     ${topics.length ? filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList', s.id) : ''}
    </div>
-   ${topics.length ? `${filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList', s.id)}<div id="topicsListWrap">${sortTopicsList(topics, s.id).map(t=>topicRow(t)).join('')}</div>` : emptyRow('કોઈ ટોપિક નથી')}
+   ${topics.length ? `<div id="topicsListWrap">${sortTopicsList(topics, s.id).map(t=>topicRow(t)).join('')}</div>` : emptyRow('કોઈ ટોપિક નથી')}
   `;
 }
 function topicReorderListHTML(subjectId){
@@ -2886,7 +2892,7 @@ let mqSession = null;
 let mqTimerHandle = null;
 const MQ_LET = ['A','B','C','D'];
 
-function mqSticky(h){ return `<div class="mq-sticky">${h}</div>`; }
+function mqSticky(h){ return `<div class="hs-sticky mq-sticky">${h}</div>`; }
 function setMockView(v){ mockView=v; renderMain(); }
 function mqExamId(){ const e=getActiveExam(); return e?e.id:null; }
 function mqFolders(parentId){ return DB.qfolders.filter(f=>f.examId===mqExamId() && (f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
@@ -3839,7 +3845,21 @@ function checkNotifications(){
 
   if(changed) saveNotifyLog(log);
 }
+function initHideOnScroll(){
+  const main = document.getElementById('main'); if(!main) return;
+  let last = 0;
+  main.addEventListener('scroll', ()=>{
+    const y = main.scrollTop, dy = y - last;
+    if(Math.abs(dy) < 6) return;
+    last = y;
+    const hide = dy > 0 && y > 60;
+    const ae = document.activeElement;
+    if(hide && ae && ae.closest && ae.closest('.hs-sticky')) return;
+    main.querySelectorAll('.hs-sticky').forEach(el=>el.classList.toggle('hs-hidden', hide));
+  }, {passive:true});
+}
 function init(){
+  initHideOnScroll();
   applyTheme();
   buildNav();
   populateBrand();
