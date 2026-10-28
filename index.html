@@ -65,7 +65,7 @@ p{margin:0;}
 button{font-family:inherit;}
 a{color:inherit;}
 
-.topbar{flex:0 0 auto; z-index:20; background:var(--surface); border-bottom:1px solid var(--border);}
+.topbar{flex:0 0 auto; z-index:20; background:var(--surface); border-bottom:1px solid var(--border); transition:margin-top .3s cubic-bezier(.4,0,.2,1), opacity .25s ease;}
 .topbar-inner{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; gap:8px;}
 .brand{font-weight:800; font-size:17px; letter-spacing:-0.02em;}
 .brand-row{display:flex; align-items:center; gap:8px;}
@@ -3847,15 +3847,31 @@ function checkNotifications(){
 }
 function initHideOnScroll(){
   const main = document.getElementById('main'); if(!main) return;
-  let last = 0;
+  const tb = document.querySelector('.topbar');
+  let last = 0, lock = 0, tbHidden = false;
+  function setTopbar(hide){
+    if(!tb || hide===tbHidden) return;
+    tbHidden = hide;
+    tb.style.marginTop = hide ? (-tb.offsetHeight)+'px' : '0px';
+    tb.style.opacity = hide ? '0' : '1';
+    lock = performance.now() + 450;
+  }
   main.addEventListener('scroll', ()=>{
     const y = main.scrollTop, dy = y - last;
+    if(performance.now() < lock){ last = y; return; }
+    if(y <= 20){ last = y; setTopbar(false); main.querySelectorAll('.hs-sticky').forEach(el=>el.classList.remove('hs-hidden')); return; }
     if(Math.abs(dy) < 6) return;
     last = y;
     const hide = dy > 0 && y > 60;
     const ae = document.activeElement;
     if(hide && ae && ae.closest && ae.closest('.hs-sticky')) return;
-    main.querySelectorAll('.hs-sticky').forEach(el=>el.classList.toggle('hs-hidden', hide));
+    const mt = main.getBoundingClientRect().top;
+    main.querySelectorAll('.hs-sticky').forEach(el=>{
+      if(!hide){ el.classList.remove('hs-hidden'); return; }
+      const stuck = el.getBoundingClientRect().top <= mt + 2;
+      el.classList.toggle('hs-hidden', stuck);
+    });
+    setTopbar(hide);
   }, {passive:true});
 }
 function init(){
