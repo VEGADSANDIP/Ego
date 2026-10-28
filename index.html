@@ -129,6 +129,11 @@ a{color:inherit;}
 .mq-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
 .mq-actions .btn{flex:1; min-width:0; white-space:nowrap;}
 .mq-topbar{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;}
+.mq-topbar.mq-center{display:grid; grid-template-columns:1fr minmax(0,2fr) 1fr; gap:6px;}
+.mq-topbar.mq-center>:first-child{justify-self:start;} .mq-topbar.mq-center>:last-child{justify-self:end;}
+.mq-topbar.mq-center>.mq-title{text-align:center; font-weight:800; font-size:15.5px; line-height:1.35; word-break:break-word;}
+.mq-sticky{position:sticky; top:-14px; z-index:6; background:var(--bg); margin:-14px -14px 10px; padding:14px 14px 6px;}
+.mq-sticky .seg{margin-bottom:10px;} .mq-sticky .mq-topbar{margin-bottom:8px;} .mq-sticky .mq-bar{margin-bottom:8px;}
 .mq-bar{height:6px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-bottom:14px;}
 .mq-bar i{display:block; height:100%; background:var(--primary); border-radius:4px; transition:width .3s;}
 .mq-q{font-size:17px; font-weight:700; line-height:1.6; margin:4px 0 14px; white-space:pre-wrap;}
@@ -636,6 +641,7 @@ function renderDashboard(){
   const revDone = allRevs.filter(r=>r.status==='completed').length;
   const revPct = revTotal ? Math.round(revDone/revTotal*100) : 0;
   const revPending = revTotal-revDone;
+  const revUpcoming = allRevs.filter(r=>r.status==='pending' && r.dueDate>=today).length;
 
   const heroCard0 = `<div class="hero-card">
      <div class="hero-top">
@@ -666,8 +672,8 @@ function renderDashboard(){
        ${ringSVG(revPct, null, 'રિવિઝન')}
        <div class="hero-ring-stats">
          <div class="ring-stat"><span>રિવિઝન પૂર્ણ</span><b><span class="hero-count" data-target="${revDone}">0</span>/${revTotal}</b></div>
-         <div class="ring-stat"><span>બાકી</span><b class="hero-count" data-target="${revPending}">0</b></div>
-         <div class="ring-stat"><span>ઓવરડ્યુ</span><b class="hero-count" data-target="${overdueRevisions}" style="color:${overdueRevisions?'#FF8A80':'#fff'};">0</b></div>
+         <div class="ring-stat"><span>બાકી · પાછલા</span><b class="hero-count" data-target="${overdueRevisions}" style="color:${overdueRevisions?'#FF8A80':'#fff'};">0</b></div>
+         <div class="ring-stat"><span>બાકી · આજ/આવનારા</span><b class="hero-count" data-target="${revUpcoming}">0</b></div>
        </div>
      </div>
    </div>`;
@@ -2874,12 +2880,13 @@ function confirmResetAllData(){
 
 
 /* ===================== MCQ ક્વિઝ ===================== */
-let mockView = 'score';
+let mockView = 'quiz';
 let mqFolderId = null;
 let mqSession = null;
 let mqTimerHandle = null;
 const MQ_LET = ['A','B','C','D'];
 
+function mqSticky(h){ return `<div class="mq-sticky">${h}</div>`; }
 function setMockView(v){ mockView=v; renderMain(); }
 function mqExamId(){ const e=getActiveExam(); return e?e.id:null; }
 function mqFolders(parentId){ return DB.qfolders.filter(f=>f.examId===mqExamId() && (f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
@@ -2948,9 +2955,9 @@ function mqQuestionsText(qs){
 }
 
 /* ---- હોમ / ફોલ્ડર ---- */
-function renderMockQuiz(){
+function renderMockQuiz(seg){
   const exam = getActiveExam();
-  if(!exam) return emptyRow('પહેલા પરીક્ષા ઉમેરો');
+  if(!exam) return mqSticky(seg) + emptyRow('પહેલા પરીક્ષા ઉમેરો');
   const subs = mqFolders(mqFolderId), tests = mqTests(mqFolderId);
   const cur = DB.qfolders.find(f=>f.id===mqFolderId);
   const path = mqFolderPath(mqFolderId);
@@ -2973,7 +2980,7 @@ function renderMockQuiz(){
       </div>
       ${mqRevLineHTML(t)}</div>`;
   }).join('');
-  return `
+  return mqSticky(seg + `
    <div class="mq-topbar">
      ${cur?backButtonHTML(`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`):'<span></span>'}
      <span class="flex-gap-6">
@@ -2981,8 +2988,8 @@ function renderMockQuiz(){
        <button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>
      </span>
    </div>
-   ${path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:''}
-   ${(!subs.length && !tests.length)?emptyState('🧠', cur?'આ ફોલ્ડર ખાલી છે':'કોઈ MCQ ટેસ્ટ નથી','ફોલ્ડર બનાવો અને PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)'):folderCards+testCards}
+   ${path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:''}`) + `
+      ${(!subs.length && !tests.length)?emptyState('🧠', cur?'આ ફોલ્ડર ખાલી છે':'કોઈ MCQ ટેસ્ટ નથી','ફોલ્ડર બનાવો અને PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)'):folderCards+testCards}
   `;
 }
 function mqOpenFolder(id){ mqFolderId = id||null; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
@@ -3025,8 +3032,6 @@ function openQTestForm(id){
       <textarea class="mq-ta" id="f_qttext" oninput="mqPreview()" placeholder="1) પ્રશ્ન...&#10;(A) ... (B) ...&#10;(C) ... (D) ...">${t?esc(mqQuestionsText(t.questions)):''}</textarea></div>
     <div class="field"><label>જવાબ ચાવી (દા.ત. DACBBC… અથવા 1-D 2-A 3-A…)</label>
       <input type="text" id="f_qtkey" oninput="mqPreview()" value="${t?esc(mqKeyString(t.questions)):''}" placeholder="DACBBCADBC…" style="letter-spacing:1px;"></div>
-    <label class="item cursor-pointer" style="margin-bottom:6px;"><span>ગુજરાતી અક્ષરોની સામાન્ય ભૂલો આપમેળે સુધારો</span>
-      <input type="checkbox" id="f_qtfix" ${t?'':'checked'} onchange="mqPreview()" style="width:18px;height:18px;"></label>
     <div id="mqPreview" class="ink-dim" style="font-size:13px;margin:8px 0 4px;"></div>
     <div class="sheet-actions">
       ${t?`<button class="btn btn-danger" onclick="deleteQTest('${t.id}')">ડિલીટ</button>`:''}
@@ -3037,7 +3042,7 @@ function openQTestForm(id){
 function mqPreview(){
   const el = document.getElementById('mqPreview'); if(!el) return;
   const txt = (document.getElementById('f_qttext')||{}).value||'';
-  const fix = document.getElementById('f_qtfix').checked;
+  const fix = false;
   const nameEl = document.getElementById('f_qtname');
   if(nameEl && !nameEl.value){ const mm = txt.match(/Test\s*[–\-]?\s*(\d+)/i); if(mm) nameEl.value = 'Test '+mm[1]; }
   const r = mqParse(txt, fix);
@@ -3050,7 +3055,7 @@ function mqPreview(){
 function saveQTest(id){
   const name = val('f_qtname');
   const txt = (document.getElementById('f_qttext')||{}).value||'';
-  const fix = document.getElementById('f_qtfix').checked;
+  const fix = false;
   const r = mqParse(txt, fix);
   if(!name){ toast('ટેસ્ટનું નામ લખો','error'); return; }
   if(!r.questions.length){ toast('કોઈ પ્રશ્ન મળ્યો નથી','error'); return; }
@@ -3115,15 +3120,15 @@ function mqRenderQuestion(){
   }).join('');
   const total = S.idx.length;
   const answeredN = Object.keys(S.answers).length;
-  return `
-   <div class="mq-topbar">
+  return mqSticky(`
+   <div class="mq-topbar mq-center">
      <button class="btn btn-sm btn-secondary" onclick="mqExit()">✕ બહાર</button>
-     <span style="font-weight:800;">${esc(t.name)}</span>
+     <span class="mq-title">${esc(t.name)}</span>
      <span class="badge badge-primary" id="mqTimer">00:00</span>
    </div>
    <div class="mq-bar"><i style="width:${Math.round((S.pos+1)/total*100)}%"></i></div>
    <div class="ink-dim" style="font-size:12.5px;display:flex;justify-content:space-between;">
-     <span>${S.mode==='test'?'⏱ ટેસ્ટ':'✍ પ્રેક્ટિસ'} · પ્રશ્ન ${S.pos+1}/${total}</span><span>જવાબ આપ્યા: ${answeredN}</span></div>
+     <span>${S.mode==='test'?'⏱ ટેસ્ટ':'✍ પ્રેક્ટિસ'} · પ્રશ્ન ${S.pos+1}/${total}</span><span>જવાબ આપ્યા: ${answeredN}</span></div>`) + `
    <div class="card" style="margin-top:8px;">
      <div class="mq-q">${S.pos+1}. ${esc(q.q)}</div>
      ${opts}
@@ -3196,7 +3201,7 @@ function mqRenderResult(){
       <div class="ink-dim" style="font-size:12.5px;">${a===undefined?'તમે જવાબ આપ્યો નથી':'તમારો જવાબ: ('+MQ_LET[a]+')'}${q.ans!=null?' · સાચો: ('+MQ_LET[q.ans]+')':''}</div></div>`;
   }).join('');
   return `
-   <div class="mq-topbar"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span style="font-weight:800;">${esc(t.name)}</span><span></span></div>
+   ${mqSticky(`<div class="mq-topbar mq-center"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span class="mq-title">${esc(t.name)}</span><span></span></div>`)}
    <div class="card" style="text-align:center;">
      <div style="font-size:44px;font-weight:900;color:${color};">${r.pct}%</div>
      <div class="ink-dim">${r.correct} સાચા / ${r.total} પ્રશ્નો · ⏱ ${String(Math.floor(r.timeSec/60)).padStart(2,'0')}:${String(r.timeSec%60).padStart(2,'0')}</div>
@@ -3227,11 +3232,11 @@ function mqRenderRead(){
     </div>`;
   }).join('');
   return `
-   <div class="mq-topbar"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span style="font-weight:800;">📖 ${esc(t.name)}</span><span></span></div>
-   <div class="mq-actions" style="margin:0 0 12px;">
+   ${mqSticky(`<div class="mq-topbar mq-center"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span class="mq-title">${esc(t.name)}</span><span></span></div>
+   <div class="mq-actions" style="margin:0;">
      <button class="btn btn-sm ${S.showAns?'btn-primary':'btn-secondary'}" onclick="mqSession.showAns=!mqSession.showAns; renderMain();">${S.showAns?'🙈 જવાબ છુપાવો':'👁 જવાબ બતાવો'}</button>
      <button class="btn btn-sm ${S.onlyStar?'btn-primary':'btn-secondary'}" onclick="mqSession.onlyStar=!mqSession.onlyStar; renderMain();">⭐ ફક્ત તારાંકિત</button>
-   </div>
+   </div>`)}
    ${cards || emptyRow('કોઈ પ્રશ્ન નથી')}`;
 }
 function mqToggleStar(qi){
@@ -3382,8 +3387,8 @@ function dashboardQuizCard(){
 }
 function renderMock(){
   if(mqSession) return renderMqSession();
-  const seg = `<div class="seg"><button class="${mockView==='score'?'on':''}" onclick="setMockView('score')">📝 મોક ગુણ</button><button class="${mockView==='quiz'?'on':''}" onclick="setMockView('quiz')">🧠 MCQ ક્વિઝ</button></div>`;
-  return seg + (mockView==='quiz' ? renderMockQuiz() : renderMockScores());
+  const seg = `<div class="seg"><button class="${mockView==='quiz'?'on':''}" onclick="setMockView('quiz')">🧠 MCQ ક્વિઝ</button><button class="${mockView==='score'?'on':''}" onclick="setMockView('score')">📝 મોક ગુણ</button></div>`;
+  return mockView==='quiz' ? renderMockQuiz(seg) : (mqSticky(seg) + renderMockScores());
 }
 
 /* ===================== AFTER-RENDER CHART HOOKS ===================== */
