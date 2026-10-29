@@ -289,6 +289,22 @@ canvas{width:100%; display:block;}
 .slider:before{position:absolute; content:""; height:19px; width:19px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.3);}
 input:checked + .slider{background:var(--primary);}
 input:checked + .slider:before{transform:translateX(19px);}
+#printArea{display:none;}
+@media print{
+  body>*:not(#printArea){display:none !important;}
+  html,body{background:#fff !important; height:auto !important; overflow:visible !important;}
+  #printArea{display:block !important; color:#000; background:#fff; font-family:inherit; font-size:11.5pt; line-height:1.4;}
+  #printArea .pq{break-inside:avoid; page-break-inside:avoid; margin:0 0 9pt;}
+  #printArea .pqs{column-count:2; column-gap:22pt; column-rule:0.5pt solid #bbb;}
+  #printArea .pq b.qn{margin-right:4pt;}
+  #printArea .po{margin:1pt 0 0 14pt;}
+  #printArea .ph{text-align:center; border-bottom:1.5pt solid #000; padding-bottom:6pt; margin-bottom:10pt;}
+  #printArea .ph h1{font-size:18pt; margin:0 0 4pt;}
+  #printArea .pm{display:flex; justify-content:space-between; font-size:12pt; margin-bottom:12pt;}
+  #printArea .pk{break-before:page; page-break-before:always;}
+  #printArea .pkg{display:grid; grid-template-columns:repeat(5,1fr); gap:6pt 10pt; font-size:13pt;}
+  @page{margin:14mm;}
+}
 </style>
 </head>
 <body>
@@ -3013,6 +3029,7 @@ function mqTestCardHTML(t, showPath){
       <button class="btn btn-primary btn-sm" onclick="mqStart('${t.id}','test')">⏱ ટેસ્ટ</button>
       <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','practice')">✍ પ્રેક્ટિસ</button>
       <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','read')">📖 વાંચન</button>
+      <button class="btn btn-secondary btn-sm" onclick="openMqPdf('${t.id}')">📄 PDF</button>
     </div>
     ${mqRevLineHTML(t)}</div>`;
 }
@@ -3466,6 +3483,35 @@ function dashboardQuizCard(){
   </div>`;
   return `<div class="sub-book-wrap">${bookHTML('dashquiz', [front, back], 'book-card')}</div>
     ${due.length?`<div class="card"><div class="ink-dim fs-12" style="margin:0 0 4px;">આજની / બાકી ટેસ્ટ રિવિઝન (${due.length})</div><div class="scroll-list-sm">${due.map(r=>qrevRowHTML(r,true)).join('')}</div></div>`:''}`;
+}
+function openMqPdf(testId){
+  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  const hasKey = t.questions.some(q=>q.ans!=null);
+  openSheet(`
+    <div class="sheet-title">📄 PDF બનાવો</div>
+    <div style="font-weight:800; margin-bottom:6px;">${esc(t.name)}</div>
+    <div class="ink-dim fs-12 mb-6">${t.questions.length} પ્રશ્નો · પ્રશ્નપત્ર જવાબ વગર બનશે.</div>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="pdfKey" ${hasKey?'checked':''} ${hasKey?'':'disabled'}> છેલ્લા પાને જવાબ ચાવી ઉમેરો${hasKey?'':' (ચાવી નથી)'}</label>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="pdfName" checked> નામ / તારીખ / ગુણ લાઈન</label>
+    <div class="ink-dim fs-12">આગળ ખુલતી પ્રિન્ટ વિન્ડોમાં "Save as PDF" પસંદ કરો, પછી PDF શેર કરી શકાશે.</div>
+    <div class="sheet-actions" style="margin-top:14px;"><button class="btn btn-primary btn-block" onclick="mqPrintPdf('${t.id}')">📄 PDF તૈયાર કરો</button></div>
+  `);
+}
+function mqPrintPdf(testId){
+  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  const withKey = !!(document.getElementById('pdfKey')||{}).checked;
+  const withName = !!(document.getElementById('pdfName')||{}).checked;
+  closeSheet();
+  const L = MQ_LET;
+  const qs = t.questions.map((q,i)=>`<div class="pq"><div><b class="qn">${i+1}.</b>${esc(q.q)}</div>${(q.opts||[]).map((o,k)=>o?`<div class="po">(${L[k]}) ${esc(o)}</div>`:'').join('')}</div>`).join('');
+  const key = withKey ? `<div class="pk"><div class="ph"><h1>જવાબ ચાવી</h1><div>${esc(t.name)}</div></div><div class="pkg">${t.questions.map((q,i)=>`<div><b>${i+1}.</b> ${q.ans!=null?L[q.ans]:'-'}</div>`).join('')}</div></div>` : '';
+  let pa = document.getElementById('printArea');
+  if(!pa){ pa = document.createElement('div'); pa.id='printArea'; document.body.appendChild(pa); }
+  pa.innerHTML = `<div class="ph"><h1>${esc(t.name)}</h1><div>કુલ પ્રશ્નો: ${t.questions.length}</div></div>${withName?`<div class="pm"><span>નામ: ____________________</span><span>તારીખ: __________</span><span>ગુણ: ____ / ${t.questions.length}</span></div>`:''}<div class="pqs">${qs}</div>${key}`;
+  const oldTitle = document.title; document.title = t.name;
+  const done = ()=>{ document.title = oldTitle; pa.innerHTML=''; window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(()=>window.print(), 150);
 }
 function renderMock(){
   if(mqSession) return renderMqSession();
