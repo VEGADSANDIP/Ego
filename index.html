@@ -3436,19 +3436,36 @@ function dashboardQuizCard(){
   const attempted = tests.filter(t=>(t.attempts||[]).length);
   const lastPcts = attempted.map(t=>t.attempts[t.attempts.length-1].pct);
   const avg = lastPcts.length ? Math.round(lastPcts.reduce((a,b)=>a+b,0)/lastPcts.length) : 0;
+  const best = lastPcts.length ? Math.max(...lastPcts) : 0;
+  const totalAtt = tests.reduce((a,t)=>a+(t.attempts||[]).length,0);
   const today = todayStr();
-  const due = qrevsForActiveExam().filter(r=>r.status==='pending' && r.dueDate<=today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
   const todayAtt = mqAttemptsOn(today).length;
-  return `<div class="card">
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;"><span>🧠 MCQ ટેસ્ટ</span>
-      <button class="btn btn-sm btn-secondary" onclick="mockView='quiz'; mqFolderId=null; mqSession=null; showTab('mock');">ખોલો →</button></div>
-    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
-      <div class="subject-mini-stat"><b>${attempted.length}/${tests.length}</b><span>આપેલી ટેસ્ટ</span></div>
-      <div class="subject-mini-stat"><b>${lastPcts.length?avg+'%':'-'}</b><span>સરેરાશ સ્કોર</span></div>
-      <div class="subject-mini-stat"><b>${todayAtt}</b><span>આજે આપી</span></div>
-    </div>
-    ${due.length?`<div class="ink-dim fs-12" style="margin:12px 0 4px;">આજની / બાકી ટેસ્ટ રિવિઝન (${due.length})</div><div class="scroll-list-sm">${due.map(r=>qrevRowHTML(r,true)).join('')}</div>`:''}
+  const pct = tests.length ? Math.round(attempted.length/tests.length*100) : 0;
+  const revs = qrevsForActiveExam();
+  const rDone = revs.filter(r=>r.status==='completed').length;
+  const rPend = revs.filter(r=>r.status==='pending');
+  const rOver = rPend.filter(r=>r.dueDate<today).length;
+  const rToday = rPend.filter(r=>r.dueDate===today).length;
+  const rLater = rPend.length - rOver - rToday;
+  const rPct = revs.length ? Math.round(rDone/revs.length*100) : 0;
+  const due = rPend.filter(r=>r.dueDate<=today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const open = `mockView='quiz'; mqFolderId=null; mqSession=null; showTab('mock');`;
+  const head = (p,t)=>`<div style="display:flex; align-items:center; gap:14px;">${miniRingSVG(p)}<div style="flex:1; min-width:0; font-weight:800; font-size:16.5px;">${t}</div>
+      <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="event.stopPropagation(); if(bookClickOK()){ ${open} }">ખોલો →</button></div>`;
+  const box = (n,l,c)=>`<div class="subject-mini-stat"><b${c?` style="color:${c}"`:''}>${n}</b><span>${l}</span></div>`;
+  const grid = h=>`<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">${h}</div>`;
+  const front = `<div class="card" style="margin-bottom:0;">
+    ${head(pct,'🧠 MCQ ટેસ્ટ')}
+    ${grid(box(tests.length,'કુલ ટેસ્ટ')+box(attempted.length,'પૂર્ણ ટેસ્ટ')+box(tests.length-attempted.length,'બાકી ટેસ્ટ')+box(lastPcts.length?avg+'%':'-','સરેરાશ સ્કોર')+box(lastPcts.length?best+'%':'-','સૌથી વધુ સ્કોર')+box(todayAtt,'આજે આપી'))}
+    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">કુલ ${totalAtt} પ્રયાસ · રિવિઝન માટે સ્વાઇપ કરો</div>
   </div>`;
+  const back = `<div class="card" style="margin-bottom:0;">
+    ${head(rPct,'🔁 ટેસ્ટ રિવિઝન')}
+    ${grid(box(revs.length,'કુલ રિવિઝન')+box(rDone,'પૂર્ણ રિવિઝન')+box(rPend.length,'બાકી રિવિઝન')+box(rOver,'પાછલા',rOver?'#E5484D':'')+box(rToday,'આજના')+box(rLater,'આવનારા'))}
+    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">ટેસ્ટ માટે સ્વાઇપ કરો</div>
+  </div>`;
+  return `<div class="sub-book-wrap">${bookHTML('dashquiz', [front, back], 'book-card')}</div>
+    ${due.length?`<div class="card"><div class="ink-dim fs-12" style="margin:0 0 4px;">આજની / બાકી ટેસ્ટ રિવિઝન (${due.length})</div><div class="scroll-list-sm">${due.map(r=>qrevRowHTML(r,true)).join('')}</div></div>`:''}`;
 }
 function renderMock(){
   if(mqSession) return renderMqSession();
