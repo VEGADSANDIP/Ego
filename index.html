@@ -880,7 +880,6 @@ function renderExamDetail(examId){
   const sections = examSections(examId);
   const totalSectionMarks = sections.reduce((a,sec)=>a+Number(sec.totalMarks||0),0);
   return `
-   ${backButtonHTML("showTab(lastMainTab)")}
    <div class="mt-10">
      <div class="card" style="margin-top:0;margin-bottom:0;">
        <div class="item item-static">
