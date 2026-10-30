@@ -375,6 +375,7 @@ let calSelectedDate = null;
 let calMonth = new Date().getMonth();
 let calYear = new Date().getFullYear();
 let calMode = 'study';
+let calKind = 'topic';
 let calGridExpanded = false;
 let revCalSelectedDate = null;
 
@@ -574,7 +575,7 @@ function buildNav(){
 function showTab(id){
   if((id==='exams'||id==='timetable') && currentTab!==id){ lastMainTab = currentTab; }
   currentTab = id;
-  if(id==='calendar'){ calMode='study'; calGridExpanded=false; }
+  if(id==='calendar'){ calMode='study'; calKind='topic'; calGridExpanded=false; }
   if(id!=='exams'){ topicDetailId=null; sectionDetailId=null; }
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
   renderMain();
@@ -2221,6 +2222,10 @@ function renderCalendar(){
      <div style="display:flex; gap:8px; margin-bottom:4px;">
        <button class="btn btn-sm ${calMode==='study'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='study'; renderMain();">અભ્યાસ 📖</button>
        <button class="btn btn-sm ${calMode==='revision'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='revision'; renderMain();">રિવિઝન 🔁</button>
+     </div>
+     <div class="seg" style="margin:8px 0 0;">
+       <button class="${calKind==='topic'?'on':''}" onclick="calKind='topic'; renderMain();">📚 ટોપિક${calKindCount(sel,'topic')}</button>
+       <button class="${calKind==='mcq'?'on':''}" onclick="calKind='mcq'; renderMain();">MCQ ટેસ્ટ${calKindCount(sel,'mcq')}</button>
      </div>`;
   if(calGridExpanded){
     return dateRow + grid + `<div class="hs-sticky hs-mid" style="margin-top:10px;">${head}</div><div>${calendarDayDetailHTML(sel)}</div>`;
@@ -2279,7 +2284,26 @@ function renderSectionGroups(groups, subjectCardHTML, sectionBadgeHTML){
     return `<div class="mt-14">${renderAccordionBlock(wrapId, headerHTML, badgeHTML, cards, shouldExpand, {headerStyle:'border:none; padding:4px 2px;', bodyStyle:'padding-left:0;'})}</div>`;
   }).join('');
 }
+function calKindCount(dateStr, kind){
+  let n = 0;
+  if(kind==='mcq'){
+    n = calMode==='study' ? mqAttemptsOn(dateStr).length : qrevsForActiveExam().filter(r=>r.dueDate===dateStr).length;
+  } else if(calMode==='study'){
+    n = DB.studyLogs.filter(l=>l.date===dateStr && activeExamSubjectIds().includes(l.subjectId)).length;
+  } else {
+    n = revisionsForActiveExam().filter(r=>r.dueDate===dateStr).length;
+  }
+  return n ? ` (${n})` : '';
+}
 function calendarDayDetailHTML(dateStr){
+  if(calKind==='mcq'){
+    if(calMode==='study'){
+      const items = mqAttemptsOn(dateStr).map(({t,a})=>({t, extra:` <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':'ટેસ્ટ'}${a.set&&a.set!=='A'?' · સેટ '+a.set:''}</span>`, right:`<span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span>`}));
+      return items.length ? mqFolderGroupedHTML(items) : emptyRow('આ દિવસે કોઈ MCQ ટેસ્ટ આપી નથી');
+    }
+    const rv = qrevsForActiveExam().filter(r=>r.dueDate===dateStr);
+    return rv.length ? qrevCalendarHTML(rv) : emptyRow('આ દિવસે કોઈ MCQ ટેસ્ટ રિવિઝન નથી');
+  }
   const activeIds = activeExamSubjectIds();
   if(calMode==='study'){
     const logs = DB.studyLogs.filter(l=>l.date===dateStr && activeIds.includes(l.subjectId));
@@ -2289,8 +2313,7 @@ function calendarDayDetailHTML(dateStr){
       bySubject[l.subjectId].entries.push(l);
     });
     const subjectIds = sortSubjectIdsByTimetable(Object.keys(bySubject), dateStr);
-    const attHTML = mqAttemptsCardHTML(dateStr);
-    if(!subjectIds.length) return attHTML || emptyRow('આ દિવસે કોઈ અભ્યાસ નથી');
+    if(!subjectIds.length) return emptyRow('આ દિવસે કોઈ અભ્યાસ નથી');
     const subjectCardHTML = (sid)=>{
       const grouped = groupStudyLogsByChapter(bySubject[sid].entries);
       return `<div class="card">
@@ -2301,7 +2324,7 @@ function calendarDayDetailHTML(dateStr){
         <div class="mt-8">${grouped.freeform.map(it=>`<div class="item" onclick="openStudyForm('${it.logId}')"><span>${esc(it.label)}</span></div>`).join('')}</div>
       </div>`;
     };
-    return renderSectionGroups(groupSubjectIdsBySection(subjectIds), subjectCardHTML) + attHTML;
+    return renderSectionGroups(groupSubjectIdsBySection(subjectIds), subjectCardHTML);
   }
   const revs = revisionsForActiveExam().filter(r=>r.dueDate===dateStr);
   const bySubject = {};
@@ -2312,7 +2335,7 @@ function calendarDayDetailHTML(dateStr){
   const subjectIds = sortSubjectIdsByTimetable(Object.keys(bySubject), dateStr);
   let topicCards;
   if(!subjectIds.length){
-    topicCards = qrevsForActiveExam().some(r=>r.dueDate===dateStr) ? '' : emptyRow('આ દિવસે કોઈ ટોપિક રિવિઝન નથી');
+    topicCards = emptyRow('આ દિવસે કોઈ ટોપિક રિવિઝન નથી');
   } else {
     const subjectCardHTML = (sid)=>{
       const chapterGroups = groupRevisionsByChapter(bySubject[sid]);
@@ -2337,9 +2360,7 @@ function calendarDayDetailHTML(dateStr){
     };
     topicCards = renderSectionGroups(groupSubjectIdsBySection(subjectIds), subjectCardHTML, sectionBadgeHTML);
   }
-  const qrToday = qrevsForActiveExam().filter(r=>r.dueDate===dateStr);
-  const qrHTML = qrevCalendarHTML(qrToday);
-  return topicCards + qrHTML;
+  return topicCards;
 }
 function groupStudyLogsByChapter(entries){
   const byChapter = {};
@@ -3561,37 +3582,43 @@ function mqCompleteMany(ids){
 }
 /* કેલેન્ડરમાં MCQ ટેસ્ટ રિવિઝન — ફોલ્ડર મુજબ (ટોપ ફોલ્ડર = વિભાગ, પેટા ફોલ્ડર = કાર્ડ) */
 function qrevCalendarHTML(revs){
-  if(!revs.length) return '';
-  const tops = {}, topOrder = [];
+  const items = [];
   revs.forEach(r=>{
     const t = DB.qtests.find(x=>x.id===r.testId); if(!t) return;
-    const chain = mqFolderChain(t.folderId);
+    items.push({t, pendId: r.status==='pending'?r.id:null, done: r.status==='completed',
+      right: r.status==='completed'?'<span class="badge badge-success">✓ પૂર્ણ</span>':`<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); mqCompleteRev('${r.id}')">✓</button>`});
+  });
+  return mqFolderGroupedHTML(items);
+}
+/* ફોલ્ડર મુજબ ગોઠવણી: ટોપ ફોલ્ડર = વિભાગ (ખોલ-બંધ), પેટા ફોલ્ડર = કાર્ડ */
+function mqFolderGroupedHTML(items){
+  const tops = {}, topOrder = [];
+  items.forEach(it=>{
+    const t = it.t, chain = mqFolderChain(t.folderId);
     const topId = chain[0] ? chain[0].id : '_none';
     const subId = chain[1] ? chain[1].id : '_direct';
     if(!tops[topId]){ tops[topId] = {name: chain[0]?chain[0].name:'', subs:{}, subOrder:[]}; topOrder.push(topId); }
     const T = tops[topId];
     if(!T.subs[subId]){ T.subs[subId] = {name: chain[1]?chain[1].name:(chain[0]?'':'MCQ ટેસ્ટ'), items:[]}; T.subOrder.push(subId); }
-    T.subs[subId].items.push({r, t, rest: chain.slice(2).map(f=>f.name).join(' › ')});
+    T.subs[subId].items.push(Object.assign({}, it, {rest: chain.slice(2).map(f=>f.name).join(' › ')}));
   });
   const card = (S)=>{
     S.items.sort((a,b)=>a.t.name.localeCompare(b.t.name,'gu',{numeric:true}));
-    const pend = S.items.filter(x=>x.r.status==='pending').map(x=>x.r.id);
+    const pend = S.items.filter(x=>x.pendId).map(x=>x.pendId);
     return `<div class="card">
       ${S.name||pend.length>1?`<div class="item item-static"><b>${esc(S.name)}</b>${pend.length>1?`<button class="btn btn-sm btn-primary" onclick="mqCompleteMany('${pend.join(',')}')">✓ બધા પૂર્ણ કરો</button>`:''}</div>`:''}
-      ${S.items.map(x=>`<div class="item"><span style="flex:1;min-width:0;" onclick="mqGoToTest('${x.t.id}')"><b>${esc(x.t.name)}</b>${x.rest?` <span class="ink-dim fs-12">${esc(x.rest)}</span>`:''}</span>
-        ${x.r.status==='completed'?'<span class="badge badge-success">✓ પૂર્ણ</span>':`<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); mqCompleteRev('${x.r.id}')">✓</button>`}</div>`).join('')}
+      ${S.items.map(x=>`<div class="item"><span style="flex:1;min-width:0;" onclick="mqGoToTest('${x.t.id}')"><b>${esc(x.t.name)}</b>${x.rest?` <span class="ink-dim fs-12">${esc(x.rest)}</span>`:''}${x.extra||''}</span>${x.right||''}</div>`).join('')}
     </div>`;
   };
-  const body = topOrder.map(topId=>{
+  return topOrder.map(topId=>{
     const T = tops[topId];
     const cards = T.subOrder.map(k=>card(T.subs[k])).join('');
-    if(topId==='_none') return cards;
-    let total=0, done=0; T.subOrder.forEach(k=>T.subs[k].items.forEach(x=>{ total++; if(x.r.status==='completed') done++; }));
-    const badge = done===total ? `<span class="badge badge-success">✓ બધા પૂર્ણ</span>` : (done===0 ? `<span class="badge badge-warning">${total} બાકી</span>` : `<span class="badge badge-warning">${done}/${total} પૂર્ણ</span>`);
+    if(topId==='_none') return `<div class="mt-14">${cards}</div>`;
+    let total=0, pending=0, hasPend=false; T.subOrder.forEach(k=>T.subs[k].items.forEach(x=>{ total++; if(x.pendId) pending++; if('pendId' in x) hasPend=true; }));
+    const badge = !hasPend ? `<span class="badge badge-primary">${total}</span>` : (pending===0 ? `<span class="badge badge-success">✓ બધા પૂર્ણ</span>` : (pending===total ? `<span class="badge badge-warning">${total} બાકી</span>` : `<span class="badge badge-warning">${total-pending}/${total} પૂર્ણ</span>`));
     const wrapId = 'qsecacc_'+topId+'_'+calMode;
     return `<div class="mt-14">${renderAccordionBlock(wrapId, `<span class="ink-dim fw-700 fs-125">📂 ${esc(T.name)}</span>`, badge, cards, isAccordionOpen(wrapId), {headerStyle:'border:none; padding:4px 2px;', bodyStyle:'padding-left:0;'})}</div>`;
   }).join('');
-  return `<div class="ink-dim fw-700 fs-12" style="margin:18px 2px 0;">MCQ ટેસ્ટ રિવિઝન</div>${body}`;
 }
 function openMqPdf(testId){
   const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
