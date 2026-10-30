@@ -109,6 +109,10 @@ a{color:inherit;}
 .book-card{margin-bottom:0;}
 .sub-book-wrap .hero-dots{margin:4px 0 14px;}
 .hero-card.hero-rev{background:linear-gradient(145deg,#6A2C91,#2A1458);}
+.hero-card.hero-quiz{background:linear-gradient(145deg,#0F766E,#073B38);}
+.hero-card.hero-qrev{background:linear-gradient(145deg,#B45309,#5A2A06);}
+[data-theme="dark"] .hero-card.hero-quiz{background:linear-gradient(145deg,#0F766E,#0A0A0A);}
+[data-theme="dark"] .hero-card.hero-qrev{background:linear-gradient(145deg,#9A4708,#0A0A0A);}
 [data-theme="dark"] .hero-card.hero-rev{background:linear-gradient(145deg,#5B2A86,#0A0A0A);}
 .bk-leaf{position:absolute; top:0; bottom:0; width:50%; z-index:3; transform-style:preserve-3d; will-change:transform;}
 .bk-leaf.right{left:50%; transform-origin:left center;}
@@ -697,7 +701,7 @@ function renderDashboard(){
        </div>
      </div>
    </div>`;
-  const heroBookMarkup = bookHTML('hero', [heroCard0, heroCard1]);
+  const heroBookMarkup = bookHTML('hero', [heroCard0, heroCard1].concat(dashboardQuizPages(exam)));
 
   return `
    ${heroBookMarkup}
@@ -716,7 +720,7 @@ function renderDashboard(){
      ${statCard('📘', total-completed, 'બાકી ટોપિક')}
    </div>
 
-   ${dashboardQuizCard()}
+   ${dashboardQuizList()}
 
    ${inProgressTopics.length ? card('ચાલુ ટોપિક 🟡 <span class="ink-dim fw-400">(ટેપ કરી ચેપ્ટર જુઓ)</span>', `<div class="scroll-list-sm">${inProgressTopics.map(t=>dashboardTopicRow(t)).join('')}</div>`) : ''}
 
@@ -2334,7 +2338,7 @@ function calendarDayDetailHTML(dateStr){
     topicCards = renderSectionGroups(groupSubjectIdsBySection(subjectIds), subjectCardHTML, sectionBadgeHTML);
   }
   const qrToday = qrevsForActiveExam().filter(r=>r.dueDate===dateStr);
-  const qrHTML = qrToday.length ? `<div class="card mt-14"><div class="item item-static"><b>🧠 MCQ ટેસ્ટ રિવિઝન</b></div>${qrToday.map(r=>qrevRowHTML(r)).join('')}</div>` : '';
+  const qrHTML = qrevCalendarHTML(qrToday);
   return topicCards + qrHTML;
 }
 function groupStudyLogsByChapter(entries){
@@ -3418,11 +3422,11 @@ function mqGoToTest(testId){
   mockView = 'quiz'; mqFolderId = t.folderId || null; mqSession = null; mqQuery = '';
   showTab('mock');
 }
-function qrevRowHTML(r, showDate){
+function qrevRowHTML(r, showDate, withPath){
   const t = DB.qtests.find(x=>x.id===r.testId); if(!t) return '';
   const path = mqFolderPath(t.folderId).join(' › ');
   const overdue = r.status==='pending' && r.dueDate<todayStr();
-  return `<div class="item"><span style="flex:1;min-width:0;" onclick="mqGoToTest('${t.id}')">🧠 <b>${esc(t.name)}</b>${path?` <span class="ink-dim fs-12">${esc(path)}</span>`:''}${showDate?` <span class="badge ${overdue?'badge-danger':'badge-warning'}">${overdue?formatDate(r.dueDate):'આજે'}</span>`:''}</span>
+  return `<div class="item"><span style="flex:1;min-width:0;" onclick="mqGoToTest('${t.id}')"><b>${esc(t.name)}</b>${(path&&withPath!==false)?` <span class="ink-dim fs-12">${esc(path)}</span>`:''}${showDate?` <span class="badge ${overdue?'badge-danger':'badge-warning'}">${overdue?formatDate(r.dueDate):'આજે'}</span>`:''}</span>
     ${r.status==='completed'?'<span class="badge badge-success">✓ પૂર્ણ</span>':`<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); mqCompleteRev('${r.id}')">✓</button>`}</div>`;
 }
 function mqCompleteRev(id){
@@ -3504,42 +3508,90 @@ function mqFolderBookHTML(f){
   </div>`;
   return `<div class="sub-book-wrap">${bookHTML('qf_'+f.id, [front, back], 'book-card')}</div>`;
 }
-function dashboardQuizCard(){
+function dashboardQuizPages(exam){
   const tests = DB.qtests.filter(t=>t.examId===mqExamId());
-  if(!tests.length) return '';
+  if(!tests.length) return [];
   const attempted = tests.filter(t=>(t.attempts||[]).length);
   const lastPcts = attempted.map(t=>t.attempts[t.attempts.length-1].pct);
   const avg = lastPcts.length ? Math.round(lastPcts.reduce((a,b)=>a+b,0)/lastPcts.length) : 0;
-  const best = lastPcts.length ? Math.max(...lastPcts) : 0;
-  const totalAtt = tests.reduce((a,t)=>a+(t.attempts||[]).length,0);
   const today = todayStr();
   const todayAtt = mqAttemptsOn(today).length;
-  const pct = tests.length ? Math.round(attempted.length/tests.length*100) : 0;
+  const pct = Math.round(attempted.length/tests.length*100);
   const revs = qrevsForActiveExam();
   const rDone = revs.filter(r=>r.status==='completed').length;
   const rPend = revs.filter(r=>r.status==='pending');
   const rOver = rPend.filter(r=>r.dueDate<today).length;
-  const rToday = rPend.filter(r=>r.dueDate===today).length;
-  const rLater = rPend.length - rOver - rToday;
+  const rUp = rPend.length - rOver;
   const rPct = revs.length ? Math.round(rDone/revs.length*100) : 0;
-  const due = rPend.filter(r=>r.dueDate<=today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  const open = `mockView='quiz'; mqFolderId=null; mqSession=null; showTab('mock');`;
-  const head = (p,t)=>`<div style="display:flex; align-items:center; gap:14px;">${miniRingSVG(p)}<div style="flex:1; min-width:0; font-weight:800; font-size:16.5px;">${t}</div>
-      <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="event.stopPropagation(); if(bookClickOK()){ ${open} }">ખોલો →</button></div>`;
-  const box = (n,l,c)=>`<div class="subject-mini-stat"><b${c?` style="color:${c}"`:''}>${n}</b><span>${l}</span></div>`;
-  const grid = h=>`<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">${h}</div>`;
-  const front = `<div class="card" style="margin-bottom:0;">
-    ${head(pct,'🧠 MCQ ટેસ્ટ')}
-    ${grid(box(tests.length,'કુલ ટેસ્ટ')+box(attempted.length,'પૂર્ણ ટેસ્ટ')+box(tests.length-attempted.length,'બાકી ટેસ્ટ')+box(lastPcts.length?avg+'%':'-','સરેરાશ સ્કોર')+box(lastPcts.length?best+'%':'-','સૌથી વધુ સ્કોર')+box(todayAtt,'આજે આપી'))}
-    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">કુલ ${totalAtt} પ્રયાસ · રિવિઝન માટે સ્વાઇપ કરો</div>
-  </div>`;
-  const back = `<div class="card" style="margin-bottom:0;">
-    ${head(rPct,'🔁 ટેસ્ટ રિવિઝન')}
-    ${grid(box(revs.length,'કુલ રિવિઝન')+box(rDone,'પૂર્ણ રિવિઝન')+box(rPend.length,'બાકી રિવિઝન')+box(rOver,'પાછલા',rOver?'#E5484D':'')+box(rToday,'આજના')+box(rLater,'આવનારા'))}
-    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">ટેસ્ટ માટે સ્વાઇપ કરો</div>
-  </div>`;
-  return `<div class="sub-book-wrap">${bookHTML('dashquiz', [front, back], 'book-card')}</div>
-    ${due.length?`<div class="card"><div class="ink-dim fs-12" style="margin:0 0 4px;">આજની / બાકી ટેસ્ટ રિવિઝન (${due.length})</div><div class="scroll-list-sm">${due.map(r=>qrevRowHTML(r,true)).join('')}</div></div>`:''}`;
+  const open = `if(bookClickOK()){ mockView='quiz'; mqFolderId=null; mqSession=null; showTab('mock'); }`;
+  const top = (title)=>`<div class="hero-top"><div><div class="hero-exam-name">${title}</div><div class="hero-exam-date">${esc(exam.name)} · 📅 ${formatDate(exam.date)}</div></div><button class="btn btn-sm" onclick="${open}">ખોલો</button></div>`;
+  const p2 = `<div class="hero-card hero-quiz">${top('🧠 MCQ ટેસ્ટ')}
+     <div class="hero-ring-row">${ringSVG(pct, null, 'ટેસ્ટ')}
+       <div class="hero-ring-stats">
+         <div class="ring-stat"><span>ટેસ્ટ પૂર્ણ</span><b><span class="hero-count" data-target="${attempted.length}">0</span>/${tests.length}</b></div>
+         <div class="ring-stat"><span>સરેરાશ સ્કોર</span><b>${lastPcts.length?avg+'%':'-'}</b></div>
+         <div class="ring-stat"><span>આજે આપી</span><b class="hero-count" data-target="${todayAtt}">0</b></div>
+       </div></div></div>`;
+  const p3 = `<div class="hero-card hero-qrev">${top('🔁 ટેસ્ટ રિવિઝન')}
+     <div class="hero-ring-row">${ringSVG(rPct, null, 'રિવિઝન')}
+       <div class="hero-ring-stats">
+         <div class="ring-stat"><span>રિવિઝન પૂર્ણ</span><b><span class="hero-count" data-target="${rDone}">0</span>/${revs.length}</b></div>
+         <div class="ring-stat"><span>બાકી · પાછલા</span><b class="hero-count" data-target="${rOver}" style="color:${rOver?'#FFB4A8':'#fff'};">0</b></div>
+         <div class="ring-stat"><span>બાકી · આજ/આવનારા</span><b class="hero-count" data-target="${rUp}">0</b></div>
+       </div></div></div>`;
+  return [p2, p3];
+}
+function dashboardQuizList(){
+  const today = todayStr();
+  const due = qrevsForActiveExam().filter(r=>r.status==='pending' && r.dueDate<=today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  if(!due.length) return '';
+  return `<div class="card"><div class="item item-static"><b>MCQ ટેસ્ટ રિવિઝન</b><span class="badge badge-warning">${due.length} બાકી</span></div>
+    <div class="scroll-list-sm">${due.map(r=>qrevRowHTML(r,true,true)).join('')}</div></div>`;
+}
+function mqFolderChain(folderId){
+  const out = []; let cur = folderId, guard = 0;
+  while(cur && guard++<20){ const f = DB.qfolders.find(x=>x.id===cur); if(!f) break; out.unshift(f); cur = f.parentId; }
+  return out;
+}
+function mqCompleteMany(ids){
+  if(!confirm('આ બધા ટેસ્ટ રિવિઝન પૂર્ણ કરવા છે?')) return;
+  const set = new Set(ids.split(','));
+  (DB.qrevs||[]).forEach(r=>{ if(set.has(r.id) && r.status==='pending'){ r.status='completed'; r.completedDate=todayStr(); } });
+  save(); renderMain(); toast('રિવિઝન પૂર્ણ ✅');
+}
+/* કેલેન્ડરમાં MCQ ટેસ્ટ રિવિઝન — ફોલ્ડર મુજબ (ટોપ ફોલ્ડર = વિભાગ, પેટા ફોલ્ડર = કાર્ડ) */
+function qrevCalendarHTML(revs){
+  if(!revs.length) return '';
+  const tops = {}, topOrder = [];
+  revs.forEach(r=>{
+    const t = DB.qtests.find(x=>x.id===r.testId); if(!t) return;
+    const chain = mqFolderChain(t.folderId);
+    const topId = chain[0] ? chain[0].id : '_none';
+    const subId = chain[1] ? chain[1].id : '_direct';
+    if(!tops[topId]){ tops[topId] = {name: chain[0]?chain[0].name:'', subs:{}, subOrder:[]}; topOrder.push(topId); }
+    const T = tops[topId];
+    if(!T.subs[subId]){ T.subs[subId] = {name: chain[1]?chain[1].name:(chain[0]?'':'MCQ ટેસ્ટ'), items:[]}; T.subOrder.push(subId); }
+    T.subs[subId].items.push({r, t, rest: chain.slice(2).map(f=>f.name).join(' › ')});
+  });
+  const card = (S)=>{
+    S.items.sort((a,b)=>a.t.name.localeCompare(b.t.name,'gu',{numeric:true}));
+    const pend = S.items.filter(x=>x.r.status==='pending').map(x=>x.r.id);
+    return `<div class="card">
+      ${S.name||pend.length>1?`<div class="item item-static"><b>${esc(S.name)}</b>${pend.length>1?`<button class="btn btn-sm btn-primary" onclick="mqCompleteMany('${pend.join(',')}')">✓ બધા પૂર્ણ કરો</button>`:''}</div>`:''}
+      ${S.items.map(x=>`<div class="item"><span style="flex:1;min-width:0;" onclick="mqGoToTest('${x.t.id}')"><b>${esc(x.t.name)}</b>${x.rest?` <span class="ink-dim fs-12">${esc(x.rest)}</span>`:''}</span>
+        ${x.r.status==='completed'?'<span class="badge badge-success">✓ પૂર્ણ</span>':`<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); mqCompleteRev('${x.r.id}')">✓</button>`}</div>`).join('')}
+    </div>`;
+  };
+  const body = topOrder.map(topId=>{
+    const T = tops[topId];
+    const cards = T.subOrder.map(k=>card(T.subs[k])).join('');
+    if(topId==='_none') return cards;
+    let total=0, done=0; T.subOrder.forEach(k=>T.subs[k].items.forEach(x=>{ total++; if(x.r.status==='completed') done++; }));
+    const badge = done===total ? `<span class="badge badge-success">✓ બધા પૂર્ણ</span>` : (done===0 ? `<span class="badge badge-warning">${total} બાકી</span>` : `<span class="badge badge-warning">${done}/${total} પૂર્ણ</span>`);
+    const wrapId = 'qsecacc_'+topId+'_'+calMode;
+    return `<div class="mt-14">${renderAccordionBlock(wrapId, `<span class="ink-dim fw-700 fs-125">📂 ${esc(T.name)}</span>`, badge, cards, isAccordionOpen(wrapId), {headerStyle:'border:none; padding:4px 2px;', bodyStyle:'padding-left:0;'})}</div>`;
+  }).join('');
+  return `<div class="ink-dim fw-700 fs-12" style="margin:18px 2px 0;">MCQ ટેસ્ટ રિવિઝન</div>${body}`;
 }
 function openMqPdf(testId){
   const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
