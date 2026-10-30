@@ -371,6 +371,7 @@ let sectionDetailId = null;
 let lastMainTab = 'dashboard';
 let highlightTopicId = null;
 let highlightRevisionId = null;
+let highlightQTestId = null;
 let calSelectedDate = null;
 let calMonth = new Date().getMonth();
 let calYear = new Date().getFullYear();
@@ -3042,7 +3043,8 @@ function mqTestCardHTML(t, showPath){
   const best = (t.attempts||[]).reduce((a,x)=>Math.max(a,x.pct),0);
   const hasKey = t.questions.some(q=>q.ans!=null);
   const path = showPath ? mqFolderPath(t.folderId).join(' › ') : '';
-  return `<div class="card" data-search="${esc(t.name.toLowerCase())}">
+  const hl = (highlightQTestId===t.id) ? ' row-highlight' : '';
+  return `<div class="card${hl}" id="qtest-${t.id}" data-search="${esc(t.name.toLowerCase())}">
     <div class="mq-row"><span class="mq-ico">📄</span>
       <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">${esc(t.name)}</div>
       ${path?`<div class="ink-dim" style="font-size:12px;">📁 ${esc(path)}</div>`:''}
@@ -3441,6 +3443,7 @@ function mqAttemptsCardHTML(dateStr){
 function mqGoToTest(testId){
   const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
   mockView = 'quiz'; mqFolderId = t.folderId || null; mqSession = null; mqQuery = '';
+  highlightQTestId = t.id;
   showTab('mock');
 }
 function qrevRowHTML(r, showDate, withPath){
@@ -3809,6 +3812,14 @@ function afterRender(tab){
         if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
       });
     }
+  }
+  if(tab==='mock' && highlightQTestId){
+    const targetId = highlightQTestId;
+    highlightQTestId = null;
+    requestAnimationFrame(()=>{
+      const el = document.getElementById('qtest-'+targetId);
+      if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+    });
   }
   if(tab==='calendar' && highlightRevisionId){
     const targetId = highlightRevisionId;
