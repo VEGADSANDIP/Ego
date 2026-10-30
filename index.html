@@ -4042,10 +4042,16 @@ function checkNotifications(){
 function initHideOnScroll(){
   const main = document.getElementById('main'); if(!main) return;
   const tb = document.querySelector('.topbar');
-  let last = 0, tbHidden = false;
+  let last = 0, tbHidden = false, lockUntil = 0;
   function setTopbar(hide){
     if(!tb || hide===tbHidden) return;
+    if(hide){
+      /* હેડર છુપાતાં સ્ક્રીન મોટી થાય; જો સામગ્રી ટૂંકી હોય તો scroll ગોઠવાઈ જઈને ઝબકારો થાય — એટલે ત્યારે છુપાવવું નહીં */
+      const room = main.scrollHeight - (main.clientHeight + tb.offsetHeight) - main.scrollTop;
+      if(room < 12) return;
+    }
     tbHidden = hide;
+    lockUntil = performance.now() + 450;
     tb.style.marginTop = hide ? (-tb.offsetHeight)+'px' : '0px';
     tb.style.opacity = hide ? '0' : '1';
   }
@@ -4080,7 +4086,7 @@ function initHideOnScroll(){
       el.style.pointerEvents = tr < -h*0.5 ? 'none' : '';
       if(tr < -1) allShown = false;
     });
-    if(typing) return;
+    if(typing || performance.now() < lockUntil) return;
     if(dy > 2 && y > 60) setTopbar(true);
     else if(dy < -2 && allShown) setTopbar(false);
   }, {passive:true});
