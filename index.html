@@ -302,7 +302,7 @@ input:checked + .slider:before{transform:translateX(19px);}
   #printArea .pqs{column-count:2; column-gap:22pt; column-rule:0.5pt solid #bbb;}
   #printArea .pq b.qn{margin-right:4pt;}
   #printArea .po{margin:1pt 0 0 14pt;}
-  #printArea .pok{font-weight:800; text-decoration:underline;}
+  #printArea .pok{font-weight:800; color:#D00000 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
   #printArea .ph{text-align:center; border-bottom:1.5pt solid #000; padding-bottom:6pt; margin-bottom:10pt;}
   #printArea .ph h1{font-size:18pt; margin:0 0 4pt;}
   #printArea .pm{display:flex; justify-content:space-between; font-size:12pt; margin-bottom:12pt;}
@@ -3455,7 +3455,22 @@ function openQQuestionForm(qi){
     <div class="field"><label>પ્રશ્ન</label><textarea class="mq-ta" style="min-height:90px;" id="f_qq">${esc(q.q)}</textarea></div>
     ${MQ_LET.map((l,k)=>`<div class="field"><label>વિકલ્પ ${l}</label><input type="text" id="f_qo${k}" value="${esc(q.opts[k])}"></div>`).join('')}
     <div class="field"><label>સાચો જવાબ</label><select id="f_qa"><option value="">— નથી —</option>${MQ_LET.map((l,k)=>`<option value="${k}" ${q.ans===k?'selected':''}>${l}</option>`).join('')}</select></div>
-    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="saveQQuestion(${qi})">સેવ કરો</button></div>`);
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="saveQQuestion(${qi})">સેવ કરો</button>
+      <button class="btn btn-block" style="margin-top:8px; background:color-mix(in srgb, var(--danger) 16%, transparent); color:var(--danger); font-weight:700;" onclick="deleteQQuestion(${qi})">🗑 આ પ્રશ્ન ડિલીટ કરો</button></div>`);
+}
+function deleteQQuestion(qi){
+  const S = mqSession; if(!S) return;
+  const t = mqTest(); if(!t) return;
+  const q = t.questions[qi]; if(!q) return;
+  if(!confirm('આ પ્રશ્ન કાયમ માટે ડિલીટ કરવો છે? (પ્રશ્ન '+(qi+1)+')')) return;
+  const owner = DB.qtests.find(x=>x.questions.includes(q));
+  if(!owner){ toast('પ્રશ્ન મળ્યો નહીં','error'); return; }
+  owner.questions.splice(owner.questions.indexOf(q),1);
+  /* સત્રની યાદી ગોઠવો: ડિલીટ થયેલા પછીના નંબર એક ઓછા */
+  S.idx = S.idx.filter(i=>i!==qi).map(i=>i>qi?i-1:i);
+  const np = {}; Object.keys(S.perm||{}).forEach(k=>{ k=+k; if(k===qi) return; np[k>qi?k-1:k] = S.perm[k]; }); S.perm = np;
+  save(); closeSheet(); const y=window.scrollY; renderMain(); window.scrollTo(0,y);
+  toast('પ્રશ્ન ડિલીટ થયો 🗑');
 }
 function saveQQuestion(qi){
   const q = mqTest().questions[qi];
@@ -3692,7 +3707,7 @@ function mqPrintPdf(testId){
   const withName = !solved && !!(document.getElementById('pdfName')||{}).checked;
   closeSheet();
   const L = MQ_LET;
-  const qs = t.questions.map((q,i)=>`<div class="pq"><div><b class="qn">${i+1}.</b>${esc(q.q)}</div>${(q.opts||[]).map((o,k)=>o?(solved && q.ans===k?`<div class="po pok">(${L[k]}) ${esc(o)} &nbsp;✔</div>`:`<div class="po">(${L[k]}) ${esc(o)}</div>`):'').join('')}</div>`).join('');
+  const qs = t.questions.map((q,i)=>`<div class="pq"><div><b class="qn">${i+1}.</b>${esc(q.q)}</div>${(q.opts||[]).map((o,k)=>o?(solved && q.ans===k?`<div class="po pok">(${L[k]}) ${esc(o)}</div>`:`<div class="po">(${L[k]}) ${esc(o)}</div>`):'').join('')}</div>`).join('');
   const key = withKey ? `<div class="pk"><div class="ph"><h1>જવાબ ચાવી</h1><div>${esc(t.name)}</div></div><div class="pkg">${t.questions.map((q,i)=>`<div><b>${i+1}.</b> ${q.ans!=null?L[q.ans]:'-'}</div>`).join('')}</div></div>` : '';
   let pa = document.getElementById('printArea');
   if(!pa){ pa = document.createElement('div'); pa.id='printArea'; document.body.appendChild(pa); }
