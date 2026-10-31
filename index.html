@@ -302,6 +302,7 @@ input:checked + .slider:before{transform:translateX(19px);}
   #printArea .pqs{column-count:2; column-gap:22pt; column-rule:0.5pt solid #bbb;}
   #printArea .pq b.qn{margin-right:4pt;}
   #printArea .po{margin:1pt 0 0 14pt;}
+  #printArea .pok{font-weight:800; text-decoration:underline;}
   #printArea .ph{text-align:center; border-bottom:1.5pt solid #000; padding-bottom:6pt; margin-bottom:10pt;}
   #printArea .ph h1{font-size:18pt; margin:0 0 4pt;}
   #printArea .pm{display:flex; justify-content:space-between; font-size:12pt; margin-bottom:12pt;}
@@ -3667,25 +3668,36 @@ function openMqPdf(testId){
   openSheet(`
     <div class="sheet-title">📄 PDF બનાવો</div>
     <div style="font-weight:800; margin-bottom:6px;">${esc(t.name)}</div>
-    <div class="ink-dim fs-12 mb-6">${t.questions.length} પ્રશ્નો · પ્રશ્નપત્ર જવાબ વગર બનશે.</div>
-    <label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="pdfKey" ${hasKey?'checked':''} ${hasKey?'':'disabled'}> છેલ્લા પાને જવાબ ચાવી ઉમેરો${hasKey?'':' (ચાવી નથી)'}</label>
-    <label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="pdfName" checked> નામ / તારીખ / ગુણ લાઈન</label>
+    <div class="ink-dim fs-12 mb-6">${t.questions.length} પ્રશ્નો</div>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;"><input type="radio" name="pdfType" value="paper" checked onchange="mqPdfTypeChange()" style="margin-top:4px;"> <span><b>પ્રશ્નપત્ર</b> — જવાબ વગર<br><span class="ink-dim fs-12">વિદ્યાર્થી માટે ખાલી પેપર</span></span></label>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;"><input type="radio" name="pdfType" value="solved" onchange="mqPdfTypeChange()" ${hasKey?'':'disabled'} style="margin-top:4px;"> <span><b>જવાબ સાથે (ટિક)</b> — સાચા જવાબ ✓ ટિક સાથે<br><span class="ink-dim fs-12">${hasKey?'દરેક પ્રશ્નમાં સાચો વિકલ્પ ટિક અને બોલ્ડમાં':'જવાબ ચાવી નથી'}</span></span></label>
+    <div id="pdfPaperOpts">
+      <label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="pdfKey" ${hasKey?'checked':''} ${hasKey?'':'disabled'}> છેલ્લા પાને જવાબ ચાવી ઉમેરો${hasKey?'':' (ચાવી નથી)'}</label>
+      <label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="pdfName" checked> નામ / તારીખ / ગુણ લાઈન</label>
+    </div>
     <div class="ink-dim fs-12">આગળ ખુલતી પ્રિન્ટ વિન્ડોમાં "Save as PDF" પસંદ કરો, પછી PDF શેર કરી શકાશે.</div>
     <div class="sheet-actions" style="margin-top:14px;"><button class="btn btn-primary btn-block" onclick="mqPrintPdf('${t.id}')">📄 PDF તૈયાર કરો</button></div>
   `);
 }
+function mqPdfTypeChange(){
+  const r = document.querySelector('input[name=pdfType]:checked');
+  const box = document.getElementById('pdfPaperOpts');
+  if(box) box.style.display = (r && r.value==='solved') ? 'none' : '';
+}
 function mqPrintPdf(testId){
   const t = mqGetTest(testId); if(!t) return;
-  const withKey = !!(document.getElementById('pdfKey')||{}).checked;
-  const withName = !!(document.getElementById('pdfName')||{}).checked;
+  const typeEl = document.querySelector('input[name=pdfType]:checked');
+  const solved = !!(typeEl && typeEl.value==='solved');
+  const withKey = !solved && !!(document.getElementById('pdfKey')||{}).checked;
+  const withName = !solved && !!(document.getElementById('pdfName')||{}).checked;
   closeSheet();
   const L = MQ_LET;
-  const qs = t.questions.map((q,i)=>`<div class="pq"><div><b class="qn">${i+1}.</b>${esc(q.q)}</div>${(q.opts||[]).map((o,k)=>o?`<div class="po">(${L[k]}) ${esc(o)}</div>`:'').join('')}</div>`).join('');
+  const qs = t.questions.map((q,i)=>`<div class="pq"><div><b class="qn">${i+1}.</b>${esc(q.q)}</div>${(q.opts||[]).map((o,k)=>o?(solved && q.ans===k?`<div class="po pok">(${L[k]}) ${esc(o)} &nbsp;✔</div>`:`<div class="po">(${L[k]}) ${esc(o)}</div>`):'').join('')}</div>`).join('');
   const key = withKey ? `<div class="pk"><div class="ph"><h1>જવાબ ચાવી</h1><div>${esc(t.name)}</div></div><div class="pkg">${t.questions.map((q,i)=>`<div><b>${i+1}.</b> ${q.ans!=null?L[q.ans]:'-'}</div>`).join('')}</div></div>` : '';
   let pa = document.getElementById('printArea');
   if(!pa){ pa = document.createElement('div'); pa.id='printArea'; document.body.appendChild(pa); }
-  pa.innerHTML = `<div class="ph"><h1>${esc(t.name)}</h1><div>કુલ પ્રશ્નો: ${t.questions.length}</div></div>${withName?`<div class="pm"><span>નામ: ____________________</span><span>તારીખ: __________</span><span>ગુણ: ____ / ${t.questions.length}</span></div>`:''}<div class="pqs">${qs}</div>${key}`;
-  const oldTitle = document.title; document.title = t.name;
+  pa.innerHTML = `<div class="ph"><h1>${esc(t.name)}${solved?' — જવાબ સાથે':''}</h1><div>કુલ પ્રશ્નો: ${t.questions.length}</div></div>${withName?`<div class="pm"><span>નામ: ____________________</span><span>તારીખ: __________</span><span>ગુણ: ____ / ${t.questions.length}</span></div>`:''}<div class="pqs">${qs}</div>${key}`;
+  const oldTitle = document.title; document.title = t.name + (solved?' - જવાબ સાથે':'');
   const done = ()=>{ document.title = oldTitle; pa.innerHTML=''; window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done);
   setTimeout(()=>window.print(), 150);
