@@ -3060,6 +3060,24 @@ function mqTestCardHTML(t, showPath){
     </div>
     ${mqRevLineHTML(t)}</div>`;
 }
+function mqWholeFolderCardHTML(q){
+  if(q || !mqFolderId) return '';
+  const deep = mqFolderTestsDeep(mqFolderId);
+  if(!deep.length) return '';
+  const nQ = deep.reduce((a,t)=>a+t.questions.length,0);
+  const id = 'folder:'+mqFolderId;
+  return `<div class="card" style="border:1px dashed var(--primary);">
+    <div class="mq-row"><span class="mq-ico">📚</span>
+      <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">આખા ફોલ્ડરની ટેસ્ટ એક સાથે</div>
+      <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${deep.length} ટેસ્ટ · ${nQ} પ્રશ્નો (પેટા ફોલ્ડર સહિત)</div></div></div>
+    <div class="mq-actions">
+      <button class="btn btn-primary btn-sm" onclick="openMqSet('${id}','test')">⏱ ટેસ્ટ</button>
+      <button class="btn btn-secondary btn-sm" onclick="openMqSet('${id}','practice')">✍ પ્રેક્ટિસ</button>
+      <button class="btn btn-secondary btn-sm" onclick="mqStart('${id}','read')">📖 વાંચન</button>
+      <button class="btn btn-secondary btn-sm" onclick="openMqPdf('${id}')">📄 PDF</button>
+    </div>
+  </div>`;
+}
 function mqListHTML(){
   const q = (mqQuery||'').trim().toLowerCase();
   const mode = getQSort();
@@ -3077,7 +3095,7 @@ function mqListHTML(){
     const cur = DB.qfolders.find(f=>f.id===mqFolderId);
     return emptyState('🧠', cur?'આ ફોલ્ડર ખાલી છે':'કોઈ MCQ ટેસ્ટ નથી','ફોલ્ડર બનાવો અને PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)');
   }
-  return folders.map(f=>mqFolderBookHTML(f)).join('') + tests.map(t=>mqTestCardHTML(t, !!q)).join('');
+  return mqWholeFolderCardHTML(q) + folders.map(f=>mqFolderBookHTML(f)).join('') + tests.map(t=>mqTestCardHTML(t, !!q)).join('');
 }
 function renderMockQuiz(seg){
   const exam = getActiveExam();
@@ -3219,7 +3237,7 @@ function mqBuildSet(t, idx, setCode){
   return {idx: order, perm};
 }
 function openMqSet(testId, mode){
-  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  const t = mqGetTest(testId); if(!t) return;
   if(mode==='practice' && !t.questions.some(q=>q.ans!=null)){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
   mqSetChoice = 'A';
   openSheet(`
@@ -3239,7 +3257,7 @@ function mqPickSet(c){
   });
 }
 function mqStart(testId, mode, onlyIdx, setCode){
-  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  const t = mqGetTest(testId); if(!t) return;
   if(mode!=='read' && !t.questions.some(q=>q.ans!=null) && mode==='practice'){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
   const base = onlyIdx || t.questions.map((_,i)=>i);
   const sc = (mode==='read') ? 'A' : (setCode||'A');
@@ -3263,7 +3281,17 @@ function mqExit(force){
   }
   mqSession = null; clearInterval(mqTimerHandle); renderMain(); mqScrollTop();
 }
-function mqTest(){ return DB.qtests.find(x=>x.id===mqSession.testId); }
+function mqGetTest(id){
+  if(typeof id==='string' && id.startsWith('folder:')){
+    const fid = id.slice(7);
+    const f = DB.qfolders.find(x=>x.id===fid); if(!f) return null;
+    const tests = mqFolderTestsDeep(fid).slice().sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true}));
+    const questions = []; tests.forEach(t=>t.questions.forEach(q=>questions.push(q)));
+    return {id, name:f.name, questions, attempts:[], virtual:true, folderId:fid, nTests:tests.length};
+  }
+  return DB.qtests.find(x=>x.id===id);
+}
+function mqTest(){ return mqGetTest(mqSession.testId); }
 function renderMqSession(){
   const S = mqSession;
   if(S.mode==='read') return mqRenderRead();
@@ -3343,7 +3371,7 @@ function mqFinish(){
   const timeSec = Math.floor((Date.now()-S.start)/1000);
   S.result = {correct, wrong, skipped, total, pct: total?Math.round(correct/total*100):0, timeSec};
   S.finished = true; clearInterval(mqTimerHandle);
-  if(S.idx.length===t.questions.length){
+  if(!t.virtual && S.idx.length===t.questions.length){
     t.attempts = t.attempts||[];
     t.attempts.push({id:uid(), date:todayStr(), mode:S.mode, set:S.setCode||'A', answers:S.answers, ...S.result});
     const due = (DB.qrevs||[]).filter(r=>r.testId===t.id && r.status==='pending' && r.dueDate<=todayStr()).sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
@@ -3441,7 +3469,7 @@ function mqAttemptsCardHTML(dateStr){
   return `<div class="card mt-14"><div class="item item-static"><b>🧠 MCQ ટેસ્ટ આપી</b></div>${list.map(({t,a})=>`<div class="item" onclick="mqGoToTest('${t.id}')"><span style="flex:1;">${esc(t.name)} <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':'ટેસ્ટ'}</span></span><span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span></div>`).join('')}</div>`;
 }
 function mqGoToTest(testId){
-  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  const t = mqGetTest(testId); if(!t) return;
   mockView = 'quiz'; mqFolderId = t.folderId || null; mqSession = null; mqQuery = '';
   highlightQTestId = t.id;
   showTab('mock');
@@ -3468,7 +3496,7 @@ function mqRevLineHTML(t){
     ${next?`<span class="badge ${overdue?'badge-danger':'badge-warning'}">${overdue?'મોડું · ':'આગામી · '}${formatDateShort(next.dueDate)}</span>`:''}</div>`;
 }
 function openQTestRevisionSheet(testId){
-  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  const t = mqGetTest(testId); if(!t) return;
   revisionPickerEntity = {entityType:'qtest', id:testId, mode:'manage'};
   const existing = (DB.qrevs||[]).filter(r=>r.testId===testId);
   revisionPickerDates = new Set(existing.filter(r=>r.status==='pending').map(r=>r.dueDate));
@@ -3624,7 +3652,7 @@ function mqFolderGroupedHTML(items){
   }).join('');
 }
 function openMqPdf(testId){
-  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  const t = mqGetTest(testId); if(!t) return;
   const hasKey = t.questions.some(q=>q.ans!=null);
   openSheet(`
     <div class="sheet-title">📄 PDF બનાવો</div>
@@ -3637,7 +3665,7 @@ function openMqPdf(testId){
   `);
 }
 function mqPrintPdf(testId){
-  const t = DB.qtests.find(x=>x.id===testId); if(!t) return;
+  const t = mqGetTest(testId); if(!t) return;
   const withKey = !!(document.getElementById('pdfKey')||{}).checked;
   const withName = !!(document.getElementById('pdfName')||{}).checked;
   closeSheet();
