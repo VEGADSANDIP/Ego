@@ -3455,8 +3455,10 @@ function openQQuestionForm(qi){
     <div class="field"><label>પ્રશ્ન</label><textarea class="mq-ta" style="min-height:90px;" id="f_qq">${esc(q.q)}</textarea></div>
     ${MQ_LET.map((l,k)=>`<div class="field"><label>વિકલ્પ ${l}</label><input type="text" id="f_qo${k}" value="${esc(q.opts[k])}"></div>`).join('')}
     <div class="field"><label>સાચો જવાબ</label><select id="f_qa"><option value="">— નથી —</option>${MQ_LET.map((l,k)=>`<option value="${k}" ${q.ans===k?'selected':''}>${l}</option>`).join('')}</select></div>
-    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="saveQQuestion(${qi})">સેવ કરો</button>
-      <button class="btn btn-block" style="margin-top:8px; background:color-mix(in srgb, var(--danger) 16%, transparent); color:var(--danger); font-weight:700;" onclick="deleteQQuestion(${qi})">🗑 આ પ્રશ્ન ડિલીટ કરો</button></div>`);
+    <div class="sheet-actions">
+      <button class="btn btn-danger" onclick="deleteQQuestion(${qi})">ડિલીટ</button>
+      <button class="btn btn-primary btn-block" onclick="saveQQuestion(${qi})">સેવ કરો</button>
+    </div>`);
 }
 function deleteQQuestion(qi){
   const S = mqSession; if(!S) return;
