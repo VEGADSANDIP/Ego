@@ -3236,16 +3236,25 @@ function mqBuildSet(t, idx, setCode){
   });
   return {idx: order, perm};
 }
+function mqSetHolder(id){
+  if(typeof id==='string' && id.startsWith('folder:')) return DB.qfolders.find(x=>x.id===id.slice(7));
+  return DB.qtests.find(x=>x.id===id);
+}
 function openMqSet(testId, mode){
   const t = mqGetTest(testId); if(!t) return;
   if(mode==='practice' && !t.questions.some(q=>q.ans!=null)){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
   mqSetChoice = 'A';
+  const hold = mqSetHolder(testId);
+  const ls = (hold && hold.lastSet) || {};
+  const lastNow = ls[mode] || null;
+  const lastLine = (ls.test||ls.practice) ? `છેલ્લે આપેલ સેટ: ${ls.test?'⏱ ટેસ્ટ → સેટ '+ls.test:''}${ls.test&&ls.practice?' · ':''}${ls.practice?'✍ પ્રેક્ટિસ → સેટ '+ls.practice:''}` : 'આ ટેસ્ટ હજી સેટ સાથે આપી નથી.';
   openSheet(`
     <div class="sheet-title">${mode==='test'?'⏱ ટેસ્ટ':'✍ પ્રેક્ટિસ'} — પેપર સેટ પસંદ કરો</div>
     <div style="font-weight:800; margin-bottom:4px;">${esc(t.name)}</div>
     <div class="ink-dim fs-12 mb-6">સેટ A = મૂળ પેપર. B થી G માં પ્રશ્નો અને વિકલ્પોનો ક્રમ બદલાયેલો હશે, જેથી દર વખતે પેપર નવું લાગે.</div>
+    <div class="ink-dim fs-12" style="margin-top:6px;">${lastLine}</div>
     <div id="mqSetChips" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0;">
-      ${MQ_SETS.map(c=>`<button class="btn ${c==='A'?'btn-primary':'btn-secondary'}" data-set="${c}" onclick="mqPickSet('${c}')">${c==='A'?'A · મૂળ':'સેટ '+c}</button>`).join('')}
+      ${MQ_SETS.map(c=>`<button class="btn ${c==='A'?'btn-primary':'btn-secondary'}" data-set="${c}" onclick="mqPickSet('${c}')" style="flex-direction:column; gap:1px; line-height:1.2;">${c==='A'?'A · મૂળ':'સેટ '+c}${lastNow===c?'<span style="display:block; white-space:nowrap; font-size:10.5px; font-weight:700; color:var(--success);">✓ છેલ્લે</span>':''}</button>`).join('')}
     </div>
     <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="closeSheet(); mqStart('${t.id}','${mode}',null,mqSetChoice)">શરૂ કરો ▶</button></div>`);
 }
@@ -3261,6 +3270,7 @@ function mqStart(testId, mode, onlyIdx, setCode){
   if(mode!=='read' && !t.questions.some(q=>q.ans!=null) && mode==='practice'){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
   const base = onlyIdx || t.questions.map((_,i)=>i);
   const sc = (mode==='read') ? 'A' : (setCode||'A');
+  if(mode!=='read'){ const h = mqSetHolder(testId); if(h){ h.lastSet = Object.assign({}, h.lastSet, {[mode]: sc}); save(); } }
   const built = mqBuildSet(t, base, sc);
   mqSession = {testId, mode, idx:built.idx, perm:built.perm, setCode:sc, pos:0, answers:{}, start:Date.now(), finished:false, showAns:true, onlyStar:false};
   renderMain(); mqScrollTop(); mqStartTimer();
