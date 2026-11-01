@@ -585,7 +585,11 @@ function showTab(id){
 }
 function renderMain(){
   const map = {dashboard:renderDashboard, exams:renderExams, mock:renderMock, calendar:renderCalendar, settings:renderSettings, timetable:renderTimetable};
-  document.getElementById('main').innerHTML = map[currentTab]();
+  const mainEl = document.getElementById('main');
+  mainEl.innerHTML = map[currentTab]();
+  /* બીજા પેજ/સ્ક્રીન પર જતાં સ્ક્રોલ ઉપરથી શરૂ થાય; એ જ સ્ક્રીનમાં ફરી દોરતાં જગ્યા જળવાય */
+  const viewKey = [currentTab, topicDetailId, sectionDetailId, mockView, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0].join('|');
+  if(viewKey !== window.__lastViewKey){ window.__lastViewKey = viewKey; mainEl.scrollTop = 0; }
   afterRender(currentTab);
   const _m=document.getElementById('main'); if(_m.scrollTop<=20 && window.__hdrShow) window.__hdrShow();
 }
