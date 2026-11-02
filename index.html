@@ -361,7 +361,7 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-1';
+const APP_VERSION = '2026.11.03-2';
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -464,6 +464,7 @@ let calMonth = new Date().getMonth();
 let calYear = new Date().getFullYear();
 let calMode = 'study';
 let calKind = 'topic';
+let dashStatTab = 'study';
 let calGridExpanded = false;
 let revCalSelectedDate = null;
 
@@ -895,12 +896,12 @@ function renderDashboard(){
 
    ${dashboardNowCard()}
 
-   <div class="stat-grid">
+   ${dashStatsHTML(`   <div class="stat-grid">
      ${statCard('📖', topicsDoneTodayCount, 'આજે અભ્યાસ ટોપિક', "calSelectedDate=todayStr(); showTab('calendar');", '')}
      ${statCard('🔁', `${revisionsDoneTodayCount}/${revisionsDueToday.length}`, 'આજની રિવિઝન', "calSelectedDate=todayStr(); showTab('calendar'); calMode='revision'; renderMain();", '')}
      ${statCard('⏰', overdueRevisions, 'ઓવરડ્યુ રિવિઝન')}
      ${statCard('📘', total-completed, 'બાકી ટોપિક')}
-   </div>
+   </div>`)}
 
    ${dashboardQuizList()}
 
@@ -3540,7 +3541,7 @@ function dashboardQuizPages(exam){
   const lastPcts = attempted.map(t=>t.attempts[t.attempts.length-1].pct);
   const avg = lastPcts.length ? Math.round(lastPcts.reduce((a,b)=>a+b,0)/lastPcts.length) : 0;
   const today = todayStr();
-  const todayAtt = mqAttemptsOn(today).length;
+  const mainFolders = mqFolders(null).length;
   const pct = Math.round(attempted.length/tests.length*100);
   const revs = qrevsForActiveExam();
   const rDone = revs.filter(r=>r.status==='completed').length;
@@ -3555,7 +3556,7 @@ function dashboardQuizPages(exam){
        <div class="hero-ring-stats">
          <div class="ring-stat"><span>ટેસ્ટ પૂર્ણ</span><b><span class="hero-count" data-target="${attempted.length}">0</span>/${tests.length}</b></div>
          <div class="ring-stat"><span>સરેરાશ સ્કોર</span><b>${lastPcts.length?avg+'%':'-'}</b></div>
-         <div class="ring-stat"><span>આજે આપી</span><b class="hero-count" data-target="${todayAtt}">0</b></div>
+         <div class="ring-stat"><span>કુલ ફોલ્ડર</span><b class="hero-count" data-target="${mainFolders}">0</b></div>
        </div></div></div>`;
   const p3 = `<div class="hero-card hero-qrev">${top('🔁 ટેસ્ટ રિવિઝન')}
      <div class="hero-ring-row">${ringSVG(rPct, null, 'રિવિઝન')}
@@ -3565,6 +3566,28 @@ function dashboardQuizPages(exam){
          <div class="ring-stat"><span>બાકી · આજ/આવનારા</span><b class="hero-count" data-target="${rUp}">0</b></div>
        </div></div></div>`;
   return [p2, p3];
+}
+function dashMcqStats(){
+  const today = todayStr();
+  const tests = DB.qtests.filter(t=>t.examId===mqExamId());
+  const revs = qrevsForActiveExam();
+  const dueToday = revs.filter(r=>r.dueDate===today);
+  const doneToday = dueToday.filter(r=>r.status==='completed').length;
+  const overdue = revs.filter(r=>r.status==='pending' && r.dueDate<today).length;
+  const left = tests.filter(t=>!(t.attempts||[]).length).length;
+  return `<div class="stat-grid">
+     ${statCard('🧠', mqAttemptsOn(today).length, 'આજે આપેલી ટેસ્ટ', "calSelectedDate=todayStr(); showTab('calendar'); calKind='mcq'; calMode='study'; renderMain();", '')}
+     ${statCard('🔁', `${doneToday}/${dueToday.length}`, 'આજની રિવિઝન ટેસ્ટ', "calSelectedDate=todayStr(); showTab('calendar'); calKind='mcq'; calMode='revision'; renderMain();", '')}
+     ${statCard('⏰', overdue, 'ઓવરડ્યુ રિવિઝન ટેસ્ટ')}
+     ${statCard('📝', left, 'બાકી ટેસ્ટ', "mqFolderId=null; mqSession=null; showTab('mock');", '')}
+   </div>`;
+}
+function dashStatsHTML(studyGrid){
+  return `<div class="seg">
+     <button class="${dashStatTab==='study'?'on':''}" onclick="dashStatTab='study'; renderMain();">📖 અભ્યાસ</button>
+     <button class="${dashStatTab==='mcq'?'on':''}" onclick="dashStatTab='mcq'; renderMain();">🧠 MCQ ટેસ્ટ</button>
+   </div>
+   ${dashStatTab==='mcq' ? dashMcqStats() : studyGrid}`;
 }
 function dashboardQuizList(){
   const today = todayStr();
