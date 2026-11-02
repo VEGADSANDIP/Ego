@@ -16,8 +16,8 @@
 <script>
 (function(){
   try{
-    var raw = localStorage.getItem('examPathData_v1');
-    var theme = raw ? (JSON.parse(raw).settings || {}).theme : null;
+    var theme = localStorage.getItem('examPathTheme');
+    if(!theme){ var raw = localStorage.getItem('examPathData_v1'); theme = raw ? (JSON.parse(raw).settings || {}).theme : null; }
     theme = theme || 'light';
     document.documentElement.setAttribute('data-theme', theme);
     document.querySelector('meta[name="theme-color"]').setAttribute('content', theme==='dark' ? '#1A1A1A' : '#FFFFFF');
@@ -356,31 +356,101 @@ function defaultData(){
     settings:{theme:'light', brandName:'ExamPath', sortPrefs:{sections:'default', subjects:{}, topics:{}}}
   };
 }
-function loadData(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return defaultData();
-    const parsed = JSON.parse(raw);
-    const merged = Object.assign(defaultData(), parsed);
-    merged.settings = Object.assign(defaultData().settings, parsed.settings||{});
-    return merged;
-  }catch(e){
-    console.error('ડેટા ખરાબ થયેલો મળ્યો, નવેસરથી શરૂ કરવામાં આવે છે', e);
-    return defaultData();
-  }
+function normalizeData(parsed){
+  const merged = Object.assign(defaultData(), parsed);
+  merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
+  return merged;
 }
-const APP_VERSION = '2026.11.02-1';
-const STORAGE_LIMIT = 5 * 1024 * 1024; /* બ્રાઉઝર localStorage ની આશરે મર્યાદા (અક્ષરો) */
+const APP_VERSION = '2026.11.02-2';
+let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
+
+/* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
+const IDB_NAME = 'examPathDB', IDB_STORE = 'kv', IDB_KEY = 'main';
+let _idb = null, useIDB = false, _dataLocked = false;
+function idbOpen(){
+  return new Promise((res, rej)=>{
+    if(!window.indexedDB) return rej(new Error('no idb'));
+    const rq = indexedDB.open(IDB_NAME, 1);
+    rq.onupgradeneeded = ()=>{ rq.result.createObjectStore(IDB_STORE); };
+    rq.onsuccess = ()=>res(rq.result);
+    rq.onerror = ()=>rej(rq.error);
+    rq.onblocked = ()=>rej(new Error('blocked'));
+  });
+}
+function idbGet(key){
+  return new Promise((res, rej)=>{
+    const tx = _idb.transaction(IDB_STORE,'readonly'); const rq = tx.objectStore(IDB_STORE).get(key);
+    rq.onsuccess = ()=>res(rq.result); rq.onerror = ()=>rej(rq.error);
+  });
+}
+function idbSet(key, val){
+  return new Promise((res, rej)=>{
+    const tx = _idb.transaction(IDB_STORE,'readwrite'); tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = ()=>res(); tx.onerror = ()=>rej(tx.error); tx.onabort = ()=>rej(tx.error||new Error('abort'));
+  });
+}
+/* એપ ખુલતી વખતે ડેટા લોડ: IndexedDB → (પહેલી વાર) localStorage માંથી સુરક્ષિત ટ્રાન્સફર */
+async function bootData(){
+  try{ _idb = await idbOpen(); useIDB = true; }catch(e){ useIDB = false; console.warn('IndexedDB નથી, localStorage વપરાશે', e); }
+  const legacy = (()=>{ try{ return localStorage.getItem(STORAGE_KEY); }catch(e){ return null; } })();
+  if(useIDB){
+    let raw = null;
+    try{ raw = await idbGet(IDB_KEY); }catch(e){ useIDB = false; }
+    if(useIDB){
+      if(raw){
+        try{ DB = normalizeData(JSON.parse(raw)); _lastSaveStr = raw; }
+        catch(e){ _dataLocked = true; DB = defaultData(); setTimeout(()=>dataCorruptAlert(), 300); }
+        return;
+      }
+      if(legacy){
+        /* ટ્રાન્સફર: લખો → પાછું વાંચીને સરખાવો → પછી જ જૂનો ડેટા દૂર */
+        try{
+          DB = normalizeData(JSON.parse(legacy));
+          await idbSet(IDB_KEY, legacy);
+          const back = await idbGet(IDB_KEY);
+          if(back === legacy){
+            _lastSaveStr = legacy;
+            try{ localStorage.setItem('examPathTheme', (DB.settings||{}).theme||'light'); localStorage.removeItem(STORAGE_KEY); }catch(e){}
+            setTimeout(()=>toast('ડેટા નવા મોટા સ્ટોરેજમાં સુરક્ષિત ખસેડાયો ✓'), 800);
+          } else { useIDB = false; }
+        }catch(e){ console.error('ટ્રાન્સફર નિષ્ફળ', e); useIDB = false; }
+        return;
+      }
+      DB = defaultData(); return;
+    }
+  }
+  /* localStorage fallback */
+  try{ DB = legacy ? normalizeData(JSON.parse(legacy)) : defaultData(); }
+  catch(e){ _dataLocked = true; DB = defaultData(); setTimeout(()=>dataCorruptAlert(), 300); }
+}
+function dataCorruptAlert(){
+  openSheet(`<h3>⚠️ ડેટા વાંચી શકાયો નથી</h3><div class="ink-dim" style="line-height:1.6;">સાચવેલો ડેટા ખરાબ મળ્યો. જૂનો ડેટા બચાવવા માટે નવી સેવ બંધ રાખી છે. બેકઅપ ફાઈલ ઇમ્પોર્ટ કરો.</div>`);
+}
+
+let _saveTimer = null, _savePending = false, _lastSaveStr = '';
 function save(){
+  if(_dataLocked) return;
+  _savePending = true;
+  try{ localStorage.setItem('examPathTheme', (DB.settings||{}).theme||'light'); }catch(e){}
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(flushSave, 120);
+}
+async function flushSave(){
+  if(!_savePending) return;
+  _savePending = false; clearTimeout(_saveTimer);
+  let str;
+  try{ str = JSON.stringify(DB); }catch(e){ storageFailed(e); return; }
   try{
-    const str = JSON.stringify(DB);
-    localStorage.setItem(STORAGE_KEY, str);
+    if(useIDB) await idbSet(IDB_KEY, str); else localStorage.setItem(STORAGE_KEY, str);
+    _lastSaveStr = str;
     storageCheck(str.length);
   }catch(e){ storageFailed(e); }
 }
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) flushSave(); });
+window.addEventListener('pagehide', ()=>{ flushSave(); });
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 
-let DB = loadData();
+let DB = defaultData();
 let currentTab = 'dashboard';
 let examDetailId = null;
 let topicDetailId = null;
@@ -498,19 +568,26 @@ function appBanner(id, html, cls){
 function bannerClose(id){ const el = document.getElementById('bn_'+id); if(el) el.remove(); }
 
 /* ---- સ્ટોરેજ ---- */
+let _storEst = null;
 function storageUsage(){
-  let chars = 0;
-  try{ for(let i=0;i<localStorage.length;i++){ const k = localStorage.key(i); chars += k.length + (localStorage.getItem(k)||'').length; } }catch(e){}
-  return {chars, limit:STORAGE_LIMIT, pct: Math.min(100, Math.round(chars/STORAGE_LIMIT*100))};
+  const chars = _lastSaveStr.length || (()=>{ try{ return JSON.stringify(DB).length; }catch(e){ return 0; } })();
+  const limit = (useIDB && _storEst && _storEst.quota) ? _storEst.quota : STORAGE_LIMIT;
+  return {chars, limit, pct: Math.min(100, Math.round(chars/limit*1000)/10)};
 }
-function storageMB(chars){ return (chars/1048576).toFixed(2); }
+async function refreshStorageEstimate(){
+  try{
+    if(navigator.storage && navigator.storage.estimate){ _storEst = await navigator.storage.estimate(); }
+    const el = document.getElementById('storCardBody'); if(el) el.innerHTML = storageCardInner();
+  }catch(e){}
+}
+function storageMB(chars){ return chars>=1073741824 ? (chars/1073741824).toFixed(1)+' GB' : (chars/1048576).toFixed(2)+' MB'; }
 const STORAGE_LABELS = {topics:'ટોપિક', subtopics:'સબ-ટોપિક', subjects:'વિષયો', sections:'વિભાગો', exams:'પરીક્ષાઓ', revisions:'રિવિઝન', studyLogs:'અભ્યાસ લોગ', timetable:'ટાઈમટેબલ', chapterTimetable:'ચેપ્ટર ટાઈમટેબલ', qfolders:'MCQ ફોલ્ડર', qtests:'MCQ ટેસ્ટ (પ્રશ્નો)', qrevs:'MCQ રિવિઝન', mockTests:'જૂના મોક ગુણ', settings:'સેટિંગ્સ / ફોટો'};
 function storageBreakdown(){
   return Object.keys(DB).map(k=>({k, label: STORAGE_LABELS[k]||k, size: JSON.stringify(DB[k]).length})).filter(x=>x.size>2).sort((a,b)=>b.size-a.size);
 }
 let _storWarnLevel = 0;
 function storageCheck(chars){
-  const pct = chars / STORAGE_LIMIT * 100;
+  const pct = chars / storageUsage().limit * 100;
   const level = pct>=95 ? 95 : (pct>=90 ? 90 : (pct>=80 ? 80 : 0));
   if(level===0){ _storWarnLevel = 0; bannerClose('storage'); return; }
   if(level <= _storWarnLevel) return;
@@ -528,17 +605,18 @@ function storageFailed(e){
       <button class="btn btn-primary btn-block" onclick="exportBackup()">⬇️ બેકઅપ ડાઉનલોડ કરો</button>
     </div>`);
 }
-function storageCardHTML(){
+function storageCardHTML(){ setTimeout(refreshStorageEstimate, 0); return `<div id="storCardBody">${storageCardInner()}</div>`; }
+function storageCardInner(){
   const u = storageUsage();
   const state = u.pct>=90 ? ['danger','⚠️ સ્ટોરેજ લગભગ ભરાઈ ગયું છે — હમણાં જ બેકઅપ લો.'] : (u.pct>=70 ? ['warning','સ્ટોરેજ ભરાવા આવ્યું છે — બેકઅપ લેવાનું વિચારો.'] : ['success','✓ પૂરતી જગ્યા બાકી છે.']);
   const color = u.pct>=90 ? 'var(--danger)' : (u.pct>=70 ? 'var(--warning,#E0A100)' : 'var(--success)');
   const rows = storageBreakdown().slice(0,6).map(x=>`<div class="item cursor-default"><span>${esc(x.label)}</span><span class="ink-dim">${x.size>=1024?(x.size/1024).toFixed(1)+' KB':x.size+' B'}</span></div>`).join('');
   return `
-    <div class="item cursor-default"><span>વપરાયું</span><b>${storageMB(u.chars)} MB / ${storageMB(u.limit)} MB · ${u.pct}%</b></div>
+    <div class="item cursor-default"><span>વપરાયું</span><b>${storageMB(u.chars)} / ${storageMB(u.limit)} · ${u.pct}%</b></div>
     <div class="stor-bar"><i style="width:${Math.max(u.pct,1)}%; background:${color};"></i></div>
     <div class="fs-12 mb-6" style="color:${color}; font-weight:700;">${state[1]}</div>
     ${rows}
-    <div class="ink-dim fs-12 mt-8">આ આશરે અંદાજ છે; બ્રાઉઝરની મર્યાદા લગભગ 5 MB હોય છે.</div>`;
+    <div class="ink-dim fs-12 mt-8">${useIDB ? 'મોટા IndexedDB સ્ટોરેજમાં સેવ થાય છે — મર્યાદા ફોનની ખાલી જગ્યા પર આધારિત.' : 'આ આશરે અંદાજ છે; બ્રાઉઝરની મર્યાદા લગભગ 5 MB હોય છે.'}</div>`;
 }
 
 /* ---- નવું વર્ઝન ---- */
@@ -2769,7 +2847,8 @@ function importBackup(evt){
   reader.onload = function(e){
     try{
       const parsed = JSON.parse(e.target.result);
-      DB = Object.assign(defaultData(), parsed);
+      if(!parsed || typeof parsed!=='object' || Array.isArray(parsed)) throw new Error('bad');
+      DB = normalizeData(parsed); _dataLocked = false;
       save(); applyTheme(); populateBrand(); populateExamSwitcher(); examDetailId=null; renderMain();
       toast('બેકઅપ ઇમ્પોર્ટ થયું');
     }catch(err){ toast('ફાઈલ યોગ્ય નથી','error'); }
@@ -2789,8 +2868,8 @@ function resetAllData(){
 function confirmResetAllData(){
   const v = (val('f_resetConfirm')||'').trim().toUpperCase();
   if(v!=='DELETE'){ toast('DELETE બરાબર ટાઈપ કરો','error'); return; }
-  localStorage.removeItem(STORAGE_KEY);
-  DB = defaultData(); save(); examDetailId=null; applyTheme(); populateBrand(); populateExamSwitcher(); renderMain();
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  DB = defaultData(); _dataLocked = false; save(); examDetailId=null; applyTheme(); populateBrand(); populateExamSwitcher(); renderMain();
   closeSheet();
   toast('ડેટા રીસેટ થયો');
 }
@@ -4033,7 +4112,9 @@ function initHideOnScroll(){
     else if(dy < -2 && allShown) setTopbar(false);
   }, {passive:true});
 }
-function init(){
+async function init(){
+  await bootData();
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   initHideOnScroll();
   applyTheme();
   buildNav();
@@ -4042,7 +4123,7 @@ function init(){
   showTab('dashboard');
   checkNotifications();
   setInterval(checkNotifications, 60000);
-  try{ storageCheck(JSON.stringify(DB).length); }catch(e){}
+  try{ storageCheck(JSON.stringify(DB).length); refreshStorageEstimate(); }catch(e){}
   setTimeout(()=>checkForUpdate(false), 4000);
   setInterval(()=>checkForUpdate(false), 30*60*1000);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(false); });
