@@ -361,7 +361,7 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.02-2';
+const APP_VERSION = '2026.11.03-1';
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1120,7 +1120,7 @@ function setSortPref(level, value, key){
 function sortSectionsList(sections){
   const mode = getSortPref('sections');
   if(mode==='default') return sections;
-  if(mode==='name') return [...sections].sort((a,b)=>a.name.localeCompare(b.name));
+  if(mode==='name') return [...sections].sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true}));
   const withPct = sections.map(sec=>{
     const subs = sectionSubjects(sec.id);
     let total=0, done=0;
@@ -1134,7 +1134,7 @@ function sortSectionsList(sections){
 function sortSubjectsList(subs, sectionKey){
   const mode = getSortPref('subjects', sectionKey);
   if(mode==='default') return subs;
-  if(mode==='name') return [...subs].sort((a,b)=>a.name.localeCompare(b.name));
+  if(mode==='name') return [...subs].sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true}));
   const withStats = subs.map(s=>{
     const topics = subjectTopics(s.id);
     const topicsPct = topics.length ? topics.filter(t=>t.status==='completed').length/topics.length*100 : 0;
@@ -1151,7 +1151,7 @@ function sortSubjectsList(subs, sectionKey){
 function sortTopicsList(topics, subjectKey){
   const mode = getSortPref('topics', subjectKey);
   if(mode==='default') return topics;
-  if(mode==='name') return [...topics].sort((a,b)=>a.name.localeCompare(b.name));
+  if(mode==='name') return [...topics].sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true}));
   if(mode==='star_desc') return [...topics].sort((a,b)=>(b.importance||0)-(a.importance||0));
   const rank = {completed:0, studying:1, not_started:2};
   const rankRev = {completed:2, studying:1, not_started:0};
@@ -2334,6 +2334,8 @@ function groupStudyLogsByChapter(entries){
       else byChapter[tid].push({label:'સંપૂર્ણ ચેપ્ટર', logId:l.id});
     });
   });
+  const tn = id=>{ const t = DB.topics.find(x=>x.id===id); return t ? t.name : ''; };
+  order.sort((x,y)=>tn(x).localeCompare(tn(y),'gu',{numeric:true}));
   return {chapterGroups: order.map(tid=>({topicId:tid, items:byChapter[tid]})), freeform};
 }
 function renderAccordionBlock(wrapId, headerHTML, badgeHTML, bodyHTML, expand, opts){
@@ -2374,16 +2376,9 @@ function groupRevisionsByChapter(list){
     byChapter[key].push(r);
   });
   const groups = order.map(topicId=>({topicId, items:byChapter[topicId]}));
-  groups.sort((a,b)=>{
-    const doneA = DB.revisions.filter(r=>r.topicId===a.topicId && r.status==='completed').length;
-    const doneB = DB.revisions.filter(r=>r.topicId===b.topicId && r.status==='completed').length;
-    if(doneA!==doneB) return doneA-doneB;
-    const ta = DB.topics.find(x=>x.id===a.topicId);
-    const tb = DB.topics.find(x=>x.id===b.topicId);
-    const da = (ta && ta.completedDate) ? ta.completedDate : '';
-    const db = (tb && tb.completedDate) ? tb.completedDate : '';
-    return db.localeCompare(da);
-  });
+  /* નંબર પ્રમાણે (1, 2, 3 … 10) ગોઠવો */
+  const gname = g=>{ const t = DB.topics.find(x=>x.id===g.topicId); return t ? t.name : ''; };
+  groups.sort((a,b)=>gname(a).localeCompare(gname(b),'gu',{numeric:true}));
   return groups;
 }
 function revisionChapterAccordion(topicId, items){
