@@ -344,7 +344,7 @@ const STORAGE_KEY = 'examPathData_v1';
 function defaultData(){
   return {
     exams:[], subjects:[], topics:[], revisions:[], sections:[],
-    studyLogs:[], mockTests:[], timetable:[], chapterTimetable:[], subtopics:[], qfolders:[], qtests:[], qrevs:[],
+    studyLogs:[], timetable:[], chapterTimetable:[], subtopics:[], qfolders:[], qtests:[], qrevs:[],
     settings:{theme:'light', brandName:'ExamPath', sortPrefs:{sections:'default', subjects:{}, topics:{}}}
   };
 }
@@ -426,7 +426,6 @@ function sectionSubjects(sectionId){ return DB.subjects.filter(s=>s.sectionId===
 function activeExamSubjectIds(){ const exam=getActiveExam(); if(!exam) return []; return examSubjects(exam.id).map(s=>s.id); }
 function studyLogsForActiveExam(){ const ids=activeExamSubjectIds(); return DB.studyLogs.filter(l=>ids.includes(l.subjectId)); }
 function revisionsForActiveExam(){ const ids=activeExamSubjectIds(); return DB.revisions.filter(r=>ids.includes(r.subjectId)); }
-function mockTestsForActiveExam(){ const exam=getActiveExam(); if(!exam) return []; return DB.mockTests.filter(m=>m.examId===exam.id); }
 function subjectName(id){ const s=DB.subjects.find(x=>x.id===id); return s? s.name : '-'; }
 
 function durationPickerHTML(prefix, totalSeconds){
@@ -563,7 +562,7 @@ function drawBarChart(id, labels, values, color, valueFormatter){
 const TABS = [
   {id:'dashboard', label:'ડેશબોર્ડ', icon:'📊'},
   {id:'exams', label:'પરીક્ષા', icon:'🎓'},
-  {id:'mock', label:'મોક ટેસ્ટ', icon:'📝'},
+  {id:'mock', label:'MCQ ટેસ્ટ', icon:'🧠'},
   {id:'calendar', label:'કેલેન્ડર', icon:'📅'},
   {id:'settings', label:'સેટિંગ્સ', icon:'⚙️'}
 ];
@@ -588,7 +587,7 @@ function renderMain(){
   const mainEl = document.getElementById('main');
   mainEl.innerHTML = map[currentTab]();
   /* બીજા પેજ/સ્ક્રીન પર જતાં સ્ક્રોલ ઉપરથી શરૂ થાય; એ જ સ્ક્રીનમાં ફરી દોરતાં જગ્યા જળવાય */
-  const viewKey = [currentTab, topicDetailId, sectionDetailId, mockView, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0].join('|');
+  const viewKey = [currentTab, topicDetailId, sectionDetailId, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0].join('|');
   if(viewKey !== window.__lastViewKey){ window.__lastViewKey = viewKey; mainEl.scrollTop = 0; }
   afterRender(currentTab);
   const _m=document.getElementById('main'); if(_m.scrollTop<=20 && window.__hdrShow) window.__hdrShow();
@@ -662,8 +661,6 @@ function renderDashboard(){
   const overdueRevisionList = revisionsForActiveExam().filter(r=>r.status==='pending' && r.dueDate<today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
   const todayRevisionList = revisionsForActiveExam().filter(r=>r.status==='pending' && r.dueDate===today);
   const todayStudyList = studyLogsForActiveExam().filter(l=>l.date===today);
-  const latestMock = [...mockTestsForActiveExam()].sort((a,b)=>b.date.localeCompare(a.date))[0];
-  const weak = computeWeakSubjects(exam.id);
   const inProgressTopics = topics.filter(t=>t.status==='studying');
   const importantPendingTopics = topics.filter(t=>(t.importance||0)>0 && t.status!=='completed').sort((a,b)=>(b.importance||0)-(a.importance||0));
 
@@ -748,27 +745,11 @@ function renderDashboard(){
      <div class="scroll-list-sm">${todayStudyList.map(l=>dashboardTodayStudyRow(l)).join('')}</div>
    </div>` : ''}
 
-   ${weak.length ? card('નબળા વિષયો ⚠️', weak.map(w=>`<div class="item"><span>${esc(w.name)}</span><span class="badge badge-danger">સરેરાશ ${w.avg}%</span></div>`).join('')) : ''}
 
    ${priorityList.length ? card('વેઈટેજ પ્રમાણે અગ્રતા 🎯', priorityList.slice(0,5).map(p=>`<div class="item" onclick="navigateToSection('${p.section.id}')"><span>📂 ${esc(p.section.name)} <span class="ink-dim">(${p.section.totalMarks} ગુણ)</span></span><span class="badge badge-warning">${p.remaining} બાકી</span></div>`).join('')) : ''}
 
-   ${latestMock ? card('છેલ્લો મોક ટેસ્ટ 📝', mockSummaryRow(latestMock)) : ''}
   `;
 }
-function computeWeakSubjects(examId){
-  const subs = examSubjects(examId);
-  const result = [];
-  subs.forEach(s=>{
-    let sum=0, count=0;
-    DB.mockTests.filter(m=>m.examId===examId).forEach(m=>{
-      const sm = (m.subjectMarks||[]).find(x=>x.subjectId===s.id);
-      if(sm && sm.total){ sum += (sm.obtained/sm.total)*100; count++; }
-    });
-    if(count){ result.push({name:s.name, avg:Math.round(sum/count)}); }
-  });
-  return result.filter(r=>r.avg<60).sort((a,b)=>a.avg-b.avg).slice(0,4);
-}
-
 /* --- Study Log form --- */
 function openStudyForm(id, defDate, prefill){
   const exam = getActiveExam();
@@ -1608,15 +1589,13 @@ function cascadeDeleteSubjectData(subjectId){
   DB.studyLogs = DB.studyLogs.filter(l=>l.subjectId!==subjectId);
   DB.timetable = DB.timetable.filter(x=>x.subjectId!==subjectId);
   DB.chapterTimetable = DB.chapterTimetable.filter(x=>x.subjectId!==subjectId);
-  DB.mockTests.forEach(m=>{ if(m.subjectMarks) m.subjectMarks = m.subjectMarks.filter(sm=>sm.subjectId!==subjectId); });
 }
 function deleteExam(id){
-  if(!confirm('આ પરીક્ષા અને તેના તમામ વિભાગ/વિષય/ટોપિક/સબ-ટોપિક/રિવિઝન/અભ્યાસ/ટાઈમટેબલ/મોક ટેસ્ટ — બધું ડિલીટ થશે. ચાલુ રાખવું છે?'))return;
+  if(!confirm('આ પરીક્ષા અને તેના તમામ વિભાગ/વિષય/ટોપિક/સબ-ટોપિક/રિવિઝન/અભ્યાસ/ટાઈમટેબલ/MCQ ટેસ્ટ — બધું ડિલીટ થશે. ચાલુ રાખવું છે?'))return;
   const subIds = DB.subjects.filter(s=>s.examId===id).map(s=>s.id);
   subIds.forEach(sid=>cascadeDeleteSubjectData(sid));
   DB.subjects = DB.subjects.filter(s=>s.examId!==id);
   DB.sections = DB.sections.filter(x=>x.examId!==id);
-  DB.mockTests = DB.mockTests.filter(m=>m.examId!==id);
   DB.qfolders = (DB.qfolders||[]).filter(f=>f.examId!==id);
   { const gone = new Set((DB.qtests||[]).filter(t=>t.examId===id).map(t=>t.id)); DB.qrevs = (DB.qrevs||[]).filter(r=>!gone.has(r.testId)); }
   DB.qtests = (DB.qtests||[]).filter(t=>t.examId!==id);
@@ -1934,200 +1913,6 @@ function saveBulkTopics(subjectId){
     DB.topics.push({id:uid(),subjectId,name,status:'not_started'});
   });
   save(); closeSheet(); renderMain(); toast(`${lines.length} ટોપિક ઉમેરાયા`);
-}
-
-/* ===================== MOCK TESTS ===================== */
-function renderMockScores(){
-  const tests = [...mockTestsForActiveExam()].sort((a,b)=>b.date.localeCompare(a.date));
-  return `
-   <div class="section-header"><h2 class="m-0">મોક ટેસ્ટ 📝</h2><button class="btn btn-primary btn-sm" onclick="openMockForm(null)">+ નવો</button></div>
-   ${tests.length ? `<div class="chart-card"><div class="chart-title">ટ્રેન્ડ (%)</div><canvas id="chartMockTrend"></canvas></div>` : ''}
-   ${tests.length ? `<div class="scroll-list">${tests.map(m=>mockCard(m)).join('')}</div>` : emptyState('📝','કોઈ મોક ટેસ્ટ નથી','તમારા પ્રથમ મોક ટેસ્ટનું પરિણામ ઉમેરો','ટેસ્ટ ઉમેરો','openMockForm(null)')}
-  `;
-}
-function mockCard(m){
-  const pct = m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0;
-  const cls = pct>=70?'badge-success':(pct>=40?'badge-warning':'badge-danger');
-  return `<div class="card">
-    <div class="item" style="border:none;padding:0;cursor:pointer;" onclick="openMockForm('${m.id}')">
-      <span><b>${formatDate(m.date)}</b>${m.mode==='single'?' <span class="ink-dim fw-400">(એક વિષય)</span>':''}</span>
-      <span class="badge ${cls}">${pct}%</span>
-    </div>
-    <div class="ink-dim" style="margin-top:4px;font-size:13px;">${m.obtainedMarks}/${m.totalMarks} ગુણ${m.timeTaken?' · '+formatDuration(m.timeTaken/60):''}</div>
-    ${(m.subjectMarks&&m.subjectMarks.length)?`<button class="btn btn-sm btn-secondary mt-8" onclick="openMockAnalysis('${m.id}')">📊 એનાલિસિસ</button>`:''}
-  </div>`;
-}
-function mockSummaryRow(m){
-  const pct = m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0;
-  return `<div class="item cursor-default"><span>${formatDate(m.date)}</span><span class="badge ${pct>=60?'badge-success':'badge-warning'}">${m.obtainedMarks}/${m.totalMarks} (${pct}%)</span></div>`;
-}
-let mockFormRows = [];
-let mockFormMode = 'full';
-let mockFormEditId = null;
-function openMockForm(id){
-  const exam = getActiveExam();
-  if(!exam){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
-  if(!id){
-    openSheet(`
-      <h3>નવો મોક ટેસ્ટ 📝</h3>
-      <div class="ink-dim" style="margin-bottom:14px;">ટેસ્ટ કયા પ્રકારની છે?</div>
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <button class="btn btn-primary" style="padding:16px;" onclick="openMockFormBody(null,'single')">📗 એક વિષયની ટેસ્ટ</button>
-        <button class="btn btn-secondary" style="padding:16px;" onclick="openMockFormBody(null,'full')">📚 પૂરી પરીક્ષા (બધા વિષય)</button>
-      </div>
-    `);
-    return;
-  }
-  const m = DB.mockTests.find(x=>x.id===id);
-  let mode = m.mode;
-  if(!mode) mode = (m.subjectMarks && m.subjectMarks.length>1) ? 'full' : 'single';
-  openMockFormBody(id, mode);
-}
-function openMockFormBody(id, mode){
-  const exam = getActiveExam();
-  const subs = examSubjects(exam.id);
-  const m = id ? DB.mockTests.find(x=>x.id===id) : null;
-  mockFormMode = mode; mockFormEditId = id;
-  if(mode==='single'){
-    let row;
-    if(m && m.subjectMarks && m.subjectMarks[0]) row = m.subjectMarks[0];
-    else if(m) row = {subjectId:(subs[0]?subs[0].id:''), total:m.totalMarks, obtained:m.obtainedMarks};
-    else row = {subjectId:(subs[0]?subs[0].id:''), total:'', obtained:''};
-    mockFormRows = [Object.assign({}, row)];
-  } else {
-    mockFormRows = (m && m.subjectMarks && m.subjectMarks.length) ? m.subjectMarks.map(x=>Object.assign({},x)) : [{subjectId:(subs[0]?subs[0].id:''), total:'', obtained:''}];
-  }
-  renderMockFormSheet(id, mode, m, subs);
-}
-function renderMockFormSheet(id, mode, m, subs){
-  openSheet(`
-    <h3>${m?'મોક ટેસ્ટ એડિટ':'નવો મોક ટેસ્ટ'} ${mode==='single'?'📗':'📚'}</h3>
-    <div class="field"><label>તારીખ</label><input type="date" id="f_date" value="${m?m.date:todayStr()}"></div>
-    <div class="field"><label>સમય</label>${durationPickerHTML('f_time', m?Math.round((m.timeTaken||0)*60):0)}</div>
-    <label style="font-size:12.5px;color:var(--ink-dim);font-weight:600;">${mode==='single'?'વિષય':'વિષયો'}</label>
-    <div id="mockRowsWrap" class="mt-8">${mockFormRows.map((r,i)=>mockFormRowHTML(r,i,subs,mode)).join('')}</div>
-    ${mode==='full'?`<button class="btn btn-sm btn-secondary mt-8" onclick="addMockFormRow()">+ વિષય ઉમેરો</button>`:''}
-    <div class="sheet-actions">
-      ${id?`<button class="btn btn-danger" onclick="deleteMock('${id}')">ડિલીટ</button>`:''}
-      <button class="btn btn-primary btn-block" onclick="saveMock(${id?`'${id}'`:'null'})">સેવ કરો</button>
-    </div>
-  `);
-  populateMockChapterChecklist();
-}
-function mockFormRowHTML(r, i, subs, mode){
-  const subjectRow = `<div class="field" style="display:flex;gap:6px;align-items:center;">
-    <select id="mrow_subj_${i}" style="flex:1.4;" ${mode==='single'?`onchange="onMockSubjectChange(${i})"`:''}>
-      ${subs.map(s=>`<option value="${s.id}" ${r.subjectId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
-    </select>
-    <input type="number" id="mrow_total_${i}" placeholder="કુલ" value="${r.total!==''&&r.total!=null?r.total:''}" style="width:62px;">
-    <input type="number" id="mrow_obt_${i}" placeholder="ગુણ" value="${r.obtained!==''&&r.obtained!=null?r.obtained:''}" style="width:62px;">
-    ${mode==='full' && (mockFormRows.length>1) ? `<button class="btn btn-sm btn-danger" onclick="removeMockFormRow(${i})">🗑</button>` : ''}
-  </div>`;
-  if(mode!=='single') return subjectRow;
-  return subjectRow + `
-    <div class="ink-dim fs-12 mb-6">ચેપ્ટર (વૈકલ્પિક — કયા ચેપ્ટરમાંથી ટેસ્ટ હતી)</div>
-    <input type="text" id="mock_chapter_search" placeholder="🔍 ચેપ્ટર શોધો..." oninput="filterMockChapterChecklist()" class="mb-6" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
-    <div id="mockChapterChecklist" class="scroll-list-sm" style="border:1px solid var(--border); border-radius:10px; padding:8px 10px;"></div>
-  `;
-}
-function populateMockChapterChecklist(){
-  if(mockFormMode!=='single') return;
-  const wrap = document.getElementById('mockChapterChecklist');
-  if(!wrap) return;
-  const subjEl = document.getElementById('mrow_subj_0');
-  const subjectId = subjEl ? subjEl.value : (mockFormRows[0]?mockFormRows[0].subjectId:'');
-  const topics = subjectTopics(subjectId);
-  const selected = (mockFormRows[0] && mockFormRows[0].chapterIds) || [];
-  wrap.innerHTML = topics.length ? topics.map(t=>`<label class="item cursor-pointer" style="width:100%;" data-search="${esc(t.name.toLowerCase())}">
-    <span style="flex:1; padding-right:10px;">${esc(t.name)}</span>
-    <input type="checkbox" class="mock-chapter-checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''} style="width:18px;height:18px;flex-shrink:0;">
-  </label>`).join('') : `<span class="ink-dim" style="font-size:13px;">આ વિષયમાં કોઈ ટોપિક નથી</span>`;
-  const searchEl = document.getElementById('mock_chapter_search');
-  if(searchEl) searchEl.value = '';
-}
-function filterMockChapterChecklist(){
-  const q = (val('mock_chapter_search')||'').trim().toLowerCase();
-  document.querySelectorAll('#mockChapterChecklist label').forEach(el=>{
-    const match = !q || (el.dataset.search||'').includes(q);
-    el.style.display = match ? '' : 'none';
-  });
-}
-function onMockSubjectChange(i){
-  if(i===0 && mockFormMode==='single'){
-    if(mockFormRows[0]) mockFormRows[0].chapterIds = [];
-    populateMockChapterChecklist();
-  }
-}
-function syncMockFormRowsFromDOM(){
-  mockFormRows.forEach((r,i)=>{
-    const subjEl=document.getElementById('mrow_subj_'+i);
-    const totEl=document.getElementById('mrow_total_'+i);
-    const obtEl=document.getElementById('mrow_obt_'+i);
-    if(subjEl) r.subjectId=subjEl.value;
-    if(totEl) r.total=totEl.value;
-    if(obtEl) r.obtained=obtEl.value;
-  });
-}
-function addMockFormRow(){
-  syncMockFormRowsFromDOM();
-  const exam = getActiveExam(); const subs = examSubjects(exam.id);
-  mockFormRows.push({subjectId:(subs[0]?subs[0].id:''), total:'', obtained:''});
-  renderMockFormSheet(mockFormEditId, mockFormMode, mockFormEditId?DB.mockTests.find(x=>x.id===mockFormEditId):null, subs);
-}
-function removeMockFormRow(i){
-  syncMockFormRowsFromDOM();
-  mockFormRows.splice(i,1);
-  const exam = getActiveExam(); const subs = examSubjects(exam.id);
-  renderMockFormSheet(mockFormEditId, mockFormMode, mockFormEditId?DB.mockTests.find(x=>x.id===mockFormEditId):null, subs);
-}
-function saveMock(id){
-  const exam = getActiveExam();
-  const date = val('f_date'), time = Math.round(durationPickerSeconds('f_time')/60);
-  if(!date){ toast('તારીખ ભરો','error'); return; }
-  const rows = [];
-  for(let i=0;i<mockFormRows.length;i++){
-    const subjEl=document.getElementById('mrow_subj_'+i), totEl=document.getElementById('mrow_total_'+i), obtEl=document.getElementById('mrow_obt_'+i);
-    const total = parseFloat(totEl.value), obtained = parseFloat(obtEl.value);
-    if(!subjEl.value || !total || total<=0 || isNaN(obtained) || obtained<0 || obtained>total){ toast('દરેક વિષયના માન્ય ગુણ ભરો','error'); return; }
-    rows.push({subjectId:subjEl.value, total, obtained});
-  }
-  if(!rows.length){ toast('ઓછામાં ઓછો એક વિષય ઉમેરો','error'); return; }
-  if(mockFormMode==='single'){
-    const checkedChapters = Array.from(document.querySelectorAll('.mock-chapter-checkbox:checked')).map(b=>b.value);
-    if(checkedChapters.length) rows[0].chapterIds = checkedChapters;
-  }
-  const totalMarks = rows.reduce((a,b)=>a+b.total,0);
-  const obtainedMarks = rows.reduce((a,b)=>a+b.obtained,0);
-  let newId = id;
-  if(id){ const m=DB.mockTests.find(x=>x.id===id); Object.assign(m,{date,totalMarks,obtainedMarks,timeTaken:time,subjectMarks:rows,mode:mockFormMode}); }
-  else { newId = uid(); DB.mockTests.push({id:newId,examId:exam.id,date,totalMarks,obtainedMarks,timeTaken:time,subjectMarks:rows,mode:mockFormMode}); }
-  save(); renderMain(); toast('સેવ થયું');
-  openMockAnalysis(newId);
-}
-function deleteMock(id){ if(!confirm('ડિલીટ કરવું છે?'))return; DB.mockTests=DB.mockTests.filter(x=>x.id!==id); save(); closeSheet(); renderMain(); toast('ડિલીટ થયું'); }
-function openMockAnalysis(id){
-  const m = DB.mockTests.find(x=>x.id===id);
-  if(!m) return;
-  const pct = m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0;
-  const overallCls = pct>=70?'badge-success':(pct>=40?'badge-warning':'badge-danger');
-  const rows = (m.subjectMarks||[]).map(sm=>{
-    const s = DB.subjects.find(x=>x.id===sm.subjectId);
-    const p = sm.total ? Math.round(sm.obtained/sm.total*100) : 0;
-    const cls = p>=70?'badge-success':(p>=40?'badge-warning':'badge-danger');
-    const chapterNames = (sm.chapterIds||[]).map(cid=>{ const t=DB.topics.find(x=>x.id===cid); return t?t.name:null; }).filter(Boolean);
-    return `<div class="item cursor-default"><span>${s?esc(s.name):'વિષય'}${chapterNames.length?`<br><span class="ink-dim fs-12">📘 ${esc(chapterNames.join(', '))}</span>`:''}</span><span class="badge ${cls}">${sm.obtained}/${sm.total} (${p}%)</span></div>`;
-  }).join('');
-  openSheet(`
-    <h3>એનાલિસિસ 📊 — ${formatDate(m.date)}</h3>
-    <div class="card" style="background:var(--surface2); margin-bottom:14px;">
-      <div class="item item-static"><b>ઓવરઓલ</b><span class="badge ${overallCls}">${m.obtainedMarks}/${m.totalMarks} (${pct}%)</span></div>
-    </div>
-    ${rows || emptyRow('વિષય-વાઈઝ ડેટા નથી')}
-    <div class="sheet-actions">
-      <button class="btn btn-secondary" onclick="openMockForm('${m.id}')">✎ એડિટ</button>
-      <button class="btn btn-primary btn-block" onclick="closeSheet();">બંધ કરો</button>
-    </div>
-  `);
 }
 
 /* ===================== REVISION ===================== */
@@ -2840,7 +2625,7 @@ function applyTheme(){
   if(metaTheme) metaTheme.setAttribute('content', theme==='dark' ? '#1A1A1A' : '#FFFFFF');
 }
 function cleanOrphanedData(){
-  if(!confirm('ડિલીટ થયેલા વિષય/ટોપિક સાથે જોડાયેલો જૂનો, છૂટો પડેલો ડેટા સાફ કરવો છે? (સ્ટડી લોગ, રિવિઝન, ટાઈમટેબલ, મોક ટેસ્ટના ભાગ વગેરેમાંથી)')) return;
+  if(!confirm('ડિલીટ થયેલા વિષય/ટોપિક સાથે જોડાયેલો જૂનો, છૂટો પડેલો ડેટા સાફ કરવો છે? (સ્ટડી લોગ, રિવિઝન, ટાઈમટેબલ વગેરેમાંથી)')) return;
   const examIds = new Set(DB.exams.map(e=>e.id));
   const beforeSections = DB.sections.length;
   DB.sections = DB.sections.filter(s=>examIds.has(s.examId));
@@ -2868,10 +2653,7 @@ function cleanOrphanedData(){
   DB.timetable = DB.timetable.filter(x=>subjectIds.has(x.subjectId));
   const beforeCT = DB.chapterTimetable.length;
   DB.chapterTimetable = DB.chapterTimetable.filter(x=>subjectIds.has(x.subjectId));
-  const beforeMocks = DB.mockTests.length;
-  DB.mockTests = DB.mockTests.filter(m=>examIds.has(m.examId));
-  DB.mockTests.forEach(m=>{ if(m.subjectMarks) m.subjectMarks = m.subjectMarks.filter(sm=>subjectIds.has(sm.subjectId)); });
-  const removed = (beforeSections-DB.sections.length) + (beforeSubjects-DB.subjects.length) + (beforeTopics-DB.topics.length) + (beforeSubtopics-DB.subtopics.length) + (beforeRevisions-DB.revisions.length) + (beforeLogs-DB.studyLogs.length) + (beforeTT-DB.timetable.length) + (beforeCT-DB.chapterTimetable.length) + (beforeMocks-DB.mockTests.length);
+  const removed = (beforeSections-DB.sections.length) + (beforeSubjects-DB.subjects.length) + (beforeTopics-DB.topics.length) + (beforeSubtopics-DB.subtopics.length) + (beforeRevisions-DB.revisions.length) + (beforeLogs-DB.studyLogs.length) + (beforeTT-DB.timetable.length) + (beforeCT-DB.chapterTimetable.length);
   save(); renderMain();
   toast(removed>0 ? `સાફ થયું — ${removed} જૂના રેકોર્ડ કાઢ્યા 🧹` : 'બધું પહેલેથી ચોખ્ખું છે ✅');
 }
@@ -2900,7 +2682,7 @@ function importBackup(evt){
 function resetAllData(){
   openSheet(`
     <h3>⚠️ બધો ડેટા રીસેટ કરો</h3>
-    <div class="ink-dim" style="font-size:13px; margin-bottom:14px; line-height:1.6;">આ ક્રિયાથી તમારી બધી પરીક્ષા, વિભાગ, વિષય, ટોપિક, અભ્યાસ લોગ, રિવિઝન, મોક ટેસ્ટ — બધો ડેટા કાયમ માટે ડિલીટ થઈ જશે. આ ક્રિયા પાછી થઈ શકતી નથી.</div>
+    <div class="ink-dim" style="font-size:13px; margin-bottom:14px; line-height:1.6;">આ ક્રિયાથી તમારી બધી પરીક્ષા, વિભાગ, વિષય, ટોપિક, અભ્યાસ લોગ, રિવિઝન, MCQ ટેસ્ટ — બધો ડેટા કાયમ માટે ડિલીટ થઈ જશે. આ ક્રિયા પાછી થઈ શકતી નથી.</div>
     <div class="field"><label>ખાતરી કરવા માટે નીચે બરાબર <b>DELETE</b> ટાઈપ કરો</label><input type="text" id="f_resetConfirm" placeholder="DELETE" autocomplete="off" oninput="document.getElementById('confirmResetBtn').disabled = (this.value.trim().toUpperCase()!=='DELETE');"></div>
     <div class="sheet-actions">
       <button class="btn btn-danger btn-block" id="confirmResetBtn" disabled onclick="confirmResetAllData()">🗑️ કાયમ માટે ડિલીટ કરો</button>
@@ -2918,14 +2700,12 @@ function confirmResetAllData(){
 
 
 /* ===================== MCQ ક્વિઝ ===================== */
-let mockView = 'quiz';
 let mqFolderId = null;
 let mqSession = null;
 let mqTimerHandle = null;
 const MQ_LET = ['A','B','C','D'];
 
 function mqSticky(h){ return `<div class="hs-sticky mq-sticky">${h}</div>`; }
-function setMockView(v){ mockView=v; renderMain(); }
 function mqExamId(){ const e=getActiveExam(); return e?e.id:null; }
 function mqFolders(parentId){ return DB.qfolders.filter(f=>f.examId===mqExamId() && (f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
 function mqTests(folderId){ return DB.qtests.filter(t=>t.examId===mqExamId() && (t.folderId||null)===(folderId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
@@ -3492,7 +3272,7 @@ function mqAttemptsCardHTML(dateStr){
 }
 function mqGoToTest(testId){
   const t = mqGetTest(testId); if(!t) return;
-  mockView = 'quiz'; mqFolderId = t.folderId || null; mqSession = null; mqQuery = '';
+  mqFolderId = t.folderId || null; mqSession = null; mqQuery = '';
   highlightQTestId = t.id;
   showTab('mock');
 }
@@ -3597,7 +3377,7 @@ function dashboardQuizPages(exam){
   const rOver = rPend.filter(r=>r.dueDate<today).length;
   const rUp = rPend.length - rOver;
   const rPct = revs.length ? Math.round(rDone/revs.length*100) : 0;
-  const open = `if(bookClickOK()){ mockView='quiz'; mqFolderId=null; mqSession=null; showTab('mock'); }`;
+  const open = `if(bookClickOK()){ mqFolderId=null; mqSession=null; showTab('mock'); }`;
   const top = (title)=>`<div class="hero-top"><div><div class="hero-exam-name">${title}</div><div class="hero-exam-date">${esc(exam.name)} · 📅 ${formatDate(exam.date)}</div></div><button class="btn btn-sm" onclick="${open}">ખોલો</button></div>`;
   const p2 = `<div class="hero-card hero-quiz">${top('🧠 MCQ ટેસ્ટ')}
      <div class="hero-ring-row">${ringSVG(pct, null, 'ટેસ્ટ')}
@@ -3715,8 +3495,7 @@ function mqPrintPdf(testId){
 }
 function renderMock(){
   if(mqSession) return renderMqSession();
-  const seg = `<div class="seg"><button class="${mockView==='quiz'?'on':''}" onclick="setMockView('quiz')">🧠 MCQ ક્વિઝ</button><button class="${mockView==='score'?'on':''}" onclick="setMockView('score')">📝 મોક ગુણ</button></div>`;
-  return mockView==='quiz' ? renderMockQuiz(seg) : (mqSticky(seg) + renderMockScores());
+  return renderMockQuiz('');
 }
 
 /* ===================== AFTER-RENDER CHART HOOKS ===================== */
@@ -3852,12 +3631,6 @@ function afterRender(tab){
   }
   if(tab==='mock'){
     requestAnimationFrame(()=>{ document.querySelectorAll('#main .ring-progress').forEach(el=>{ el.style.strokeDashoffset = el.dataset.offset; }); });
-    const tests = [...mockTestsForActiveExam()].sort((a,b)=>a.date.localeCompare(b.date)).slice(-8);
-    if(tests.length && document.getElementById('chartMockTrend')){
-      const labels = tests.map(m=>formatDateShort(m.date));
-      const values = tests.map(m=>m.totalMarks ? Math.round(m.obtainedMarks/m.totalMarks*100) : 0);
-      drawBarChart('chartMockTrend', labels, values, getVar('--accent'), v=>v+'%');
-    }
   }
   if(tab==='exams'){
     requestAnimationFrame(()=>{
