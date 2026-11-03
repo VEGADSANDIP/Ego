@@ -408,8 +408,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-12';
-const APP_BUILT = '2026-11-03T11:53:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.03-13';
+const APP_BUILT = '2026-11-03T13:06:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -532,20 +532,29 @@ function daysLeftColor(d){
   if(d>=10) return getVar('--warning');
   return getVar('--danger');
 }
+/* અભ્યાસ ગણાય તેવા બધા દિવસ: અભ્યાસ લોગ + પૂર્ણ રિવિઝન + MCQ ટેસ્ટ આપેલી + પૂર્ણ MCQ રિવિઝન */
+function activityDates(exam){
+  const out = new Set();
+  if(!exam) return out;
+  const activeIds = activeExamSubjectIds();
+  DB.studyLogs.forEach(l=>{ if(activeIds.includes(l.subjectId) && l.date) out.add(l.date); });
+  DB.revisions.forEach(r=>{ if(activeIds.includes(r.subjectId) && r.status==='completed' && r.completedDate) out.add(r.completedDate); });
+  const tIds = new Set();
+  DB.qtests.forEach(t=>{ if(t.examId===exam.id){ tIds.add(t.id); (t.attempts||[]).forEach(a=>{ if(a.date) out.add(a.date); }); } });
+  (DB.qrevs||[]).forEach(r=>{ if(tIds.has(r.testId) && r.status==='completed' && r.completedDate) out.add(r.completedDate); });
+  return out;
+}
 function calcStudyStreak(exam){
   if(!exam) return {streak:0, todayDone:false};
-  const activeIds = activeExamSubjectIds();
-  const studyDates = new Set(DB.studyLogs.filter(l=>activeIds.includes(l.subjectId)).map(l=>l.date));
-  const revDates = new Set(DB.revisions.filter(r=>activeIds.includes(r.subjectId) && r.status==='completed' && r.completedDate).map(r=>r.completedDate));
-  const hasEntry = (ds)=> studyDates.has(ds) || revDates.has(ds);
+  const dates = activityDates(exam);
   const today = todayStr();
-  const todayDone = hasEntry(today);
+  const todayDone = dates.has(today);
   let cursor = new Date(today+'T00:00:00');
   if(!todayDone) cursor.setDate(cursor.getDate()-1);
   let streak = 0;
   while(true){
-    const ds = cursor.toISOString().slice(0,10);
-    if(hasEntry(ds)){ streak++; cursor.setDate(cursor.getDate()-1); }
+    const ds = toLocalISODate(cursor);
+    if(dates.has(ds)){ streak++; cursor.setDate(cursor.getDate()-1); }
     else break;
   }
   return {streak, todayDone};
@@ -553,14 +562,12 @@ function calcStudyStreak(exam){
 function studyWeek(exam){
   const out = [];
   if(!exam) return out;
-  const activeIds = activeExamSubjectIds();
-  const dates = new Set(DB.studyLogs.filter(l=>activeIds.includes(l.subjectId)).map(l=>l.date));
-  DB.revisions.forEach(r=>{ if(activeIds.includes(r.subjectId) && r.status==='completed' && r.completedDate) dates.add(r.completedDate); });
+  const dates = activityDates(exam);
   const names = ['રવિ','સોમ','મંગ','બુધ','ગુરુ','શુક્ર','શનિ'];
   const today = todayStr();
   for(let i=6;i>=0;i--){
     const d = new Date(today+'T00:00:00'); d.setDate(d.getDate()-i);
-    const ds = d.toISOString().slice(0,10);
+    const ds = toLocalISODate(d);
     out.push({ds, name:names[d.getDay()], done:dates.has(ds), today:ds===today});
   }
   return out;
