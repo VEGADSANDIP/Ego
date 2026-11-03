@@ -246,6 +246,27 @@ a{color:inherit;}
 .app-banner .btn{flex-shrink:0;}
 .stor-bar{height:10px; border-radius:6px; background:var(--surface2); overflow:hidden; margin:8px 0;}
 .stor-bar>i{display:block; height:100%; border-radius:6px; background:var(--success);}
+
+.pin-screen{position:fixed; inset:0; z-index:400; background:var(--bg); display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:max(28px, env(safe-area-inset-top)) 20px max(22px, env(safe-area-inset-bottom)); animation:pinIn .22s ease;}
+@keyframes pinIn{from{opacity:0; transform:scale(1.04);}to{opacity:1; transform:none;}}
+.pin-top{text-align:center; margin-top:6vh; width:100%;}
+.pin-lock{font-size:30px; margin-bottom:10px;}
+.pin-title{font-size:20px; font-weight:800;}
+.pin-sub{min-height:20px; margin-top:6px; font-size:13px; color:var(--ink-dim);}
+.pin-dots{display:flex; gap:18px; justify-content:center; margin:26px 0 8px;}
+.pin-dots i{width:15px; height:15px; border-radius:50%; border:2px solid var(--ink-dim); transition:background .12s, transform .12s;}
+.pin-dots i.on{background:var(--ink); border-color:var(--ink); transform:scale(1.08);}
+.pin-dots.shake{animation:pinShake .42s;}
+@keyframes pinShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-12px);}40%{transform:translateX(10px);}60%{transform:translateX(-8px);}80%{transform:translateX(6px);}}
+.pin-len{display:inline-flex; gap:6px; margin-top:12px; background:var(--surface2); padding:4px; border-radius:12px;}
+.pin-len button{border:none; background:transparent; color:var(--ink-dim); padding:7px 14px; border-radius:9px; font-weight:700; font-family:inherit; font-size:13px;}
+.pin-len button.on{background:var(--surface); color:var(--ink); box-shadow:var(--shadow);}
+.pin-pad{display:grid; grid-template-columns:repeat(3,76px); gap:16px 22px; justify-content:center; margin-bottom:6px;}
+.pin-key{width:76px; height:76px; border-radius:50%; border:none; background:var(--surface2); color:var(--ink); font-size:28px; font-weight:600; font-family:inherit; -webkit-tap-highlight-color:transparent; transition:background .1s, transform .08s;}
+.pin-key:active{background:var(--primary); color:#fff; transform:scale(.94);}
+.pin-key.pin-aux{background:transparent; font-size:14px; font-weight:700; color:var(--ink-dim);}
+.pin-key.pin-aux:active{background:var(--surface2); color:var(--ink);}
+.pin-back2{border:none; background:transparent; color:var(--ink-dim); font-weight:700; font-family:inherit; font-size:13px; padding:6px;}
 .toast{position:fixed; bottom:92px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13.5px; z-index:200; box-shadow:var(--shadow); max-width:85%; text-align:center;}
 .toast.hidden{display:none;}
 .toast-error{background:var(--danger); color:#fff;}
@@ -362,8 +383,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-7';
-const APP_BUILT = '2026-11-03T06:10:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.03-8';
+const APP_BUILT = '2026-11-03T06:35:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -2852,18 +2873,175 @@ async function lockHash(pw, saltHex){
   }
   let h = 5381; const str = saltHex+pw; for(let i=0;i<str.length;i++){ h = ((h<<5)+h) ^ str.charCodeAt(i); } return 'x'+(h>>>0).toString(16);
 }
-async function lockSetPassword(pw, hint){
+async function lockSetPassword(pw, hint, len, fp){
   const salt = _hex((crypto.getRandomValues ? crypto.getRandomValues(new Uint8Array(16)) : new Uint8Array(16).map(()=>Math.floor(Math.random()*256))));
   const hash = await lockHash(pw, salt);
-  localStorage.setItem(LOCK_KEY, JSON.stringify({salt, hash, hint: hint||''}));
+  localStorage.setItem(LOCK_KEY, JSON.stringify({salt, hash, hint: hint||'', len: len||0, fp: fp||null}));
 }
 async function lockCheck(pw){ const l = lockGet(); if(!l) return true; return (await lockHash(pw, l.salt)) === l.hash; }
 
 let _lockCb = null, _lockFails = 0, _lockBlockUntil = 0;
-/* સુરક્ષિત ક્રિયા: પાસવર્ડ પૂછે, સાચો હોય તો જ cb ચાલે. પાસવર્ડ સેટ ન હોય તો પહેલા સેટ કરાવે. */
+function lockIsPin(){ const l = lockGet(); return !!(l && l.len); }
+
+/* ---------- મોબાઈલ જેવી PIN સ્ક્રીન ---------- */
+let _pin = null;
+function pinClose(){ const el = document.getElementById('pinScreen'); if(el) el.remove(); _pin = null; document.body.style.overflow=''; }
+/* opts: {title, sub, len, allowLenPick, fp, onDone(pin)->Promise<true|string>, onCancel} */
+function pinOpen(opts){
+  pinClose();
+  _pin = Object.assign({val:'', busy:false}, opts);
+  const el = document.createElement('div'); el.id = 'pinScreen'; el.className = 'pin-screen';
+  document.body.appendChild(el); document.body.style.overflow='hidden';
+  pinRender();
+  if(opts.fp) setTimeout(pinFingerprint, 350);
+}
+function pinRender(){
+  const el = document.getElementById('pinScreen'); if(!el || !_pin) return;
+  const P = _pin;
+  const dots = Array.from({length:P.len}, (_,i)=>`<i class="${i<P.val.length?'on':''}"></i>`).join('');
+  const key = d=>`<button class="pin-key" onclick="pinPress('${d}')">${d}</button>`;
+  el.innerHTML = `
+    <div class="pin-top">
+      <div class="pin-lock">🔒</div>
+      <div class="pin-title">${esc(P.title)}</div>
+      <div class="pin-sub" id="pinSub">${esc(P.sub||'')}</div>
+      <div class="pin-dots" id="pinDots">${dots}</div>
+      ${P.allowLenPick?`<div class="pin-len"><button class="${P.len===4?'on':''}" onclick="pinSetLen(4)">4 અંક</button><button class="${P.len===6?'on':''}" onclick="pinSetLen(6)">6 અંક</button></div>`:''}
+    </div>
+    <div class="pin-pad">
+      ${[1,2,3,4,5,6,7,8,9].map(key).join('')}
+      <button class="pin-key pin-aux" onclick="pinCancel()">રદ કરો</button>
+      ${key(0)}
+      ${P.fp ? `<button class="pin-key pin-aux" onclick="pinFingerprint()" aria-label="ફિંગરપ્રિન્ટ">👆</button>` : `<button class="pin-key pin-aux" onclick="pinBack()" aria-label="ભૂંસો">⌫</button>`}
+    </div>
+    ${P.fp ? `<button class="pin-back2" onclick="pinBack()">⌫ ભૂંસો</button>` : ''}`;
+}
+function pinSetLen(n){ if(!_pin||_pin.busy) return; _pin.len = n; _pin.val=''; pinRender(); }
+function pinBack(){ if(!_pin||_pin.busy) return; _pin.val = _pin.val.slice(0,-1); pinRender(); }
+function pinCancel(){ const cb = _pin && _pin.onCancel; pinClose(); _lockCb = null; if(cb) cb(); }
+function pinMsg(t){ const e = document.getElementById('pinSub'); if(e) e.textContent = t; }
+async function pinPress(d){
+  if(!_pin || _pin.busy) return;
+  if(_pin.val.length >= _pin.len) return;
+  try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+  _pin.val += d; pinRender();
+  if(_pin.val.length === _pin.len){
+    _pin.busy = true;
+    const pin = _pin.val;
+    await new Promise(r=>setTimeout(r,120));
+    const res = await _pin.onDone(pin);
+    if(!_pin) return;                      /* onDone એ સ્ક્રીન બદલી/બંધ કરી */
+    if(res === true){ return; }
+    _pin.busy = false; _pin.val = '';
+    const dots = document.getElementById('pinDots');
+    try{ navigator.vibrate && navigator.vibrate([60,40,60]); }catch(e){}
+    if(dots){ dots.classList.add('shake'); setTimeout(()=>{ pinRender(); pinMsg(typeof res==='string'?res:''); }, 420); }
+    else { pinRender(); }
+  }
+}
+/* ---------- ફિંગરપ્રિન્ટ (ફોનનું બાયોમેટ્રિક, WebAuthn) ---------- */
+function _b64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function _unb64(str){ return Uint8Array.from(atob(str), c=>c.charCodeAt(0)); }
+async function fpSupported(){
+  try{ return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); }catch(e){ return false; }
+}
+async function fpEnroll(){
+  const cred = await navigator.credentials.create({publicKey:{
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rp:{name:'ExamPath'}, user:{id:crypto.getRandomValues(new Uint8Array(16)), name:'exampath', displayName:'ExamPath'},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform', userVerification:'required'}, timeout:60000
+  }});
+  return _b64(cred.rawId);
+}
+async function fpVerify(){
+  const l = lockGet(); if(!l || !l.fp) return false;
+  try{
+    await navigator.credentials.get({publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials:[{id:_unb64(l.fp), type:'public-key', transports:['internal']}],
+      userVerification:'required', timeout:60000
+    }});
+    return true;
+  }catch(e){ return false; }
+}
+async function pinFingerprint(){
+  if(!_pin || !_pin.fp || _pin.busy) return;
+  pinMsg('👆 ફિંગરપ્રિન્ટ મૂકો…');
+  if(await fpVerify()){ if(_pin && _pin.onFp) _pin.onFp(); }
+  else pinMsg('પાસવર્ડ દાખલ કરો');
+}
+
+/* ---------- સુરક્ષિત ક્રિયા ---------- */
 function guard(label, cb){
   _lockCb = cb;
-  if(!lockHasPw()){ lockSetSheet(label, true); return; }
+  if(!lockHasPw()){ lockSetupFlow(label); return; }
+  if(!lockIsPin()){ guardLegacy(label); return; }
+  const l = lockGet();
+  const finish = ()=>{ _lockFails = 0; const c = _lockCb; _lockCb = null; pinClose(); if(c) c(); };
+  pinOpen({
+    title:'પાસવર્ડ દાખલ કરો', sub:label, len:l.len, fp:!!l.fp, onFp:finish,
+    onDone: async (pin)=>{
+      const wait = _lockBlockUntil - Date.now();
+      if(wait>0) return `ઘણા ખોટા પ્રયાસ. ${Math.ceil(wait/1000)} સેકન્ડ રાહ જુઓ`;
+      if(await lockCheck(pin)){ finish(); return true; }
+      _lockFails++;
+      if(_lockFails>=5){ _lockBlockUntil = Date.now()+30000; _lockFails = 0; return 'ઘણા ખોટા પ્રયાસ. 30 સેકન્ડ રાહ જુઓ'; }
+      return '❌ પાસવર્ડ ખોટો છે';
+    }
+  });
+}
+/* નવો PIN બનાવવાની પ્રક્રિયા: દાખલ કરો → ફરી દાખલ કરો → સેવ */
+function lockSetupFlow(label, keepFp){
+  const prevLen = (lockGet()||{}).len || 4;
+  const step1 = (len)=>pinOpen({
+    title:'નવો પાસવર્ડ બનાવો', sub: label ? label+' પહેલા પાસવર્ડ સેટ કરો' : '4 કે 6 અંકનો પાસવર્ડ', len, allowLenPick:true,
+    onDone: async (pin1)=>{
+      pinOpen({
+        title:'ફરી દાખલ કરો', sub:'એ જ પાસવર્ડ ફરી લખો', len:pin1.length,
+        onCancel:()=>{ _lockCb=null; },
+        onDone: async (pin2)=>{
+          if(pin1!==pin2){ setTimeout(()=>step1(pin1.length),450); return 'બંને પાસવર્ડ સરખા નથી — ફરી શરૂ કરો'; }
+          await lockSetPassword(pin1, '', pin1.length, keepFp ? (lockGet()||{}).fp : null);
+          const cb = _lockCb; _lockCb = null; pinClose(); toast('પાસવર્ડ સેવ થયો 🔒');
+          if(currentTab==='settings') renderMain();
+          if(cb) cb();
+          return true;
+        }
+      });
+      return true;
+    }
+  });
+  step1(prevLen);
+}
+function lockChangeFlow(){ guard('પાસવર્ડ બદલવા માટે', ()=>lockSetupFlow('', false)); }
+function lockRemoveSheet(){
+  guard('પાસવર્ડ દૂર કરવા માટે', ()=>{ localStorage.removeItem(LOCK_KEY); toast('પાસવર્ડ દૂર થયો'); renderMain(); });
+}
+async function fpToggle(){
+  const l = lockGet(); if(!l) return;
+  if(l.fp){ l.fp = null; localStorage.setItem(LOCK_KEY, JSON.stringify(l)); toast('ફિંગરપ્રિન્ટ બંધ કર્યું'); renderMain(); return; }
+  guard('ફિંગરપ્રિન્ટ ચાલુ કરવા માટે', async ()=>{
+    try{
+      const id = await fpEnroll();
+      const cur = lockGet(); cur.fp = id; localStorage.setItem(LOCK_KEY, JSON.stringify(cur));
+      toast('ફિંગરપ્રિન્ટ ચાલુ થયું 👆'); renderMain();
+    }catch(e){ toast('ફિંગરપ્રિન્ટ ચાલુ ન થયું (ફોનમાં ફિંગરપ્રિન્ટ/સ્ક્રીન લોક સેટ છે?)','error'); }
+  });
+}
+let _fpOK = false;
+fpSupported().then(v=>{ _fpOK = v; if(v && currentTab==='settings') renderMain(); });
+function lockCardHTML(){
+  if(!lockHasPw()) return `<div class="item cursor-default"><span>🔓 પાસવર્ડ</span><span class="badge badge-warning">સેટ નથી</span></div>
+      <button class="btn btn-primary btn-block mt-8" onclick="lockSetupFlow('')">🔒 પાસવર્ડ સેટ કરો (4 / 6 અંક)</button>`;
+  const l = lockGet();
+  return `<div class="item cursor-default"><span>🔒 પાસવર્ડ ${l.len?`<span class="ink-dim fs-12">(${l.len} અંક)</span>`:'<span class="ink-dim fs-12">(જૂનો)</span>'}</span><span class="badge badge-success">ચાલુ</span></div>
+      <div style="display:flex; gap:8px; margin-top:8px;"><button class="btn btn-secondary flex-1" onclick="${lockIsPin()?'lockChangeFlow()':"guard('પાસવર્ડ બદલવા માટે', ()=>lockSetupFlow(''))"}">${lockIsPin()?'બદલો':'4/6 અંકનો કરો'}</button><button class="btn btn-secondary flex-1" onclick="lockRemoveSheet()">દૂર કરો</button></div>
+      ${(_fpOK && lockIsPin()) ? `<div class="item cursor-default mt-8"><span>👆 ફિંગરપ્રિન્ટ</span><button class="btn btn-sm ${l.fp?'btn-secondary':'btn-primary'}" onclick="fpToggle()">${l.fp?'બંધ કરો':'ચાલુ કરો'}</button></div>` : ''}`;
+}
+
+/* ---- જૂનો (અક્ષરવાળો) પાસવર્ડ: ફક્ત ખોલવા / બદલવા માટે ---- */
+function guardLegacy(label){
   const l = lockGet();
   openSheet(`
     <h3>🔒 પાસવર્ડ જરૂરી</h3>
@@ -2872,55 +3050,14 @@ function guard(label, cb){
     ${l.hint?`<div class="ink-dim fs-12">💡 સંકેત: ${esc(l.hint)}</div>`:''}
     <div id="lockMsg" class="fs-12" style="color:var(--danger); min-height:18px; margin-top:6px;"></div>
     <div class="sheet-actions"><button class="btn btn-secondary" onclick="closeSheet()">રદ કરો</button><button class="btn btn-primary btn-block" onclick="lockSubmit()">ચાલુ રાખો</button></div>`);
-  setTimeout(()=>{ const i=document.getElementById('f_lockPw'); if(i) i.focus(); }, 100);
 }
 async function lockSubmit(){
   const msg = document.getElementById('lockMsg');
   const wait = _lockBlockUntil - Date.now();
   if(wait>0){ msg.textContent = `ઘણા ખોટા પ્રયાસ. ${Math.ceil(wait/1000)} સેકન્ડ રાહ જુઓ.`; return; }
   const pw = (document.getElementById('f_lockPw')||{}).value || '';
-  if(await lockCheck(pw)){
-    _lockFails = 0; const cb = _lockCb; _lockCb = null; closeSheet(); if(cb) cb();
-  } else {
-    _lockFails++;
-    if(_lockFails>=5){ _lockBlockUntil = Date.now()+30000; _lockFails = 0; msg.textContent = 'ઘણા ખોટા પ્રયાસ. 30 સેકન્ડ રાહ જુઓ.'; }
-    else msg.textContent = '❌ પાસવર્ડ ખોટો છે';
-  }
-}
-/* પાસવર્ડ સેટ / બદલો */
-function lockSetSheet(label, forAction){
-  const has = lockHasPw();
-  openSheet(`
-    <h3>🔒 ${has?'પાસવર્ડ બદલો':'પાસવર્ડ સેટ કરો'}</h3>
-    ${forAction?`<div class="ink-dim fs-12 mb-6">${esc(label)} પહેલા પાસવર્ડ સેટ કરવો પડશે.</div>`:''}
-    ${has?`<div class="field"><label>હાલનો પાસવર્ડ</label><input type="password" id="f_lockOld" autocomplete="off"></div>`:''}
-    <div class="field"><label>નવો પાસવર્ડ (ઓછામાં ઓછા 4 અક્ષર)</label><input type="password" id="f_lockNew" autocomplete="off"></div>
-    <div class="field"><label>ફરી લખો</label><input type="password" id="f_lockNew2" autocomplete="off"></div>
-    <div class="field"><label>સંકેત (વૈકલ્પિક — ભૂલી જાઓ તો યાદ કરાવશે)</label><input type="text" id="f_lockHint" value="${has?esc((lockGet()||{}).hint||''):''}" placeholder="દા.ત. મારા પાળતુ પ્રાણીનું નામ"></div>
-    <div class="ink-dim fs-12">⚠️ પાસવર્ડ ભૂલી જશો તો પાછો મળશે નહીં — એટલે યાદ રાખજો.</div>
-    <div id="lockMsg" class="fs-12" style="color:var(--danger); min-height:18px; margin-top:6px;"></div>
-    <div class="sheet-actions"><button class="btn btn-secondary" onclick="closeSheet(); _lockCb=null;">રદ કરો</button><button class="btn btn-primary btn-block" onclick="lockSaveNew(${forAction?'true':'false'})">સેવ કરો</button></div>`);
-}
-async function lockSaveNew(forAction){
-  const msg = document.getElementById('lockMsg');
-  if(lockHasPw()){ if(!(await lockCheck(val('f_lockOld')))){ msg.textContent = '❌ હાલનો પાસવર્ડ ખોટો છે'; return; } }
-  const a = (document.getElementById('f_lockNew')||{}).value||'', b = (document.getElementById('f_lockNew2')||{}).value||'';
-  if(a.length<4){ msg.textContent = 'પાસવર્ડ ઓછામાં ઓછા 4 અક્ષરનો રાખો'; return; }
-  if(a!==b){ msg.textContent = 'બંને પાસવર્ડ સરખા નથી'; return; }
-  await lockSetPassword(a, val('f_lockHint'));
-  const cb = forAction ? _lockCb : null; _lockCb = null; closeSheet(); toast('પાસવર્ડ સેવ થયો 🔒');
-  if(currentTab==='settings') renderMain();
-  if(cb) cb();
-}
-function lockRemoveSheet(){
-  guard('પાસવર્ડ દૂર કરવા માટે', ()=>{ localStorage.removeItem(LOCK_KEY); toast('પાસવર્ડ દૂર થયો'); renderMain(); });
-}
-function lockCardHTML(){
-  return lockHasPw()
-   ? `<div class="item cursor-default"><span>🔒 પાસવર્ડ</span><span class="badge badge-success">ચાલુ</span></div>
-      <div style="display:flex; gap:8px; margin-top:8px;"><button class="btn btn-secondary flex-1" onclick="lockSetSheet()">બદલો</button><button class="btn btn-secondary flex-1" onclick="lockRemoveSheet()">દૂર કરો</button></div>`
-   : `<div class="item cursor-default"><span>🔓 પાસવર્ડ</span><span class="badge badge-warning">સેટ નથી</span></div>
-      <button class="btn btn-primary btn-block mt-8" onclick="lockSetSheet()">🔒 પાસવર્ડ સેટ કરો</button>`;
+  if(await lockCheck(pw)){ _lockFails = 0; const cb = _lockCb; _lockCb = null; closeSheet(); if(cb) cb(); }
+  else{ _lockFails++; if(_lockFails>=5){ _lockBlockUntil = Date.now()+30000; _lockFails = 0; msg.textContent = 'ઘણા ખોટા પ્રયાસ. 30 સેકન્ડ રાહ જુઓ.'; } else msg.textContent = '❌ પાસવર્ડ ખોટો છે'; }
 }
 function importPick(){ const i = document.getElementById('importFile'); if(i){ i.value=''; i.click(); } }
 function exportBackup(){
