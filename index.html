@@ -408,8 +408,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-14';
-const APP_BUILT = '2026-11-03T16:31:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.03-15';
+const APP_BUILT = '2026-11-03T18:16:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3942,6 +3942,7 @@ function mqFolderBookHTML(f){
   const tests = mqFolderTestsDeep(f.id);
   const nT = tests.length, nF = mqFolders(f.id).length;
   const attempted = tests.filter(t=>(t.attempts||[]).length).length;
+  const totalTimes = tests.reduce((a,t)=>a+(t.attempts||[]).length,0);
   const pct = nT ? Math.round(attempted/nT*100) : 0;
   const ids = new Set(tests.map(t=>t.id));
   const revs = (DB.qrevs||[]).filter(r=>ids.has(r.testId));
@@ -3951,10 +3952,11 @@ function mqFolderBookHTML(f){
   const edit = `openQFolderForm('${f.id}')`;
   const front = `<div class="card cursor-pointer" onclick="${nav}">
     ${progressCardHeader(pct, '📁 '+esc(f.name), edit)}
-    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:14px;">
       <div class="subject-mini-stat"><b>${nT}</b><span>કુલ ટેસ્ટ</span></div>
-      <div class="subject-mini-stat"><b>${attempted}</b><span>આપેલી ટેસ્ટ</span></div>
-      <div class="subject-mini-stat"><b>${nT-attempted}</b><span>બાકી ટેસ્ટ</span></div>
+      <div class="subject-mini-stat"><b>${attempted}</b><span>આપેલી</span></div>
+      <div class="subject-mini-stat"><b>${nT-attempted}</b><span>બાકી</span></div>
+      <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--primary) 16%, transparent);"><b>${totalTimes}</b><span>કુલ વખત</span></div>
     </div>
     <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${nF?nF+' સબફોલ્ડર · ':''}ખોલવા ટેપ કરો → · રિવિઝન માટે સ્વાઇપ કરો</div>
   </div>`;
@@ -3976,7 +3978,7 @@ function dashboardQuizPages(exam){
   const lastPcts = attempted.map(t=>t.attempts[t.attempts.length-1].pct);
   const avg = lastPcts.length ? Math.round(lastPcts.reduce((a,b)=>a+b,0)/lastPcts.length) : 0;
   const today = todayStr();
-  const mainFolders = mqFolders(null).length;
+  const totalTimesAll = tests.reduce((a,t)=>a+(t.attempts||[]).length,0);
   const pct = Math.round(attempted.length/tests.length*100);
   const revs = qrevsForActiveExam();
   const rDone = revs.filter(r=>r.status==='completed').length;
@@ -3991,7 +3993,7 @@ function dashboardQuizPages(exam){
        <div class="hero-ring-stats">
          <div class="ring-stat"><span>ટેસ્ટ પૂર્ણ</span><b><span class="hero-count" data-target="${attempted.length}">0</span>/${tests.length}</b></div>
          <div class="ring-stat"><span>સરેરાશ સ્કોર</span><b>${lastPcts.length?avg+'%':'-'}</b></div>
-         <div class="ring-stat"><span>કુલ ફોલ્ડર</span><b class="hero-count" data-target="${mainFolders}">0</b></div>
+         <div class="ring-stat"><span>કુલ વખત આપી</span><b class="hero-count" data-target="${totalTimesAll}">0</b></div>
        </div></div></div>`;
   const p3 = `<div class="hero-card hero-qrev">${top('🔁 ટેસ્ટ રિવિઝન')}
      <div class="hero-ring-row">${ringSVG(rPct, null, 'રિવિઝન')}
