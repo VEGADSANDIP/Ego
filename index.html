@@ -267,6 +267,9 @@ a{color:inherit;}
 .pin-key.pin-aux{background:transparent; font-size:14px; font-weight:700; color:var(--ink-dim);}
 .pin-key.pin-aux:active{background:var(--surface2); color:var(--ink);}
 .pin-back2{border:none; background:transparent; color:var(--ink-dim); font-weight:700; font-family:inherit; font-size:13px; padding:6px;}
+.mq-pick-row{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px;}
+.mq-pick-row input{width:20px; height:20px; flex-shrink:0;}
+.mq-pick-folder{font-weight:800;}
 .toast{position:fixed; bottom:92px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13.5px; z-index:200; box-shadow:var(--shadow); max-width:85%; text-align:center;}
 .toast.hidden{display:none;}
 .toast-error{background:var(--danger); color:#fff;}
@@ -383,8 +386,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-9';
-const APP_BUILT = '2026-11-03T05:55:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.03-10';
+const APP_BUILT = '2026-11-03T06:18:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3255,7 +3258,65 @@ function mqWholeFolderCardHTML(q){
       <button class="btn btn-secondary btn-sm" onclick="mqStart('${id}','read')">📖 વાંચન</button>
       <button class="btn btn-secondary btn-sm" onclick="openMqPdf('${id}')">📄 PDF</button>
     </div>
+    <button class="btn btn-secondary btn-block mt-8" onclick="mqPickOpen()">✅ ટેસ્ટ / ફોલ્ડર પસંદ કરીને આપો</button>
   </div>`;
+}
+/* ---- પસંદ કરેલી ટેસ્ટ (ફોલ્ડર / ટેસ્ટ ટિક કરીને) ---- */
+let mqPickSel = new Set();
+function mqPickTestsUnder(fid){
+  let out = mqTests(fid).slice();
+  mqFolders(fid).forEach(f=>{ out = out.concat(mqPickTestsUnder(f.id)); });
+  return out;
+}
+function mqPickTree(fid, depth){
+  let h = '';
+  mqTests(fid).forEach(t=>{
+    h += `<label class="mq-pick-row" style="padding-left:${depth*16}px;"><input type="checkbox" ${mqPickSel.has(t.id)?'checked':''} onchange="mqPickToggle('${t.id}')"><span style="flex:1;min-width:0;">${esc(t.name)}</span><span class="ink-dim fs-12">${t.questions.length}</span></label>`;
+  });
+  mqFolders(fid).forEach(f=>{
+    const all = mqPickTestsUnder(f.id); if(!all.length) return;
+    const on = all.filter(t=>mqPickSel.has(t.id)).length;
+    h += `<label class="mq-pick-row mq-pick-folder" style="padding-left:${depth*16}px;"><input type="checkbox" ${on===all.length?'checked':''} ${(on>0&&on<all.length)?'data-part="1"':''} onchange="mqPickFolder('${f.id}', this.checked)"><span style="flex:1;min-width:0;">📁 ${esc(f.name)}</span><span class="ink-dim fs-12">${on}/${all.length}</span></label>`;
+    h += mqPickTree(f.id, depth+1);
+  });
+  return h;
+}
+function mqPickOpen(){
+  mqPickSel = new Set();
+  mqPickRender();
+}
+function mqPickRender(){
+  const all = mqPickTestsUnder(mqFolderId);
+  const sel = all.filter(t=>mqPickSel.has(t.id));
+  const nQ = sel.reduce((a,t)=>a+t.questions.length,0);
+  const ids = 'sel:'+sel.map(t=>t.id).join(',');
+  const dis = sel.length ? '' : 'disabled';
+  const sc = (document.querySelector('#mqPickList')||{}).scrollTop || 0;
+  openSheet(`
+    <div class="sheet-title">✅ ટેસ્ટ પસંદ કરો</div>
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <button class="btn btn-sm btn-secondary" onclick="mqPickAll(true)">બધી</button>
+      <button class="btn btn-sm btn-secondary" onclick="mqPickAll(false)">કોઈ નહીં</button>
+      <span class="ink-dim fs-12" style="margin-left:auto; align-self:center;"><b>${sel.length}</b> ટેસ્ટ · <b>${nQ}</b> પ્રશ્નો</span>
+    </div>
+    <div id="mqPickList" style="max-height:46vh; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${mqPickTree(mqFolderId,0)}</div>
+    <div class="mq-actions" style="margin-top:12px;">
+      <button class="btn btn-primary btn-sm" ${dis} onclick="mqPickGo('${ids}','test')">⏱ ટેસ્ટ</button>
+      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','practice')">✍ પ્રેક્ટિસ</button>
+      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','read')">📖 વાંચન</button>
+      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','pdf')">📄 PDF</button>
+    </div>`);
+  const l = document.getElementById('mqPickList'); if(l) l.scrollTop = sc;
+  document.querySelectorAll('#mqPickList input[data-part]').forEach(i=>{ i.indeterminate = true; });
+}
+function mqPickToggle(id){ const l=document.getElementById('mqPickList'); const st=l?l.scrollTop:0; if(mqPickSel.has(id)) mqPickSel.delete(id); else mqPickSel.add(id); mqPickRender(); const n=document.getElementById('mqPickList'); if(n) n.scrollTop=st; }
+function mqPickFolder(fid, on){ const l=document.getElementById('mqPickList'); const st=l?l.scrollTop:0; mqPickTestsUnder(fid).forEach(t=>{ if(on) mqPickSel.add(t.id); else mqPickSel.delete(t.id); }); mqPickRender(); const n=document.getElementById('mqPickList'); if(n) n.scrollTop=st; }
+function mqPickAll(on){ mqPickSel = new Set(on ? mqPickTestsUnder(mqFolderId).map(t=>t.id) : []); mqPickRender(); }
+function mqPickGo(id, mode){
+  closeSheet();
+  if(mode==='read') mqStart(id,'read');
+  else if(mode==='pdf') openMqPdf(id);
+  else openMqSet(id, mode);
 }
 function mqListHTML(){
   const q = (mqQuery||'').trim().toLowerCase();
@@ -3416,6 +3477,7 @@ function mqBuildSet(t, idx, setCode){
   return {idx: order, perm};
 }
 function mqSetHolder(id){
+  if(typeof id==='string' && id.startsWith('sel:')) return _mqSelHolder;
   if(typeof id==='string' && id.startsWith('folder:')) return DB.qfolders.find(x=>x.id===id.slice(7));
   return DB.qtests.find(x=>x.id===id);
 }
@@ -3507,7 +3569,15 @@ function mqExit(force){
   }
   mqSession = null; clearInterval(mqTimerHandle); renderMain(); mqScrollTop();
 }
+let _mqSelHolder = {};
 function mqGetTest(id){
+  if(typeof id==='string' && id.startsWith('sel:')){
+    const ids = id.slice(4).split(',').filter(Boolean);
+    const tests = ids.map(i=>DB.qtests.find(x=>x.id===i)).filter(Boolean);
+    if(!tests.length) return null;
+    const questions = []; tests.forEach(t=>t.questions.forEach(q=>questions.push(q)));
+    return {id, name:'પસંદ કરેલી ટેસ્ટ ('+tests.length+')', questions, attempts:[], virtual:true, folderId:mqFolderId, nTests:tests.length};
+  }
   if(typeof id==='string' && id.startsWith('folder:')){
     const fid = id.slice(7);
     const f = DB.qfolders.find(x=>x.id===fid); if(!f) return null;
