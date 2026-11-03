@@ -361,7 +361,7 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-2';
+const APP_VERSION = '2026.11.03-3';
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -465,6 +465,7 @@ let calYear = new Date().getFullYear();
 let calMode = 'study';
 let calKind = 'topic';
 let dashStatTab = 'study';
+let dashListTab = 'study';
 let calGridExpanded = false;
 let revCalSelectedDate = null;
 
@@ -903,8 +904,9 @@ function renderDashboard(){
      ${statCard('📘', total-completed, 'બાકી ટોપિક')}
    </div>`)}
 
-   ${dashboardQuizList()}
+   ${dashListTabsHTML()}
 
+   ${dashListTab==='mcq' ? dashMcqLists() : `
    ${inProgressTopics.length ? card('ચાલુ ટોપિક 🟡 <span class="ink-dim fw-400">(ટેપ કરી ચેપ્ટર જુઓ)</span>', `<div class="scroll-list-sm">${inProgressTopics.map(t=>dashboardTopicRow(t)).join('')}</div>`) : ''}
 
    ${importantPendingTopics.length ? card('⭐ મહત્વના બાકી ટોપિક <span class="ink-dim fw-400">(પેપર એનાલિસિસ પ્રમાણે)</span>', `<div class="scroll-list-sm">${importantPendingTopics.map(t=>dashboardImportantTopicRow(t)).join('')}</div>`) : ''}
@@ -922,7 +924,7 @@ function renderDashboard(){
    </div>` : ''}
 
 
-   ${priorityList.length ? card('વેઈટેજ પ્રમાણે અગ્રતા 🎯', priorityList.slice(0,5).map(p=>`<div class="item" onclick="navigateToSection('${p.section.id}')"><span>📂 ${esc(p.section.name)} <span class="ink-dim">(${p.section.totalMarks} ગુણ)</span></span><span class="badge badge-warning">${p.remaining} બાકી</span></div>`).join('')) : ''}
+   ${priorityList.length ? card('વેઈટેજ પ્રમાણે અગ્રતા 🎯', priorityList.slice(0,5).map(p=>`<div class="item" onclick="navigateToSection('${p.section.id}')"><span>📂 ${esc(p.section.name)} <span class="ink-dim">(${p.section.totalMarks} ગુણ)</span></span><span class="badge badge-warning">${p.remaining} બાકી</span></div>`).join('')) : ''}`}
 
   `;
 }
@@ -3588,6 +3590,30 @@ function dashStatsHTML(studyGrid){
      <button class="${dashStatTab==='mcq'?'on':''}" onclick="dashStatTab='mcq'; renderMain();">🧠 MCQ ટેસ્ટ</button>
    </div>
    ${dashStatTab==='mcq' ? dashMcqStats() : studyGrid}`;
+}
+function dashListTabsHTML(){
+  return `<div class="seg">
+     <button class="${dashListTab==='study'?'on':''}" onclick="dashListTab='study'; renderMain();">📖 અભ્યાસ</button>
+     <button class="${dashListTab==='mcq'?'on':''}" onclick="dashListTab='mcq'; renderMain();">🧠 ટેસ્ટ</button>
+   </div>`;
+}
+function dashMcqLists(){
+  const today = todayStr();
+  const revs = qrevsForActiveExam();
+  const todayAtt = mqAttemptsOn(today);
+  const dueToday = revs.filter(r=>r.dueDate===today).sort((a,b)=>(a.status==='completed')-(b.status==='completed'));
+  const overdue = revs.filter(r=>r.status==='pending' && r.dueDate<today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const empty = t=>`<div class="ink-dim" style="padding:8px 2px;">${t}</div>`;
+  return `
+   <div class="card"><div class="card-title">આજની ટેસ્ટ 🧠 <span class="ink-dim fw-400">(${todayAtt.length})</span></div>
+     ${todayAtt.length ? `<div class="scroll-list-sm">${todayAtt.map(({t,a})=>`<div class="item" onclick="mqGoToTest('${t.id}')"><span style="flex:1;min-width:0;"><b>${esc(t.name)}</b> <span class="ink-dim fs-12">${esc(mqFolderPath(t.folderId).join(' › '))}</span></span><span class="badge badge-success">${a.pct}%</span></div>`).join('')}</div>` : empty('આજે હજી કોઈ ટેસ્ટ આપી નથી.')}
+   </div>
+   <div class="card"><div class="card-title">આજની રિવિઝન ટેસ્ટ 🔁 <span class="ink-dim fw-400">(${dueToday.filter(r=>r.status==='completed').length}/${dueToday.length})</span></div>
+     ${dueToday.length ? `<div class="scroll-list-sm">${dueToday.map(r=>qrevRowHTML(r,false,true)).join('')}</div>` : empty('આજે કોઈ રિવિઝન ટેસ્ટ નથી.')}
+   </div>
+   <div class="card"><div class="card-title">બાકી રિવિઝન ટેસ્ટ ⏰ <span class="ink-dim fw-400">(${overdue.length})</span></div>
+     ${overdue.length ? `<div class="scroll-list-sm">${overdue.map(r=>qrevRowHTML(r,true,true)).join('')}</div>` : empty('કોઈ બાકી રિવિઝન નથી 🎉')}
+   </div>`;
 }
 function dashboardQuizList(){
   const today = todayStr();
