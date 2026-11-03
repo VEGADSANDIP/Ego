@@ -408,8 +408,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-13';
-const APP_BUILT = '2026-11-03T13:06:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.03-14';
+const APP_BUILT = '2026-11-03T16:31:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3639,15 +3639,15 @@ function mqGetTest(id){
     const ids = id.slice(4).split(',').filter(Boolean);
     const tests = ids.map(i=>DB.qtests.find(x=>x.id===i)).filter(Boolean);
     if(!tests.length) return null;
-    const questions = []; tests.forEach(t=>t.questions.forEach(q=>questions.push(q)));
-    return {id, name:'પસંદ કરેલી ટેસ્ટ ('+tests.length+')', questions, attempts:[], virtual:true, folderId:mqFolderId, nTests:tests.length};
+    const questions = [], srcs = []; tests.forEach(t=>t.questions.forEach((q,i)=>{ questions.push(q); srcs.push({t:t.id, i}); }));
+    return {id, name:'પસંદ કરેલી ટેસ્ટ ('+tests.length+')', questions, srcs, attempts:[], virtual:true, folderId:mqFolderId, nTests:tests.length};
   }
   if(typeof id==='string' && id.startsWith('folder:')){
     const fid = id.slice(7);
     const f = DB.qfolders.find(x=>x.id===fid); if(!f) return null;
     const tests = mqFolderTestsDeep(fid).slice().sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true}));
-    const questions = []; tests.forEach(t=>t.questions.forEach(q=>questions.push(q)));
-    return {id, name:f.name, questions, attempts:[], virtual:true, folderId:fid, nTests:tests.length};
+    const questions = [], srcs = []; tests.forEach(t=>t.questions.forEach((q,i)=>{ questions.push(q); srcs.push({t:t.id, i}); }));
+    return {id, name:f.name, questions, srcs, attempts:[], virtual:true, folderId:fid, nTests:tests.length};
   }
   return DB.qtests.find(x=>x.id===id);
 }
@@ -3735,6 +3735,32 @@ function mqFinish(){
   const pct = maxScore>0 ? Math.max(0, Math.round(score/maxScore*100)) : 0;
   S.result = {correct, wrong, skipped, total, pct, score, maxScore, pos:mk.pos, neg:mk.neg, timeSec};
   S.finished = true; clearInterval(mqTimerHandle);
+  /* એક સાથે ઘણી ટેસ્ટ આપી હોય તો દરેક ટેસ્ટમાં તેનું પોતાનું પરિણામ (વાર, સાચા, ગુણ) સેવ થાય */
+  if(t.virtual && t.srcs && S.idx.length===t.questions.length){
+    const groups = {};
+    S.idx.forEach(qi=>{ const sr = t.srcs[qi]; if(sr) (groups[sr.t] = groups[sr.t] || []).push({gi:qi, li:sr.i}); });
+    const breakdown = []; let revDone = 0;
+    Object.keys(groups).forEach(tid=>{
+      const rt = DB.qtests.find(x=>x.id===tid); if(!rt) return;
+      const items = groups[tid];
+      if(items.length !== rt.questions.length) return;
+      let c=0, w=0, sk=0; const ans = {};
+      items.forEach(({gi,li})=>{
+        const a = S.answers[gi], q = rt.questions[li];
+        if(a===undefined) sk++; else { ans[li] = a; if(q.ans!=null && a===q.ans) c++; else if(q.ans!=null) w++; else sk++; }
+      });
+      const tot = items.length;
+      const sc = Math.round((c*mk.pos - w*mk.neg)*100)/100, mx = Math.round(tot*mk.pos*100)/100;
+      const pc = mx>0 ? Math.max(0, Math.round(sc/mx*100)) : 0;
+      rt.attempts = rt.attempts || [];
+      rt.attempts.push({id:uid(), date:todayStr(), mode:S.mode, set:S.setCode||'A', answers:ans, correct:c, wrong:w, skipped:sk, total:tot, pct:pc, score:sc, maxScore:mx, pos:mk.pos, neg:mk.neg, timeSec:Math.round(timeSec*tot/Math.max(1,total)), combined:true});
+      const due = (DB.qrevs||[]).filter(r=>r.testId===rt.id && r.status==='pending' && r.dueDate<=todayStr()).sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
+      if(due){ due.status='completed'; due.completedDate=todayStr(); revDone++; }
+      breakdown.push({name:rt.name, c, tot, sc, mx, pc});
+    });
+    S.result.breakdown = breakdown;
+    if(breakdown.length){ save(); setTimeout(()=>toast(`${breakdown.length} ટેસ્ટનું પરિણામ સેવ થયું ✅${revDone?` · ${revDone} રિવિઝન પૂર્ણ`:''}`),400); }
+  }
   if(!t.virtual && S.idx.length===t.questions.length){
     t.attempts = t.attempts||[];
     t.attempts.push({id:uid(), date:todayStr(), mode:S.mode, set:S.setCode||'A', answers:S.answers, ...S.result});
@@ -3775,6 +3801,7 @@ function mqRenderResult(){
        <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','read')">📖 વાંચન</button>
      </div>
    </div>
+   ${r.breakdown && r.breakdown.length ? `<div class="card"><div class="card-title">ટેસ્ટ મુજબ પરિણામ</div>${r.breakdown.map(b=>`<div class="item cursor-default"><span style="flex:1;min-width:0;"><b>${esc(b.name)}</b><div class="ink-dim fs-12">${b.c}/${b.tot} સાચા · ગુણ ${fmtMark(b.sc)}/${fmtMark(b.mx)}</div></span><span class="badge ${b.pc>=70?'badge-success':(b.pc>=40?'badge-warning':'badge-danger')}">${b.pc}%</span></div>`).join('')}</div>` : ''}
    ${review?`<div class="section-header"><h3>ખોટા / બાકી પ્રશ્નો</h3></div>${review}`:'<div class="card" style="text-align:center;">🎉 બધા જવાબ સાચા!</div>'}`;
 }
 function mqRenderRead(){
