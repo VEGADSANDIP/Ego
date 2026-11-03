@@ -65,7 +65,8 @@ p{margin:0;}
 button{font-family:inherit;}
 a{color:inherit;}
 
-.topbar{flex:0 0 auto; z-index:20; background:var(--surface); border-bottom:1px solid var(--border); transition:margin-top .3s cubic-bezier(.4,0,.2,1), opacity .25s ease;}
+.topbar{flex:0 0 auto; z-index:20; background:var(--surface); border-bottom:1px solid var(--border); will-change:margin-top, opacity;}
+.topbar.tb-anim{transition:margin-top .25s ease, opacity .2s ease;}
 .topbar-inner{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; gap:8px;}
 .brand{font-weight:800; font-size:17px; letter-spacing:-0.02em;}
 .brand-row{display:flex; align-items:center; gap:8px;}
@@ -270,6 +271,27 @@ a{color:inherit;}
 .mq-pick-row{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px;}
 .mq-pick-row input{width:20px; height:20px; flex-shrink:0;}
 .mq-pick-folder{font-weight:800;}
+.dh-wrap{padding-bottom:4px;}
+.dh-card{padding:11px 14px 10px; border-radius:18px; border:1px solid color-mix(in srgb, #FF8A3D 28%, var(--border)); background:linear-gradient(135deg, rgba(255,138,61,.16), rgba(255,61,107,.05)), var(--surface); box-shadow:var(--shadow);}
+.dh-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.dh-left{display:flex; align-items:center; gap:9px; min-width:0;}
+.dh-pill{font-size:12px; font-weight:800; padding:5px 11px; border-radius:20px; white-space:nowrap;} .dh-pill.ok{background:color-mix(in srgb, var(--success) 18%, transparent); color:var(--success);} .dh-pill.wait{background:rgba(255,160,0,.18); color:#E08A00;}
+.dh-flame{font-size:28px; line-height:1; filter:grayscale(1); opacity:.55;}
+.dh-flame.lit{filter:drop-shadow(0 0 7px rgba(255,138,61,.75)); opacity:1; animation:dhFlame 2.4s ease-in-out infinite;}
+@keyframes dhFlame{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+.dh-num{font-size:26px; font-weight:900; line-height:1;} .dh-num small{font-size:13px; font-weight:800; color:var(--ink-dim);}
+.dh-sub{font-size:11.5px; color:var(--ink-dim); margin-top:3px; white-space:nowrap;}
+.dh-sub .ok{color:var(--success);} .dh-sub .wait{color:#E08A00;}
+.dh-week{display:flex; justify-content:space-between; margin-top:9px;}
+.dh-d{display:flex; flex-direction:column; align-items:center; gap:3px; flex:1;}
+.dh-d i{width:22px; height:22px; border-radius:50%; background:var(--surface2); color:#fff; font-size:12px; font-weight:900; font-style:normal; display:flex; align-items:center; justify-content:center;}
+.dh-d.done i{background:linear-gradient(135deg,#FFB02E,#FF6B3D); box-shadow:0 2px 6px rgba(255,107,61,.4);}
+.dh-d.today i{outline:2px solid #FF8A3D; outline-offset:1px;}
+.dh-d span{font-size:9px; color:var(--ink-dim); font-weight:700;}
+.dh-seg{display:flex; gap:4px; margin-top:10px; padding:4px; border-radius:16px; background:var(--surface2);}
+.dh-seg button{flex:1; border:none; background:transparent; color:var(--ink-dim); padding:11px 6px; border-radius:12px; font-weight:800; font-size:14px; font-family:inherit; transition:background .2s, color .2s, box-shadow .2s;}
+.dh-seg button.on.study{background:linear-gradient(135deg,var(--primary),#1B2680); color:#fff; box-shadow:0 4px 12px rgba(46,58,168,.35);}
+.dh-seg button.on.mcq{background:linear-gradient(135deg,#0F766E,#14B8A6); color:#fff; box-shadow:0 4px 12px rgba(15,118,110,.35);}
 .toast{position:fixed; bottom:92px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13.5px; z-index:200; box-shadow:var(--shadow); max-width:85%; text-align:center;}
 .toast.hidden{display:none;}
 .toast-error{background:var(--danger); color:#fff;}
@@ -386,8 +408,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-10';
-const APP_BUILT = '2026-11-03T06:18:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.03-11';
+const APP_BUILT = '2026-11-03T11:10:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -527,6 +549,38 @@ function calcStudyStreak(exam){
     else break;
   }
   return {streak, todayDone};
+}
+function studyWeek(exam){
+  const out = [];
+  if(!exam) return out;
+  const activeIds = activeExamSubjectIds();
+  const dates = new Set(DB.studyLogs.filter(l=>activeIds.includes(l.subjectId)).map(l=>l.date));
+  DB.revisions.forEach(r=>{ if(activeIds.includes(r.subjectId) && r.status==='completed' && r.completedDate) dates.add(r.completedDate); });
+  const names = ['રવિ','સોમ','મંગ','બુધ','ગુરુ','શુક્ર','શનિ'];
+  const today = todayStr();
+  for(let i=6;i>=0;i--){
+    const d = new Date(today+'T00:00:00'); d.setDate(d.getDate()-i);
+    const ds = d.toISOString().slice(0,10);
+    out.push({ds, name:names[d.getDay()], done:dates.has(ds), today:ds===today});
+  }
+  return out;
+}
+function dashHeadHTML(streakInfo, exam){
+  const week = studyWeek(exam).map(d=>`<div class="dh-d ${d.done?'done':''} ${d.today?'today':''}"><i>${d.done?'✓':''}</i><span>${d.name}</span></div>`).join('');
+  return `<div class="dh-card">
+      <div class="dh-row">
+        <div class="dh-left">
+          <div class="dh-flame ${streakInfo.streak>0?'lit':''}">🔥</div>
+          <div class="dh-num">${streakInfo.streak}<small> દિવસ સતત અભ્યાસ</small></div>
+        </div>
+        ${streakInfo.todayDone?'<span class="dh-pill ok">આજે ✓</span>':'<span class="dh-pill wait">આજે બાકી</span>'}
+      </div>
+      <div class="dh-week">${week}</div>
+    </div>
+    <div class="dh-seg">
+      <button class="${dashStatTab==='study'?'on study':''}" onclick="dashStatTab='study'; renderMain();">📖 અભ્યાસ</button>
+      <button class="${dashStatTab==='mcq'?'on mcq':''}" onclick="dashStatTab='mcq'; renderMain();">🧠 MCQ ટેસ્ટ</button>
+    </div>`;
 }
 function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
@@ -790,8 +844,18 @@ function renderMain(){
   mainEl.innerHTML = map[currentTab]();
   /* બીજા પેજ/સ્ક્રીન પર જતાં સ્ક્રોલ ઉપરથી શરૂ થાય; એ જ સ્ક્રીનમાં ફરી દોરતાં જગ્યા જળવાય */
   const viewKey = [currentTab, topicDetailId, sectionDetailId, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0].join('|');
-  if(viewKey !== window.__lastViewKey){ window.__lastViewKey = viewKey; mainEl.scrollTop = 0; }
+  if(viewKey !== window.__lastViewKey){
+    window.__lastViewKey = viewKey;
+    /* પહેલાં જે પેજ પર જ્યાં અટક્યા હતા, પાછા આવતાં ત્યાં જ ખૂલે (ટેસ્ટ ચાલુ હોય ત્યારે નહીં) */
+    const mem = window.__scrollMem || {};
+    mainEl.scrollTop = (!mqSession && mem[viewKey]) ? mem[viewKey] : 0;
+    window.__lastScrollSet = (!mqSession && mem[viewKey]) ? mem[viewKey] : 0;
+    if(window.__hdrShow) window.__hdrShow();
+  }
   afterRender(currentTab);
+  /* સામગ્રી (બુક/કાર્ડ) પછીથી ગોઠવાય તો પણ યાદ રાખેલી સ્થિતિએ જ પહોંચે */
+  const want = window.__lastScrollSet || 0;
+  if(want > 0){ [60,200,450].forEach(ms=>setTimeout(()=>{ const m=document.getElementById('main'); if(m && window.__lastViewKey===viewKey && m.scrollTop < want-1 && m.scrollHeight-m.clientHeight >= want){ m.scrollTop = want; } }, ms)); }
   const _m=document.getElementById('main'); if(_m.scrollTop<=20 && window.__hdrShow) window.__hdrShow();
 }
 function populateExamSwitcher(){
@@ -920,15 +984,8 @@ function renderDashboard(){
   }
 
   return `
-   <div class="hs-sticky mq-sticky">
-     <div class="card" style="display:flex; align-items:center; justify-content:space-between;">
-       <span>🔥 <b>${streakInfo.streak}</b> દિવસ સતત અભ્યાસ</span>
-       ${streakInfo.todayDone ? `<span class="badge badge-success">આજે ✓</span>` : `<span class="badge badge-warning">આજે હજુ બાકી</span>`}
-     </div>
-     <div class="seg">
-       <button class="${dashStatTab==='study'?'on':''}" onclick="dashStatTab='study'; renderMain();">📖 અભ્યાસ</button>
-       <button class="${dashStatTab==='mcq'?'on':''}" onclick="dashStatTab='mcq'; renderMain();">🧠 MCQ ટેસ્ટ</button>
-     </div>
+   <div class="hs-sticky mq-sticky dh-wrap">
+     ${dashHeadHTML(streakInfo, exam)}
    </div>
 
    ${heroBookMarkup}
@@ -4451,26 +4508,28 @@ function checkNotifications(){
 function initHideOnScroll(){
   const main = document.getElementById('main'); if(!main) return;
   const tb = document.querySelector('.topbar');
-  let last = 0, tbHidden = false, lockUntil = 0;
-  function setTopbar(hide){
-    if(!tb || hide===tbHidden) return;
-    if(hide){
-      /* હેડર છુપાતાં સ્ક્રીન મોટી થાય; જો સામગ્રી ટૂંકી હોય તો scroll ગોઠવાઈ જઈને ઝબકારો થાય — એટલે ત્યારે છુપાવવું નહીં */
-      const room = main.scrollHeight - (main.clientHeight + tb.offsetHeight) - main.scrollTop;
-      if(room < 12) return;
-    }
-    tbHidden = hide;
-    lockUntil = performance.now() + 450;
-    tb.style.marginTop = hide ? (-tb.offsetHeight)+'px' : '0px';
-    tb.style.opacity = hide ? '0' : '1';
+  let last = 0, tbOff = 0, tbH = tb ? tb.offsetHeight : 0, animT = null;
+  function applyTb(off){
+    if(!tb) return;
+    tbOff = off;
+    tb.style.marginTop = (-off)+'px';
+    tb.style.opacity = tbH ? String(Math.max(0, 1 - off/tbH)) : '1';
   }
-  window.__hdrShow = ()=>{ last = main.scrollTop; setTopbar(false); main.querySelectorAll('.hs-sticky').forEach(el=>{el._tr=0; el.style.transform=''; el.style.pointerEvents='';}); };
+  /* ટોચનું હેડર સ્ક્રોલના અંતર પ્રમાણે જ સરકે છે — જેટલું સ્ક્રોલ, એટલું જ અને એટલી જ ઝડપે */
+  window.__hdrShow = ()=>{
+    last = main.scrollTop;
+    if(tb && tbOff){ tb.classList.add('tb-anim'); clearTimeout(animT); animT = setTimeout(()=>tb.classList.remove('tb-anim'), 260); }
+    applyTb(0);
+    main.querySelectorAll('.hs-sticky').forEach(el=>{el._tr=0; el.style.transform=''; el.style.pointerEvents='';});
+  };
   main.addEventListener('scroll', ()=>{
     const y = main.scrollTop, dy = y - last;
     last = y;
+    if(window.__lastViewKey !== undefined && !mqSession){ (window.__scrollMem = window.__scrollMem || {})[window.__lastViewKey] = y; }
     if(!dy) return;
     const els = main.querySelectorAll('.hs-sticky');
     if(y <= 20){ window.__hdrShow(); return; }
+    if(tb && !tbOff){ tbH = tb.offsetHeight; }
     const ae = document.activeElement;
     const typing = !!(ae && ae.closest && ae.closest('.hs-sticky'));
     const mt = main.getBoundingClientRect().top;
@@ -4495,9 +4554,15 @@ function initHideOnScroll(){
       el.style.pointerEvents = tr < -h*0.5 ? 'none' : '';
       if(tr < -1) allShown = false;
     });
-    if(typing || performance.now() < lockUntil) return;
-    if(dy > 2 && y > 60) setTopbar(true);
-    else if(dy < -2 && allShown) setTopbar(false);
+    if(typing || !tb) return;
+    if(dy > 0 && y > 40){
+      /* હેડર નાનું થતાં સ્ક્રીન મોટી થાય — સામગ્રી ટૂંકી હોય તો scroll અટકી ન જાય એટલે જગ્યા જેટલું જ */
+      const room = main.scrollHeight - main.clientHeight - main.scrollTop;
+      const d = Math.min(dy, Math.max(0, room));
+      if(d > 0 && tbOff < tbH) applyTb(Math.min(tbH, tbOff + d));
+    } else if(dy < 0 && allShown && tbOff > 0){
+      applyTb(Math.max(0, tbOff + dy));
+    }
   }, {passive:true});
 }
 async function init(){
