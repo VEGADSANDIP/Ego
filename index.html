@@ -361,7 +361,7 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.03-3';
+const APP_VERSION = '2026.11.03-4';
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3000,7 +3000,7 @@ function mqTestCardHTML(t, showPath){
       <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${(t.attempts||[]).length?` · ${t.attempts.length} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div></div>
       ${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}
       <button class="btn btn-sm btn-secondary" onclick="openQTestForm('${t.id}')">✎</button></div>
-    ${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">છેલ્લી: ${last.correct}/${last.total} સાચા · શ્રેષ્ઠ ${best}%</div>`:''}
+    ${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">છેલ્લી: ${last.correct}/${last.total} સાચા${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</div>`:''}
     <div class="mq-actions">
       <button class="btn btn-primary btn-sm" onclick="openMqSet('${t.id}','test')">⏱ ટેસ્ટ</button>
       <button class="btn btn-secondary btn-sm" onclick="openMqSet('${t.id}','practice')">✍ પ્રેક્ટિસ</button>
@@ -3189,6 +3189,41 @@ function mqSetHolder(id){
   if(typeof id==='string' && id.startsWith('folder:')) return DB.qfolders.find(x=>x.id===id.slice(7));
   return DB.qtests.find(x=>x.id===id);
 }
+/* ---- ગુણાંકન: સાચા માટે + ગુણ, ખોટા માટે − ગુણ (વપરાશકર્તા નક્કી કરે) ---- */
+function mqMarks(){
+  const m = (DB.settings && DB.settings.mqMark) || {};
+  let pos = parseFloat(m.pos), neg = parseFloat(m.neg);
+  if(!(pos>0)) pos = 1; if(!(neg>=0)) neg = 0;
+  return {pos, neg};
+}
+function fmtMark(n){ return String(Math.round(n*100)/100); }
+function mqMarkPreset(pos, neg){
+  const a = document.getElementById('f_mkPos'), b = document.getElementById('f_mkNeg');
+  if(a) a.value = pos; if(b) b.value = neg; mqMarkHint();
+}
+function mqMarkHint(){
+  const el = document.getElementById('mqMarkHint'); if(!el) return;
+  const pos = parseFloat(val('f_mkPos')), neg = parseFloat(val('f_mkNeg'));
+  el.textContent = (pos>0 && neg>=0) ? `✓ સાચો = +${fmtMark(pos)} · ✗ ખોટો = −${fmtMark(neg)} · બાકી = 0` : 'ગુણ યોગ્ય લખો';
+}
+function mqMarkBoxHTML(){
+  const m = mqMarks();
+  const chip = (p,n,l)=>`<button type="button" class="btn btn-sm btn-secondary" onclick="mqMarkPreset(${p},${n})">${l}</button>`;
+  return `<div style="margin:10px 0; padding:10px; border:1px solid var(--border); border-radius:12px;">
+    <div style="font-weight:800; margin-bottom:8px;">🎯 ગુણાંકન</div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1; margin:0;"><label>✓ સાચા માટે (+)</label><input type="number" id="f_mkPos" inputmode="decimal" step="0.25" min="0.25" value="${m.pos}" oninput="mqMarkHint()"></div>
+      <div class="field" style="flex:1; margin:0;"><label>✗ ખોટા માટે (−)</label><input type="number" id="f_mkNeg" inputmode="decimal" step="0.25" min="0" value="${m.neg}" oninput="mqMarkHint()"></div>
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${chip(1,0,'+1 / 0')}${chip(1,0.25,'+1 / −¼')}${chip(1,0.33,'+1 / −⅓')}${chip(2,0.5,'+2 / −½')}</div>
+    <div class="ink-dim fs-12" style="margin-top:6px;" id="mqMarkHint">✓ સાચો = +${fmtMark(m.pos)} · ✗ ખોટો = −${fmtMark(m.neg)} · બાકી = 0</div>
+  </div>`;
+}
+function mqSaveMarksFromSheet(){
+  const pos = parseFloat(val('f_mkPos')), neg = parseFloat(val('f_mkNeg'));
+  if(!(pos>0) || !(neg>=0)){ toast('ગુણ યોગ્ય લખો (સાચા > 0, ખોટા ≥ 0)','error'); return false; }
+  DB.settings.mqMark = {pos, neg}; save(); return true;
+}
 function openMqSet(testId, mode){
   const t = mqGetTest(testId); if(!t) return;
   if(mode==='practice' && !t.questions.some(q=>q.ans!=null)){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
@@ -3205,7 +3240,8 @@ function openMqSet(testId, mode){
     <div id="mqSetChips" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0;">
       ${MQ_SETS.map(c=>`<button class="btn ${c==='A'?'btn-primary':'btn-secondary'}" data-set="${c}" onclick="mqPickSet('${c}')" style="flex-direction:column; gap:1px; line-height:1.2;">${c==='A'?'A · મૂળ':'સેટ '+c}${lastNow===c?'<span style="display:block; white-space:nowrap; font-size:10.5px; font-weight:700; color:var(--success);">✓ છેલ્લે</span>':''}</button>`).join('')}
     </div>
-    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="closeSheet(); mqStart('${t.id}','${mode}',null,mqSetChoice)">શરૂ કરો ▶</button></div>`);
+    ${mqMarkBoxHTML()}
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="if(!mqSaveMarksFromSheet()) return; closeSheet(); mqStart('${t.id}','${mode}',null,mqSetChoice)">શરૂ કરો ▶</button></div>`);
 }
 function mqPickSet(c){
   mqSetChoice = c;
@@ -3221,7 +3257,7 @@ function mqStart(testId, mode, onlyIdx, setCode){
   const sc = (mode==='read') ? 'A' : (setCode||'A');
   if(mode!=='read'){ const h = mqSetHolder(testId); if(h){ h.lastSet = Object.assign({}, h.lastSet, {[mode]: sc}); save(); } }
   const built = mqBuildSet(t, base, sc);
-  mqSession = {testId, mode, idx:built.idx, perm:built.perm, setCode:sc, pos:0, answers:{}, start:Date.now(), finished:false, showAns:true, onlyStar:false};
+  mqSession = {testId, mode, marks:mqMarks(), idx:built.idx, perm:built.perm, setCode:sc, pos:0, answers:{}, start:Date.now(), finished:false, showAns:true, onlyStar:false};
   renderMain(); mqScrollTop(); mqStartTimer();
 }
 function mqScrollTop(){ document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
@@ -3280,7 +3316,7 @@ function mqRenderQuestion(){
    </div>
    <div class="mq-bar"><i style="width:${Math.round((S.pos+1)/total*100)}%"></i></div>
    <div class="ink-dim" style="font-size:12.5px;display:flex;justify-content:space-between;">
-     <span>${S.mode==='test'?'⏱ ટેસ્ટ':'✍ પ્રેક્ટિસ'}${S.setCode&&S.setCode!=='A'?' · સેટ '+S.setCode:''} · પ્રશ્ન ${S.pos+1}/${total}</span><span>જવાબ આપ્યા: ${answeredN}</span></div>`) + `
+     <span>${S.mode==='test'?'⏱ ટેસ્ટ':'✍ પ્રેક્ટિસ'}${S.setCode&&S.setCode!=='A'?' · સેટ '+S.setCode:''} · પ્રશ્ન ${S.pos+1}/${total} · +${fmtMark((S.marks||{pos:1}).pos)}/−${fmtMark((S.marks||{neg:0}).neg)}</span><span>જવાબ આપ્યા: ${answeredN}</span></div>`) + `
    <div class="card" style="margin-top:8px;">
      <div class="mq-q">${S.pos+1}. ${esc(q.q)}</div>
      ${opts}
@@ -3328,7 +3364,11 @@ function mqFinish(){
   });
   const total = S.idx.length;
   const timeSec = Math.floor((Date.now()-S.start)/1000);
-  S.result = {correct, wrong, skipped, total, pct: total?Math.round(correct/total*100):0, timeSec};
+  const mk = S.marks || {pos:1, neg:0};
+  const score = Math.round((correct*mk.pos - wrong*mk.neg)*100)/100;
+  const maxScore = Math.round(total*mk.pos*100)/100;
+  const pct = maxScore>0 ? Math.max(0, Math.round(score/maxScore*100)) : 0;
+  S.result = {correct, wrong, skipped, total, pct, score, maxScore, pos:mk.pos, neg:mk.neg, timeSec};
   S.finished = true; clearInterval(mqTimerHandle);
   if(!t.virtual && S.idx.length===t.questions.length){
     t.attempts = t.attempts||[];
@@ -3357,6 +3397,7 @@ function mqRenderResult(){
    ${mqSticky(`<div class="mq-topbar mq-center"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span class="mq-title">${esc(t.name)}</span><span></span></div>`)}
    <div class="card" style="text-align:center;">
      <div style="font-size:44px;font-weight:900;color:${color};">${r.pct}%</div>
+     ${r.maxScore!=null?`<div style="font-weight:800; font-size:17px; margin-top:2px;">ગુણ: ${fmtMark(r.score)} / ${fmtMark(r.maxScore)}</div><div class="ink-dim fs-12">(✓ +${fmtMark(r.pos)} · ✗ −${fmtMark(r.neg)})</div>`:''}
      <div class="ink-dim">${r.correct} સાચા / ${r.total} પ્રશ્નો · ⏱ ${String(Math.floor(r.timeSec/60)).padStart(2,'0')}:${String(r.timeSec%60).padStart(2,'0')}</div>
      <div class="mq-stat">
        <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--success) 14%, transparent);"><b style="color:var(--success);">${r.correct}</b><span>સાચા</span></div>
