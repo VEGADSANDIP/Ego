@@ -135,6 +135,8 @@ a{color:inherit;}
 .mq-ico{font-size:28px; flex-shrink:0;}
 .mq-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
 .mq-actions .btn{flex:1; min-width:0; white-space:nowrap;}
+.pg-back{margin-bottom:8px;}
+.pg-btns{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:8px;}
 .mq-topbar{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;}
 .mq-topbar.mq-center{display:grid; grid-template-columns:1fr minmax(0,2fr) 1fr; gap:6px;}
 .mq-topbar.mq-center>:first-child{justify-self:start;} .mq-topbar.mq-center>:last-child{justify-self:end;}
@@ -412,8 +414,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-7';
-const APP_BUILT = '2026-11-04T18:05:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.04-8';
+const APP_BUILT = '2026-11-04T18:14:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -523,6 +525,10 @@ let revCalSelectedDate = null;
 
 /* ===================== HELPERS ===================== */
 function esc(str){ if(str===undefined||str===null) return ''; return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* બધા પેજનો ઉપરનો ભાગ સરખો: ઉપર "પાછા", નીચે બીજા બટન, પછી ક્રમ (breadcrumb) */
+function pageTopHTML(backCode, btnsHTML, crumbHTML){
+  return `${backCode?`<div class="pg-back">${backButtonHTML(backCode)}</div>`:''}${btnsHTML?`<div class="pg-btns">${btnsHTML}</div>`:''}${crumbHTML||''}`;
+}
 function backButtonHTML(onclickCode){
   return `<button class="btn btn-sm btn-secondary" onclick="${onclickCode}">← પાછા</button>`;
 }
@@ -1334,14 +1340,8 @@ function renderSectionDetail(sectionId){
   const subs = DB.subjects.filter(x=>x.sectionId===sec.id && (x.folderId||null)===(subjFolderId||null));
   const folders = sfChildren(sec.id, subjFolderId);
   const crumb = `<div class="mq-crumb">📁 <a onclick="sfOpen(null)" style="cursor:pointer;${path.length?'text-decoration:underline;':''}">${esc(sec.name)}</a>${path.map((f,i)=>' › '+(i<path.length-1?`<a onclick="sfOpen('${f.id}')" style="cursor:pointer;text-decoration:underline;">${esc(f.name)}</a>`:esc(f.name))).join('')}</div>`;
-  const hdr = `<div class="mq-topbar">
-     ${backButtonHTML(cur ? `sfOpen(${cur.parentId?`'${cur.parentId}'`:'null'})` : "sectionDetailId=null; renderMain();")}
-     <span class="flex-gap-6">
-       ${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ</button>`:''}
-       <button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button>
-       <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
-     </span>
-   </div>${crumb}`;
+  const hdr = pageTopHTML(cur ? `sfOpen(${cur.parentId?`'${cur.parentId}'`:'null'})` : "sectionDetailId=null; renderMain();",
+     `${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}<button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>`, crumb);
   const mid = folders.length ? `<div style="margin-top:6px;">${folders.map(sfFolderCard).join('')}</div>` : '';
   if(subs.length) return subjectListHTML(subs, sec.id, hdr, mid);
   return `<div class="hs-sticky hs-mid">${hdr}</div>${mid}${folders.length?'':emptyRow(cur?'આ ફોલ્ડર ખાલી છે':'કોઈ વિષય ઉમેર્યો નથી')}`;
@@ -1448,15 +1448,13 @@ function renderTopicDetail(subjectId){
   const topics = subjectTopics(s.id);
   const completed = topics.filter(t=>t.status==='completed').length;
   const pct = topics.length ? Math.round(completed/topics.length*100) : 0;
+  const sec = s.sectionId ? DB.sections.find(x=>x.id===s.sectionId) : null;
+  const crumbParts = [sec?esc(sec.name):''].concat(sfPath(s.folderId).map(f=>esc(f.name)), [`<b>${esc(s.name)}</b>`]).filter(Boolean);
   return `
-   ${backButtonHTML("topicDetailId=null; renderMain();")}
-   <div class="hs-sticky hs-mid" style="margin-top:10px;">
-     <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-       ${topics.length>1?`<button class="btn btn-sm btn-secondary" onclick="openTopicReorder('${s.id}')">ક્રમ બદલો</button>`:''}
-       <button class="btn btn-sm btn-secondary" onclick="openBulkTopicForm('${s.id}')">+ ઘણા ટોપિક</button>
-       <button class="btn btn-sm btn-primary" onclick="openTopicEditForm(null,'${s.id}')">+ ટોપિક</button>
-     </div>
-     <h3 style="margin:10px 0 8px 0;">${esc(s.name)} <span class="ink-dim fw-400 fs-12">· ${completed}/${topics.length} પૂર્ણ</span></h3>
+   <div class="hs-sticky hs-mid">
+     ${pageTopHTML("topicDetailId=null; renderMain();",
+       `${topics.length>1?`<button class="btn btn-sm btn-secondary" onclick="openTopicReorder('${s.id}')">ક્રમ બદલો</button>`:''}<button class="btn btn-sm btn-secondary" onclick="openBulkTopicForm('${s.id}')">+ ઘણા ટોપિક</button><button class="btn btn-sm btn-primary" onclick="openTopicEditForm(null,'${s.id}')">+ ટોપિક</button>`,
+       `<div class="mq-crumb">📁 ${crumbParts.join(' › ')} <span class="ink-dim">· ${completed}/${topics.length} પૂર્ણ</span></div>`)}
      ${topics.length ? filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList', s.id) + topicTabSegHTML() : ''}
    </div>
    ${topics.length ? `<div id="topicsListWrap">${sortTopicsList(topics, s.id).map(t=>topicRow(t)).join('')}</div>` : emptyRow('કોઈ ટોપિક નથી')}
@@ -1600,11 +1598,10 @@ function topicRow(t){
   let btn;
   if(topicTab==='sub'){ const n = subtopicsForTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicSubtopicManageForm('${t.id}')">📑${n?` ${n}`:''}</button>`; }
   else if(topicTab==='rev'){ btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicRevisionForm('${t.id}')">🔁</button>`; }
-  else if(topicTab==='status'){ btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0; font-size:15px;" onclick="openTopicStatusSheet('${t.id}')">${statusDot}</button>`; }
+  else if(topicTab==='status'){ btn = `<span onclick="openTopicStatusSheet('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px; padding:8px 10px;">${statusDot}</span>`; }
   else btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>`;
   return `<div class="topic-row${highlight}" data-search="${esc(t.name.toLowerCase())}" id="topic-${t.id}">
     <div class="topic-row-top">
-      <span onclick="cycleTopicStatus('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px;">${statusDot}</span>
       <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
       ${btn}
     </div>
@@ -3450,15 +3447,9 @@ function renderMockQuiz(seg){
     <select onchange="setQSort(this.value)" style="flex-shrink:0; max-width:135px; padding:8px 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit;">
       ${MQ_SORTS.map(([v,l])=>`<option value="${v}" ${cur_sort===v?'selected':''}>${l}</option>`).join('')}
     </select></div>`;
-  return mqSticky(seg + `
-   <div class="mq-topbar">
-     ${cur?backButtonHTML(`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`):'<span></span>'}
-     <span class="flex-gap-6">
-       <button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null)">+ ફોલ્ડર</button>
-       <button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>
-     </span>
-   </div>
-   ${path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:''}
+  return mqSticky(seg + pageTopHTML(cur?`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`:'',
+     `<button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null)">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`,
+     path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:'') + `
    ${toolbar}`) + `<div id="mqListWrap">${mqListHTML()}</div>`;
 }
 function mqOpenFolder(id){ mqFolderId = id||null; mqQuery = ''; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
