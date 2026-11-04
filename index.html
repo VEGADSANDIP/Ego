@@ -403,7 +403,7 @@ const STORAGE_KEY = 'examPathData_v1';
 function defaultData(){
   return {
     exams:[], subjects:[], topics:[], revisions:[], sections:[],
-    studyLogs:[], timetable:[], chapterTimetable:[], subtopics:[], qfolders:[], qtests:[], qrevs:[],
+    studyLogs:[], timetable:[], chapterTimetable:[], subtopics:[], qfolders:[], sfolders:[], qtests:[], qrevs:[],
     settings:{theme:'light', brandName:'ExamPath', sortPrefs:{sections:'default', subjects:{}, topics:{}}}
   };
 }
@@ -412,8 +412,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-1';
-const APP_BUILT = '2026-11-04T10:22:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.04-2';
+const APP_BUILT = '2026-11-04T16:13:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -507,6 +507,7 @@ let currentTab = 'dashboard';
 let examDetailId = null;
 let topicDetailId = null;
 let sectionDetailId = null;
+let subjFolderId = null; /* વિભાગની અંદર ખુલેલું વિષય-ફોલ્ડર (ફાઈલ મેનેજરની જેમ) */
 let lastMainTab = 'dashboard';
 let highlightTopicId = null;
 let highlightRevisionId = null;
@@ -673,7 +674,7 @@ async function refreshStorageEstimate(){
   }catch(e){}
 }
 function storageMB(chars){ return chars>=1073741824 ? (chars/1073741824).toFixed(1)+' GB' : (chars/1048576).toFixed(2)+' MB'; }
-const STORAGE_LABELS = {topics:'ટોપિક', subtopics:'સબ-ટોપિક', subjects:'વિષયો', sections:'વિભાગો', exams:'પરીક્ષાઓ', revisions:'રિવિઝન', studyLogs:'અભ્યાસ લોગ', timetable:'ટાઈમટેબલ', chapterTimetable:'ચેપ્ટર ટાઈમટેબલ', qfolders:'MCQ ફોલ્ડર', qtests:'MCQ ટેસ્ટ (પ્રશ્નો)', qrevs:'MCQ રિવિઝન', mockTests:'જૂના મોક ગુણ', settings:'સેટિંગ્સ / ફોટો'};
+const STORAGE_LABELS = {topics:'ટોપિક', subtopics:'સબ-ટોપિક', subjects:'વિષયો', sections:'વિભાગો', exams:'પરીક્ષાઓ', revisions:'રિવિઝન', studyLogs:'અભ્યાસ લોગ', timetable:'ટાઈમટેબલ', chapterTimetable:'ચેપ્ટર ટાઈમટેબલ', qfolders:'MCQ ફોલ્ડર', sfolders:'વિષય ફોલ્ડર', qtests:'MCQ ટેસ્ટ (પ્રશ્નો)', qrevs:'MCQ રિવિઝન', mockTests:'જૂના મોક ગુણ', settings:'સેટિંગ્સ / ફોટો'};
 function storageBreakdown(){
   return Object.keys(DB).map(k=>({k, label: STORAGE_LABELS[k]||k, size: JSON.stringify(DB[k]).length})).filter(x=>x.size>2).sort((a,b)=>b.size-a.size);
 }
@@ -844,7 +845,7 @@ function showTab(id){
   if((id==='exams'||id==='timetable') && currentTab!==id){ lastMainTab = currentTab; }
   currentTab = id;
   if(id==='calendar'){ calMode='study'; calKind='topic'; calGridExpanded=false; }
-  if(id!=='exams'){ topicDetailId=null; sectionDetailId=null; }
+  if(id!=='exams'){ topicDetailId=null; sectionDetailId=null; subjFolderId=null; }
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
   renderMain();
   document.getElementById('main').scrollIntoView({behavior:'instant', block:'start'});
@@ -854,7 +855,7 @@ function renderMain(){
   const mainEl = document.getElementById('main');
   mainEl.innerHTML = map[currentTab]();
   /* બીજા પેજ/સ્ક્રીન પર જતાં સ્ક્રોલ ઉપરથી શરૂ થાય; એ જ સ્ક્રીનમાં ફરી દોરતાં જગ્યા જળવાય */
-  const viewKey = [currentTab, topicDetailId, sectionDetailId, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0].join('|');
+  const viewKey = [currentTab, topicDetailId, sectionDetailId, subjFolderId, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0].join('|');
   if(viewKey !== window.__lastViewKey){
     window.__lastViewKey = viewKey;
     /* પહેલાં જે પેજ પર જ્યાં અટક્યા હતા, પાછા આવતાં ત્યાં જ ખૂલે (ટેસ્ટ ચાલુ હોય ત્યારે નહીં) */
@@ -883,7 +884,7 @@ function handleExamSwitcherChange(selectEl){
   switchActiveExam(selectEl.value);
   renderMain();
 }
-function switchActiveExam(id){ DB.exams.forEach(e=>e.active = (e.id===id)); sectionDetailId=null; save(); populateExamSwitcher(); }
+function switchActiveExam(id){ DB.exams.forEach(e=>e.active = (e.id===id)); sectionDetailId=null; subjFolderId=null; save(); populateExamSwitcher(); }
 
 /* ===================== DASHBOARD ===================== */
 function renderDashboard(){
@@ -1285,17 +1286,49 @@ function sectionSlideCard(sec){
   subs.forEach(s=>{ const topics=subjectTopics(s.id); totalTopics+=topics.length; completedTopics+=topics.filter(t=>t.status==='completed').length; });
   const pct = totalTopics ? Math.round(completedTopics/totalTopics*100) : 0;
   const title = `📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}`;
-  return `<div class="card cursor-pointer" data-search="${esc(sec.name.toLowerCase())}" onclick="sectionDetailId='${sec.id}'; renderMain();">
+  return `<div class="card cursor-pointer" data-search="${esc(sec.name.toLowerCase())}" onclick="sectionDetailId='${sec.id}'; subjFolderId=null; renderMain();">
       ${progressCardHeader(pct, title, `openSectionForm('${sec.id}','${sec.examId}')`)}
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${subs.length} વિષય — વિગત જોવા ટેપ કરો →</div>
   </div>`;
 }
+function sfAll(){ return DB.sfolders = DB.sfolders || []; }
+function sfChildren(sectionId, parentId){ return sfAll().filter(f=>f.sectionId===sectionId && (f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
+function sfPath(id){ const out=[]; let f=sfAll().find(x=>x.id===id), g=0; while(f && g++<30){ out.unshift(f); f=sfAll().find(x=>x.id===f.parentId); } return out; }
+function sfDescIds(id){ let ids=[id]; sfAll().filter(f=>f.parentId===id).forEach(f=>{ ids=ids.concat(sfDescIds(f.id)); }); return ids; }
+function sfSubjectsDeep(f){ const ids=new Set(sfDescIds(f.id)); return DB.subjects.filter(x=>x.sectionId===f.sectionId && ids.has(x.folderId)); }
+function sfOpen(id){ subjFolderId = id||null; renderMain(); mqScrollTop(); }
+function sfFolderCard(f){
+  const subs = sfSubjectsDeep(f);
+  let tot=0, done=0; subs.forEach(x=>{ const tp=subjectTopics(x.id); tot+=tp.length; done+=tp.filter(t=>t.status==='completed').length; });
+  const pct = tot ? Math.round(done/tot*100) : 0;
+  const nF = sfChildren(f.sectionId, f.id).length, nS = subs.length;
+  return `<div class="card cursor-pointer" onclick="if(bookClickOK()) sfOpen('${f.id}')" style="margin-top:8px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      ${miniRingSVG(pct)}
+      <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">📁 ${esc(f.name)}</div>
+        <div class="ink-dim fs-12">${nF?nF+' ફોલ્ડર · ':''}${nS} વિષય · ${done}/${tot} ચેપ્ટર પૂર્ણ</div></div>
+      <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openSFolderForm('${f.id}')">✎</button>
+    </div></div>`;
+}
 function renderSectionDetail(sectionId){
   const sec = DB.sections.find(x=>x.id===sectionId);
   if(!sec){ sectionDetailId=null; return renderExams(); }
-  const subs = sectionSubjects(sec.id);
+  if(subjFolderId && !sfAll().find(f=>f.id===subjFolderId && f.sectionId===sec.id)) subjFolderId = null;
+  const cur = subjFolderId ? sfAll().find(f=>f.id===subjFolderId) : null;
+  const path = sfPath(subjFolderId);
+  const subs = DB.subjects.filter(x=>x.sectionId===sec.id && (x.folderId||null)===(subjFolderId||null));
+  const folders = sfChildren(sec.id, subjFolderId);
+  const hdr = `<div class="section-header mb-6">
+     <h3>વિષયો</h3>
+     <span class="flex-gap-6">
+       ${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}
+       <button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button>
+       <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
+     </span>
+   </div>`;
+  const body = subs.length ? subjectListHTML(subs, sec.id, hdr) : (hdr + (folders.length?'':emptyRow(cur?'આ ફોલ્ડર ખાલી છે':'કોઈ વિષય ઉમેર્યો નથી')));
   return `
-   ${backButtonHTML("sectionDetailId=null; renderMain();")}
+   ${backButtonHTML(cur ? `sfOpen(${cur.parentId?`'${cur.parentId}'`:'null'})` : "sectionDetailId=null; renderMain();")}
    <div class="card mt-10">
      <div class="item item-static">
        <b>📂 ${esc(sec.name)}</b>
@@ -1305,14 +1338,50 @@ function renderSectionDetail(sectionId){
        </span>
      </div>
    </div>
-   ${subjectListHTML(subs, sec.id, `<div class="section-header mb-6">
-     <h3>વિષયો</h3>
-     <span class="flex-gap-6">
-       ${subs.length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}
-       <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
-     </span>
-   </div>`)}
+   ${path.length?`<div class="mq-crumb">📁 <a onclick="sfOpen(null)" style="cursor:pointer;text-decoration:underline;">${esc(sec.name)}</a> › ${path.map((f,i)=>i<path.length-1?`<a onclick="sfOpen('${f.id}')" style="cursor:pointer;text-decoration:underline;">${esc(f.name)}</a>`:esc(f.name)).join(' › ')}</div>`:''}
+   ${folders.length?`<div class="mt-10">${folders.map(sfFolderCard).join('')}</div>`:''}
+   <div class="mt-10">${body}</div>
   `;
+}
+function sfFolderOptions(sectionId, selId, excludeId){
+  const ban = excludeId ? new Set(sfDescIds(excludeId)) : new Set();
+  const out = [`<option value="">📂 (મુખ્ય — ફોલ્ડર વગર)</option>`];
+  const walk = (pid, depth)=>{ sfChildren(sectionId, pid).forEach(f=>{ if(ban.has(f.id)) return;
+    out.push(`<option value="${f.id}" ${selId===f.id?'selected':''}>${'  '.repeat(depth)}📁 ${esc(f.name)}</option>`); walk(f.id, depth+1); }); };
+  walk(null,0);
+  return out.join('');
+}
+function openSFolderForm(id, sectionId){
+  const f = id ? sfAll().find(x=>x.id===id) : null;
+  const secId = f ? f.sectionId : sectionId;
+  const parent = f ? (f.parentId||'') : (subjFolderId||'');
+  openSheet(`
+    <h3>${f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર'} 📁</h3>
+    <div class="field"><label>નામ</label><input type="text" id="f_sfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: ઇતિહાસ"></div>
+    <div class="field"><label>ક્યાં રાખવું?</label><select id="f_sfparent">${sfFolderOptions(secId, parent, id)}</select></div>
+    <div class="sheet-actions">
+      ${f?`<button class="btn btn-danger" onclick="deleteSFolder('${f.id}')">ડિલીટ</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveSFolder(${f?`'${f.id}'`:'null'},'${secId}')">સેવ કરો</button>
+    </div>`);
+}
+function saveSFolder(id, sectionId){
+  const name = val('f_sfname'); if(!name){ toast('નામ લખો','error'); return; }
+  const parentId = val('f_sfparent') || null;
+  const dup = sfChildren(sectionId, parentId).find(x=>x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
+  if(dup){ toast('આ નામનું ફોલ્ડર પહેલેથી છે','error'); return; }
+  if(id){ const f = sfAll().find(x=>x.id===id); f.name = name; f.parentId = parentId; }
+  else { const sec = DB.sections.find(x=>x.id===sectionId); sfAll().push({id:uid(), examId:sec?sec.examId:null, sectionId, parentId, name}); }
+  save(); closeSheet(); renderMain();
+}
+function deleteSFolder(id){
+  const f = sfAll().find(x=>x.id===id); if(!f) return;
+  if(!confirm('આ ફોલ્ડર ડિલીટ થશે. અંદરના વિષયો અને ફોલ્ડર ડિલીટ નહીં થાય — તે ઉપરના સ્તરે ખસેડાશે. ચાલુ રાખવું છે?')) return;
+  const up = f.parentId || null;
+  DB.subjects.forEach(x=>{ if(x.folderId===id) x.folderId = up; });
+  sfAll().forEach(x=>{ if(x.parentId===id) x.parentId = up; });
+  DB.sfolders = sfAll().filter(x=>x.id!==id);
+  if(subjFolderId===id) subjFolderId = up;
+  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
 }
 function subjectListHTML(subs, sectionKey, headerHTML){
   headerHTML = headerHTML || '';
@@ -1871,6 +1940,7 @@ function deleteExam(id){
   DB.subjects = DB.subjects.filter(s=>s.examId!==id);
   DB.sections = DB.sections.filter(x=>x.examId!==id);
   DB.qfolders = (DB.qfolders||[]).filter(f=>f.examId!==id);
+  DB.sfolders = (DB.sfolders||[]).filter(f=>f.examId!==id);
   { const gone = new Set((DB.qtests||[]).filter(t=>t.examId===id).map(t=>t.id)); DB.qrevs = (DB.qrevs||[]).filter(r=>!gone.has(r.testId)); }
   DB.qtests = (DB.qtests||[]).filter(t=>t.examId!==id);
   DB.exams = DB.exams.filter(x=>x.id!==id);
@@ -1892,9 +1962,10 @@ function openSubjectForm(id, examId, sectionId){
   openSheet(`
     <h3>${s?'વિષય એડિટ':'નવો વિષય'}</h3>
     <div class="field"><label>વિષયનું નામ</label><input type="text" id="f_name" value="${s?esc(s.name):''}"></div>
-    <div class="field"><label>કયા વિભાગમાં?</label><select id="f_section">
+    <div class="field"><label>કયા વિભાગમાં?</label><select id="f_section" onchange="document.getElementById('f_sfolder').innerHTML=sfFolderOptions(this.value,'')">
       ${sections.map(sec=>`<option value="${sec.id}" ${(currentSectionId===sec.id || (!currentSectionId && sec.id===sections[0].id))?'selected':''}>📂 ${esc(sec.name)}</option>`).join('')}
     </select></div>
+    <div class="field"><label>કયા ફોલ્ડરમાં?</label><select id="f_sfolder">${sfFolderOptions(currentSectionId || sections[0].id, s ? (s.folderId||'') : (subjFolderId||''))}</select></div>
     <div class="sheet-actions">
       ${s?`<button class="btn btn-danger" onclick="deleteSubject('${id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveSubject(${s?`'${id}'`:'null'},'${exId}')">સેવ કરો</button>
@@ -1908,8 +1979,9 @@ function saveSubject(id, examId){
   if(!sectionId){ toast('વિભાગ પસંદ કરો','error'); return; }
   const dup = DB.subjects.find(x=>x.examId===examId && x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
   if(dup){ toast('આ નામનો વિષય પહેલેથી છે','error'); return; }
-  if(id){ const s=DB.subjects.find(x=>x.id===id); Object.assign(s,{name,sectionId}); }
-  else DB.subjects.push({id:uid(),examId,name,sectionId});
+  const folderId = val('f_sfolder') || null;
+  if(id){ const s=DB.subjects.find(x=>x.id===id); Object.assign(s,{name,sectionId,folderId}); }
+  else DB.subjects.push({id:uid(),examId,name,sectionId,folderId});
   save(); closeSheet(); renderMain(); toast('સેવ થયું');
 }
 function openSectionForm(id, examId){
@@ -1937,7 +2009,8 @@ function saveSection(id, examId){
 }
 function deleteSection(id){
   if(!confirm('આ વિભાગ ડિલીટ થશે. તેમાંના વિષયો "કોઈ વિભાગ નહીં" હેઠળ યથાવત રહેશે (ડિલીટ નહીં થાય). ચાલુ રાખવું છે?'))return;
-  DB.subjects.forEach(s=>{ if(s.sectionId===id) s.sectionId=null; });
+  DB.subjects.forEach(s=>{ if(s.sectionId===id){ s.sectionId=null; s.folderId=null; } });
+  DB.sfolders = (DB.sfolders||[]).filter(f=>f.sectionId!==id);
   DB.sections = DB.sections.filter(x=>x.id!==id);
   if(sectionDetailId===id) sectionDetailId=null;
   save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
@@ -2793,13 +2866,13 @@ function timetableRow(b){
 }
 function navigateToSection(sectionId){
   topicDetailId = null;
-  sectionDetailId = sectionId;
+  sectionDetailId = sectionId; subjFolderId = null;
   showTab('exams');
 }
 function navigateToSubjectTopics(subjectId, topicId){
   const s = DB.subjects.find(x=>x.id===subjectId);
   if(!s) return;
-  sectionDetailId = s.sectionId || null;
+  sectionDetailId = s.sectionId || null; subjFolderId = s.folderId || null;
   topicDetailId = s.id;
   highlightTopicId = topicId || null;
   showTab('exams');
