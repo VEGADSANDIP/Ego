@@ -414,8 +414,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-8';
-const APP_BUILT = '2026-11-04T18:14:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.04-9';
+const APP_BUILT = '2026-11-04T18:27:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -2914,6 +2914,10 @@ function renderSettings(){
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('બેકઅપ એક્સપોર્ટ કરવા માટે', exportBackup)">⬇️ બેકઅપ એક્સપોર્ટ કરો</button>
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('બેકઅપ ઇમ્પોર્ટ કરવા માટે', importPick)">⬆️ બેકઅપ ઇમ્પોર્ટ કરો</button>
      <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackup(event)">
+     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="openStructExport()">📐 ફક્ત માળખું એક્સપોર્ટ (નવી પરીક્ષા માટે)</button>
+     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="structImportPick()">📥 માળખું ઇમ્પોર્ટ → નવી પરીક્ષા</button>
+     <input type="file" id="structFile" accept="application/json" style="display:none" onchange="structImportRead(event)">
+     <div class="ink-dim fs-12 mb-6">માળખું = વિભાગ, ફોલ્ડર, વિષય, ચેપ્ટર અને MCQ ફોલ્ડર/ટેસ્ટ. અભ્યાસ, રિવિઝન, ગુણ, પ્રયત્નો કે તારીખો સાથે નથી — એટલે નવી પરીક્ષા શૂન્યથી શરૂ થાય.</div>
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('જૂનો ડેટા સાફ કરવા માટે', cleanOrphanedData)">🧹 જૂનો છૂટો ડેટા સાફ કરો</button>
      <div class="ink-dim fs-12 mb-6">ડિલીટ થયેલા વિષય/ટોપિક સાથે જોડાયેલો, પણ પાછળ રહી ગયેલો ડેટા (અભ્યાસ-લોગ, રિવિઝન, ટાઈમટેબલ) સાફ કરે — સેફ, બાકી કંઈ અસર નહીં થાય</div>
      <button class="btn btn-danger btn-block" onclick="guard('બધો ડેટા રીસેટ કરવા માટે', resetAllData)">🗑️ બધો ડેટા રીસેટ કરો</button>
@@ -3160,6 +3164,83 @@ async function lockSubmit(){
   const pw = (document.getElementById('f_lockPw')||{}).value || '';
   if(await lockCheck(pw)){ _lockFails = 0; const cb = _lockCb; _lockCb = null; closeSheet(); if(cb) cb(); }
   else{ _lockFails++; if(_lockFails>=5){ _lockBlockUntil = Date.now()+30000; _lockFails = 0; msg.textContent = 'ઘણા ખોટા પ્રયાસ. 30 સેકન્ડ રાહ જુઓ.'; } else msg.textContent = '❌ પાસવર્ડ ખોટો છે'; }
+}
+/* ---- 📐 ફક્ત માળખું (Template) એક્સપોર્ટ / ઇમ્પોર્ટ ---- */
+function openStructExport(){
+  if(!DB.exams.length){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
+  const act = (DB.exams.find(e=>e.active)||DB.exams[0]).id;
+  openSheet(`<h3>📐 માળખું એક્સપોર્ટ</h3>
+    <div class="field"><label>કઈ પરીક્ષાનું?</label><select id="f_stExam">${DB.exams.map(e=>`<option value="${e.id}" ${e.id===act?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="f_stTests" checked> MCQ ફોલ્ડર અને ટેસ્ટ પણ ઉમેરો</label>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="f_stQs" checked> ટેસ્ટના પ્રશ્નો અને જવાબ ચાવી સાથે <span class="ink-dim fs-12">(બંધ કરો તો ફક્ત ટેસ્ટના નામ)</span></label>
+    <div class="ink-dim fs-12">ફાઈલમાં અભ્યાસ, રિવિઝન, સ્ટેટસ, ગુણ, પ્રયત્નો, તારાંકિત પ્રશ્નો કંઈ નહીં આવે.</div>
+    <div class="sheet-actions" style="margin-top:12px;"><button class="btn btn-primary btn-block" onclick="structExportDo()">⬇️ ડાઉનલોડ કરો</button></div>`);
+}
+function structBuild(examId, withTests, withQs){
+  const e = DB.exams.find(x=>x.id===examId); if(!e) return null;
+  const secs = DB.sections.filter(x=>x.examId===examId);
+  const subs = DB.subjects.filter(x=>x.examId===examId);
+  const subIds = new Set(subs.map(x=>x.id));
+  const out = {exampathTemplate:1, name:e.name,
+    sections: secs.map(x=>({id:x.id, name:x.name, totalMarks:x.totalMarks||0})),
+    sfolders: (DB.sfolders||[]).filter(f=>f.examId===examId).map(f=>({id:f.id, sectionId:f.sectionId, parentId:f.parentId||null, name:f.name})),
+    subjects: subs.map(x=>({id:x.id, name:x.name, sectionId:x.sectionId||null, folderId:x.folderId||null})),
+    topics: DB.topics.filter(t=>subIds.has(t.subjectId)).map(t=>({id:t.id, subjectId:t.subjectId, name:t.name})),
+    qfolders: [], qtests: []};
+  if(withTests){
+    out.qfolders = DB.qfolders.filter(f=>f.examId===examId).map(f=>({id:f.id, parentId:f.parentId||null, name:f.name}));
+    out.qtests = DB.qtests.filter(t=>t.examId===examId).map(t=>({id:t.id, folderId:t.folderId||null, name:t.name,
+      questions: withQs ? (t.questions||[]).map(q=>({q:q.q, opts:(q.opts||[]).slice(0,4), ans:(q.ans==null?null:q.ans), star:false})) : []}));
+  }
+  return out;
+}
+function structExportDo(){
+  const id = val('f_stExam');
+  const st = structBuild(id, !!document.getElementById('f_stTests').checked, !!document.getElementById('f_stQs').checked);
+  if(!st){ toast('પરીક્ષા મળી નથી','error'); return; }
+  closeSheet();
+  const blob = new Blob([JSON.stringify(st,null,1)], {type:'application/json'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = `exampath-structure-${st.name.replace(/[^\p{L}\p{N}]+/gu,'-')}-${todayStr()}.json`; a.click(); URL.revokeObjectURL(url);
+  toast(`માળખું ડાઉનલોડ થયું (${st.subjects.length} વિષય, ${st.topics.length} ચેપ્ટર, ${st.qtests.length} ટેસ્ટ)`);
+}
+let _structPending = null;
+function structImportPick(){ const i = document.getElementById('structFile'); if(i){ i.value=''; i.click(); } }
+function structImportRead(evt){
+  const file = evt.target.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = e=>{
+    try{
+      const p = JSON.parse(e.target.result);
+      if(!p || p.exampathTemplate!==1 || !Array.isArray(p.sections) || !Array.isArray(p.subjects) || !Array.isArray(p.topics)) throw new Error('bad');
+      _structPending = p;
+      openSheet(`<h3>📥 નવી પરીક્ષા બનાવો</h3>
+        <div class="ink-dim fs-12 mb-6">${p.sections.length} વિભાગ · ${(p.sfolders||[]).length} ફોલ્ડર · ${p.subjects.length} વિષય · ${p.topics.length} ચેપ્ટર · ${(p.qfolders||[]).length} MCQ ફોલ્ડર · ${(p.qtests||[]).length} ટેસ્ટ. હાલનો તમારો ડેટા બદલાશે નહીં.</div>
+        <div class="field"><label>નવી પરીક્ષાનું નામ</label><input type="text" id="f_stName" value="${esc(p.name||'')}"></div>
+        <div class="field"><label>પરીક્ષાની તારીખ</label><input type="date" id="f_stDate"></div>
+        <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="structApply()">બનાવો</button></div>`);
+    }catch(err){ toast('આ માળખાની ફાઈલ યોગ્ય નથી','error'); }
+  };
+  r.readAsText(file);
+}
+function structApply(){
+  const p = _structPending; if(!p) return;
+  const name = val('f_stName'), date = val('f_stDate');
+  if(!name || !date){ toast('નામ અને તારીખ ભરો','error'); return; }
+  if(DB.exams.find(x=>x.name.trim().toLowerCase()===name.toLowerCase())){ toast('આ નામની પરીક્ષા પહેલેથી છે','error'); return; }
+  const examId = uid(); const map = {};
+  const nid = old=>{ if(old==null) return null; if(!map[old]) map[old]=uid(); return map[old]; };
+  DB.exams.push({id:examId, name, date, description:'', active:DB.exams.length===0});
+  p.sections.forEach(x=>DB.sections.push({id:nid(x.id), examId, name:x.name, totalMarks:x.totalMarks||0}));
+  (p.sfolders||[]).forEach(f=>sfAll().push({id:nid(f.id), examId, sectionId:nid(f.sectionId), parentId:nid(f.parentId), name:f.name}));
+  p.subjects.forEach(x=>DB.subjects.push({id:nid(x.id), examId, name:x.name, sectionId:nid(x.sectionId), folderId:nid(x.folderId)}));
+  p.topics.forEach(t=>DB.topics.push({id:uid(), subjectId:nid(t.subjectId), name:t.name, status:'not_started'}));
+  (p.qfolders||[]).forEach(f=>DB.qfolders.push({id:nid(f.id), examId, parentId:nid(f.parentId), name:f.name}));
+  (p.qtests||[]).forEach(t=>DB.qtests.push({id:uid(), examId, folderId:nid(t.folderId), name:t.name, attempts:[], created:todayStr(),
+    questions:(t.questions||[]).map(q=>({q:q.q, opts:(q.opts||['','','','']).slice(0,4), ans:(q.ans==null?null:q.ans), star:false}))}));
+  _structPending = null;
+  save(); closeSheet(); populateExamSwitcher(); renderMain();
+  toast('નવી પરીક્ષા બની ✅ — ઉપરથી પરીક્ષા બદલો');
 }
 function importPick(){ const i = document.getElementById('importFile'); if(i){ i.value=''; i.click(); } }
 function exportBackup(){
