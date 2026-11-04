@@ -412,8 +412,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-4';
-const APP_BUILT = '2026-11-04T16:51:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.04-5';
+const APP_BUILT = '2026-11-04T17:30:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3507,11 +3507,20 @@ function renderMockQuiz(seg){
 }
 function mqOpenFolder(id){ mqFolderId = id||null; mqQuery = ''; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
 
+function mqFolderOptions(selId, excludeId){
+  const ban = excludeId ? new Set(mqCollectFolderIds(excludeId)) : new Set();
+  const out = [`<option value="">📂 (મુખ્ય — ફોલ્ડર વગર)</option>`];
+  const walk = (pid, depth)=>{ mqFolders(pid).forEach(f=>{ if(ban.has(f.id)) return;
+    out.push(`<option value="${f.id}" ${selId===f.id?'selected':''}>${'\u00A0\u00A0'.repeat(depth)}📁 ${esc(f.name)}</option>`); walk(f.id, depth+1); }); };
+  walk(null,0);
+  return out.join('');
+}
 function openQFolderForm(id){
   const f = id ? DB.qfolders.find(x=>x.id===id) : null;
   openSheet(`
     <h3>${f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર'} 📁</h3>
     <div class="field"><label>નામ</label><input type="text" id="f_qfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: Daily Test Series"></div>
+    <div class="field"><label>ક્યાં રાખવું?</label><select id="f_qfparent">${mqFolderOptions(f ? (f.parentId||'') : (mqFolderId||''), id)}</select></div>
     <div class="sheet-actions">
       ${f?`<button class="btn btn-danger" onclick="deleteQFolder('${f.id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveQFolder(${f?`'${f.id}'`:'null'})">સેવ કરો</button>
@@ -3519,8 +3528,9 @@ function openQFolderForm(id){
 }
 function saveQFolder(id){
   const name = val('f_qfname'); if(!name){ toast('નામ લખો','error'); return; }
-  if(id){ DB.qfolders.find(x=>x.id===id).name = name; }
-  else DB.qfolders.push({id:uid(), examId:mqExamId(), parentId:mqFolderId, name});
+  const parentId = val('f_qfparent') || null;
+  if(id){ const f = DB.qfolders.find(x=>x.id===id); f.name = name; f.parentId = parentId; }
+  else DB.qfolders.push({id:uid(), examId:mqExamId(), parentId, name});
   save(); closeSheet(); renderMain();
 }
 function mqCollectFolderIds(id){ let ids=[id]; DB.qfolders.filter(f=>f.parentId===id).forEach(f=>{ ids = ids.concat(mqCollectFolderIds(f.id)); }); return ids; }
@@ -3541,6 +3551,7 @@ function openQTestForm(id){
   openSheet(`
     <h3>${t?'ટેસ્ટ એડિટ':'નવી MCQ ટેસ્ટ'} 🧠</h3>
     <div class="field"><label>ટેસ્ટનું નામ</label><input type="text" id="f_qtname" value="${t?esc(t.name):''}" placeholder="જેમ કે: Test 65"></div>
+    <div class="field"><label>કયા ફોલ્ડરમાં?</label><select id="f_qtfolder">${mqFolderOptions(t ? (t.folderId||'') : (mqFolderId||''))}</select></div>
     <div class="field"><label>પ્રશ્નો (PDF માંથી કોપી કરીને પેસ્ટ કરો)</label>
       <textarea class="mq-ta" id="f_qttext" oninput="mqPreview()" placeholder="1) પ્રશ્ન...&#10;(A) ... (B) ...&#10;(C) ... (D) ...">${t?esc(mqQuestionsText(t.questions)):''}</textarea></div>
     <div class="field"><label>જવાબ ચાવી (દા.ત. DACBBC… અથવા 1-D 2-A 3-A…)</label>
@@ -3578,9 +3589,9 @@ function saveQTest(id){
     const t = DB.qtests.find(x=>x.id===id);
     const old = t.questions;
     r.questions.forEach((q,i)=>{ if(old[i] && old[i].star) q.star = true; });
-    t.name = name; t.questions = r.questions;
+    t.name = name; t.questions = r.questions; t.folderId = val('f_qtfolder') || null;
   } else {
-    DB.qtests.push({id:uid(), examId:mqExamId(), folderId:mqFolderId, name, questions:r.questions, attempts:[], created:todayStr()});
+    DB.qtests.push({id:uid(), examId:mqExamId(), folderId:(val('f_qtfolder')||null), name, questions:r.questions, attempts:[], created:todayStr()});
   }
   save(); closeSheet(); renderMain(); toast('સેવ થયું ✅');
 }
