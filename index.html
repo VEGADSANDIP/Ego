@@ -412,8 +412,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-2';
-const APP_BUILT = '2026-11-04T16:13:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.04-3';
+const APP_BUILT = '2026-11-04T16:30:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1301,14 +1301,17 @@ function sfFolderCard(f){
   const subs = sfSubjectsDeep(f);
   let tot=0, done=0; subs.forEach(x=>{ const tp=subjectTopics(x.id); tot+=tp.length; done+=tp.filter(t=>t.status==='completed').length; });
   const pct = tot ? Math.round(done/tot*100) : 0;
-  const nF = sfChildren(f.sectionId, f.id).length, nS = subs.length;
-  return `<div class="card cursor-pointer" onclick="if(bookClickOK()) sfOpen('${f.id}')" style="margin-top:8px;">
-    <div style="display:flex;align-items:center;gap:12px;">
-      ${miniRingSVG(pct)}
-      <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">📁 ${esc(f.name)}</div>
-        <div class="ink-dim fs-12">${nF?nF+' ફોલ્ડર · ':''}${nS} વિષય · ${done}/${tot} ચેપ્ટર પૂર્ણ</div></div>
-      <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openSFolderForm('${f.id}')">✎</button>
-    </div></div>`;
+  const nF = sfChildren(f.sectionId, f.id).length;
+  return `<div class="card cursor-pointer" onclick="if(bookClickOK()) sfOpen('${f.id}')" style="margin-bottom:12px;">
+    ${progressCardHeader(pct, '📁 '+esc(f.name), `openSFolderForm('${f.id}')`)}
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px;">
+      <div class="subject-mini-stat"><b>${nF}</b><span>ફોલ્ડર</span></div>
+      <div class="subject-mini-stat"><b>${subs.length}</b><span>વિષય</span></div>
+      <div class="subject-mini-stat"><b>${done}</b><span>પૂર્ણ ચેપ્ટર</span></div>
+      <div class="subject-mini-stat"><b>${tot-done}</b><span>બાકી ચેપ્ટર</span></div>
+    </div>
+    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">ખોલવા ટેપ કરો →</div>
+  </div>`;
 }
 function renderSectionDetail(sectionId){
   const sec = DB.sections.find(x=>x.id===sectionId);
@@ -1318,30 +1321,19 @@ function renderSectionDetail(sectionId){
   const path = sfPath(subjFolderId);
   const subs = DB.subjects.filter(x=>x.sectionId===sec.id && (x.folderId||null)===(subjFolderId||null));
   const folders = sfChildren(sec.id, subjFolderId);
-  const hdr = `<div class="section-header mb-6">
-     <h3>વિષયો</h3>
+  const crumb = `<div class="mq-crumb">📁 <a onclick="sfOpen(null)" style="cursor:pointer;${path.length?'text-decoration:underline;':''}">${esc(sec.name)}</a>${sec.totalMarks?` <span class="badge badge-primary">${sec.totalMarks} ગુણ</span>`:''}${path.map((f,i)=>' › '+(i<path.length-1?`<a onclick="sfOpen('${f.id}')" style="cursor:pointer;text-decoration:underline;">${esc(f.name)}</a>`:esc(f.name))).join('')}</div>`;
+  const hdr = `<div class="mq-topbar">
+     ${backButtonHTML(cur ? `sfOpen(${cur.parentId?`'${cur.parentId}'`:'null'})` : "sectionDetailId=null; renderMain();")}
      <span class="flex-gap-6">
-       ${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}
+       ${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ</button>`:''}
+       <button class="btn btn-sm btn-secondary" onclick="openSectionForm('${sec.id}','${sec.examId}')">✎</button>
        <button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button>
        <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
      </span>
-   </div>`;
-  const body = subs.length ? subjectListHTML(subs, sec.id, hdr) : (hdr + (folders.length?'':emptyRow(cur?'આ ફોલ્ડર ખાલી છે':'કોઈ વિષય ઉમેર્યો નથી')));
-  return `
-   ${backButtonHTML(cur ? `sfOpen(${cur.parentId?`'${cur.parentId}'`:'null'})` : "sectionDetailId=null; renderMain();")}
-   <div class="card mt-10">
-     <div class="item item-static">
-       <b>📂 ${esc(sec.name)}</b>
-       <span>
-         ${sec.totalMarks?`<span class="badge badge-primary">${sec.totalMarks} ગુણ</span>`:''}
-         <button class="btn btn-sm btn-secondary" onclick="openSectionForm('${sec.id}','${sec.examId}')">✎</button>
-       </span>
-     </div>
-   </div>
-   ${path.length?`<div class="mq-crumb">📁 <a onclick="sfOpen(null)" style="cursor:pointer;text-decoration:underline;">${esc(sec.name)}</a> › ${path.map((f,i)=>i<path.length-1?`<a onclick="sfOpen('${f.id}')" style="cursor:pointer;text-decoration:underline;">${esc(f.name)}</a>`:esc(f.name)).join(' › ')}</div>`:''}
-   ${folders.length?`<div class="mt-10">${folders.map(sfFolderCard).join('')}</div>`:''}
-   <div class="mt-10">${body}</div>
-  `;
+   </div>${crumb}`;
+  const mid = folders.length ? `<div style="margin-top:6px;">${folders.map(sfFolderCard).join('')}</div>` : '';
+  if(subs.length) return subjectListHTML(subs, sec.id, hdr, mid);
+  return `<div class="hs-sticky hs-mid">${hdr}</div>${mid}${folders.length?'':emptyRow(cur?'આ ફોલ્ડર ખાલી છે':'કોઈ વિષય ઉમેર્યો નથી')}`;
 }
 function sfFolderOptions(sectionId, selId, excludeId){
   const ban = excludeId ? new Set(sfDescIds(excludeId)) : new Set();
@@ -1383,10 +1375,10 @@ function deleteSFolder(id){
   if(subjFolderId===id) subjFolderId = up;
   save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
 }
-function subjectListHTML(subs, sectionKey, headerHTML){
+function subjectListHTML(subs, sectionKey, headerHTML, midHTML){
   headerHTML = headerHTML || '';
   if(!subs.length) return headerHTML + emptyRow('કોઈ વિષય ઉમેર્યો નથી');
-  return `<div class="hs-sticky hs-mid">${headerHTML}${filterSortToolbarHTML('subjects','subjectSearchInput','filterSubjectsList', sectionKey)}</div><div class="subject-list" id="subjectsListWrap">${sortSubjectsList(subs, sectionKey).map(s=>subjectSlideCard(s)).join('')}</div>`;
+  return `<div class="hs-sticky hs-mid">${headerHTML}${filterSortToolbarHTML('subjects','subjectSearchInput','filterSubjectsList', sectionKey)}</div>${midHTML||''}<div class="subject-list" id="subjectsListWrap">${sortSubjectsList(subs, sectionKey).map(s=>subjectSlideCard(s)).join('')}</div>`;
 }
 function subjectSlideCard(s){
   const topics = subjectTopics(s.id);
