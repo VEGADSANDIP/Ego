@@ -412,8 +412,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-6';
-const APP_BUILT = '2026-11-04T17:57:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.04-7';
+const APP_BUILT = '2026-11-04T18:05:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1450,17 +1450,13 @@ function renderTopicDetail(subjectId){
   const pct = topics.length ? Math.round(completed/topics.length*100) : 0;
   return `
    ${backButtonHTML("topicDetailId=null; renderMain();")}
-   <div class="card mt-10">
-     <div class="item item-static"><b>${esc(s.name)}</b><span class="ink-dim">${completed}/${topics.length} પૂર્ણ</span></div>
-     <div class="progress-track mt-8"><div class="progress-fill" style="width:${pct}%"></div></div>
-   </div>
    <div class="hs-sticky hs-mid" style="margin-top:10px;">
      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
        ${topics.length>1?`<button class="btn btn-sm btn-secondary" onclick="openTopicReorder('${s.id}')">ક્રમ બદલો</button>`:''}
        <button class="btn btn-sm btn-secondary" onclick="openBulkTopicForm('${s.id}')">+ ઘણા ટોપિક</button>
        <button class="btn btn-sm btn-primary" onclick="openTopicEditForm(null,'${s.id}')">+ ટોપિક</button>
      </div>
-     <h3 style="margin:10px 0 8px 0;">બધા ટોપિક</h3>
+     <h3 style="margin:10px 0 8px 0;">${esc(s.name)} <span class="ink-dim fw-400 fs-12">· ${completed}/${topics.length} પૂર્ણ</span></h3>
      ${topics.length ? filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList', s.id) + topicTabSegHTML() : ''}
    </div>
    ${topics.length ? `<div id="topicsListWrap">${sortTopicsList(topics, s.id).map(t=>topicRow(t)).join('')}</div>` : emptyRow('કોઈ ટોપિક નથી')}
@@ -1594,9 +1590,9 @@ function dashboardTodayStudyRow(l){
     <span class="badge badge-success">પૂર્ણ ✓</span>
   </div>`;
 }
-let topicTab = 'edit'; /* ચેપ્ટરની બાજુનું બટન કયું કામ કરે: edit / sub / rev */
+let topicTab = 'edit'; /* ચેપ્ટરની બાજુનું બટન કયું કામ કરે: edit / sub / rev / status */
 function topicTabSegHTML(){
-  return `<div class="seg seg-sm" style="margin-top:8px;">${[['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન']].map(([k,l])=>`<button class="${topicTab===k?'on':''}" onclick="topicTab='${k}'; renderMain();">${l}</button>`).join('')}</div>`;
+  return `<div class="seg seg-sm" style="margin-top:8px;">${[['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન'],['status','🚦 સ્ટેટસ']].map(([k,l])=>`<button class="${topicTab===k?'on':''}" onclick="topicTab='${k}'; renderMain();">${l}</button>`).join('')}</div>`;
 }
 function topicRow(t){
   const statusDot = t.status==='completed' ? '🟢' : (t.status==='studying' ? '🟡' : '🔴');
@@ -1604,6 +1600,7 @@ function topicRow(t){
   let btn;
   if(topicTab==='sub'){ const n = subtopicsForTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicSubtopicManageForm('${t.id}')">📑${n?` ${n}`:''}</button>`; }
   else if(topicTab==='rev'){ btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicRevisionForm('${t.id}')">🔁</button>`; }
+  else if(topicTab==='status'){ btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0; font-size:15px;" onclick="openTopicStatusSheet('${t.id}')">${statusDot}</button>`; }
   else btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>`;
   return `<div class="topic-row${highlight}" data-search="${esc(t.name.toLowerCase())}" id="topic-${t.id}">
     <div class="topic-row-top">
@@ -1629,10 +1626,21 @@ function moveTopic(id, dir){
 function cycleTopicStatus(id){
   const t = DB.topics.find(x=>x.id===id);
   if(!t) return;
+  const order = ['not_started','studying','completed'];
+  setTopicStatus(id, order[(order.indexOf(t.status)+1) % order.length]);
+}
+function openTopicStatusSheet(id){
+  const t = DB.topics.find(x=>x.id===id); if(!t) return;
+  const opt = (k,dot,label)=>`<button class="btn ${t.status===k?'btn-primary':'btn-secondary'} btn-block" style="justify-content:flex-start; gap:12px; margin-bottom:8px; font-size:15.5px;" onclick="setTopicStatus('${id}','${k}')"><span style="font-size:20px;">${dot}</span><span>${label}</span>${t.status===k?'<span style="margin-left:auto;">✓</span>':''}</button>`;
+  openSheet(`<h3>સ્ટેટસ બદલો</h3><div style="font-weight:800; margin-bottom:10px;">${esc(t.name)}</div>
+    ${opt('not_started','🔴','શરૂ નથી')}${opt('studying','🟡','ચાલુ ટોપિક')}${opt('completed','🟢','પૂર્ણ (રિવિઝન સાથે)')}`);
+}
+function setTopicStatus(id, next){
+  const t = DB.topics.find(x=>x.id===id);
+  if(!t) return;
+  if(t.status===next){ closeSheet(); return; }
   const subs = subtopicsForTopic(id);
   const hasSubtopics = subs.length>0;
-  const order = ['not_started','studying','completed'];
-  const next = order[(order.indexOf(t.status)+1) % order.length];
   const labels = {not_started:'શરૂ નથી 🔴', studying:'ચાલુ 🟡', completed:'પૂર્ણ 🟢'};
   if(hasSubtopics && next==='completed'){
     const pending = subs.filter(s=>!s.completed);
@@ -1642,6 +1650,7 @@ function cycleTopicStatus(id){
     }
   }
   if(!hasSubtopics && next==='completed'){
+    closeSheet();
     openRevisionCalendarSheet('topic', id);
     return;
   }
@@ -1654,6 +1663,7 @@ function cycleTopicStatus(id){
     }
   }
   if(!confirm(msg)) return;
+  closeSheet();
   t.status = next;
   if(next==='completed'){
     t.completedDate = todayStr();
