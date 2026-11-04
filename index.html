@@ -412,8 +412,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.05-1';
-const APP_BUILT = '2026-11-05T05:20:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.05-2';
+const APP_BUILT = '2026-11-05T05:26:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -568,6 +568,30 @@ function topicRevInfo(t){
   DB.revisions.forEach(r=>{ if(r.topicId===t.id && r.status==='completed'){ n++; const d=r.completedDate||r.dueDate; if(d>last) last = d; } });
   return {n, last};
 }
+/* સ્ટ્રીક માટે ફક્ત એક લીટી: {છેલ્લી તારીખ, સળંગ દિવસ} — રોજનો જૂનો ડેટા સાચવવાની જરૂર નથી */
+function streakRecordAll(){
+  DB.activity = DB.activity || {};
+  DB.exams.forEach(e=>{
+    const set = new Set(); const ex = e;
+    /* આ પરીક્ષાના દિવસો (activityDates હાલની active પરીક્ષા પર ચાલે છે, એટલે અહીં સીધું ગણીએ) */
+    const subIds = new Set(DB.subjects.filter(x=>x.examId===ex.id).map(x=>x.id));
+    const rec = DB.activity[ex.id];
+    if(Array.isArray(rec)) rec.forEach(d=>set.add(d));
+    else if(rec && rec.last && rec.count>0){ const c = new Date(rec.last+'T00:00:00'); for(let i=0;i<rec.count;i++){ set.add(toLocalISODate(c)); c.setDate(c.getDate()-1); } }
+    DB.studyLogs.forEach(l=>{ if(subIds.has(l.subjectId) && l.date) set.add(l.date); });
+    DB.revisions.forEach(r=>{ if(subIds.has(r.subjectId) && r.status==='completed' && r.completedDate) set.add(r.completedDate); });
+    const tIds = new Set();
+    DB.qtests.forEach(t=>{ if(t.examId===ex.id){ tIds.add(t.id); (t.attempts||[]).forEach(a=>{ if(a.date) set.add(a.date); }); } });
+    (DB.qrevs||[]).forEach(r=>{ if(tIds.has(r.testId) && r.status==='completed' && r.completedDate) set.add(r.completedDate); });
+    const today = todayStr();
+    const days = [...set].filter(d=>d<=today).sort();
+    if(!days.length){ delete DB.activity[ex.id]; return; }
+    const last = days[days.length-1];
+    let count = 0; const c = new Date(last+'T00:00:00');
+    while(set.has(toLocalISODate(c))){ count++; c.setDate(c.getDate()-1); }
+    DB.activity[ex.id] = {last, count};
+  });
+}
 function compactHistory(){
   const today = todayStr();
   const stat = {rev:0, qrev:0, logs:0, att:0};
@@ -575,8 +599,8 @@ function compactHistory(){
   const subBy = {}; DB.subtopics.forEach(x=>subBy[x.id]=x);
   const subjBy = {}; DB.subjects.forEach(x=>subjBy[x.id]=x);
   const testBy = {}; DB.qtests.forEach(x=>testBy[x.id]=x);
-  DB.activity = DB.activity || {};
-  const act = (examId, d)=>{ if(!examId || !d) return; const a = DB.activity[examId] = DB.activity[examId] || []; if(!a.includes(d)) a.push(d); };
+  const act = ()=>{};
+  streakRecordAll(); /* ભૂંસતા પહેલા સ્ટ્રીક (છેલ્લી તારીખ + કેટલા દિવસ) નોંધી લો */
   const bump = (e, cnt, last, d)=>{ e[cnt] = (e[cnt]||0)+1; if(d && d>(e[last]||'')) e[last] = d; };
   DB.revisions = DB.revisions.filter(r=>{
     if(r.status!=='completed') return true;
@@ -662,8 +686,11 @@ function compactStartupPrompt(){
 }
 /* અભ્યાસ ગણાય તેવા બધા દિવસ: અભ્યાસ લોગ + પૂર્ણ રિવિઝન + MCQ ટેસ્ટ આપેલી + પૂર્ણ MCQ રિવિઝન */
 function activityDates(exam){
-  const out = new Set((DB.activity && DB.activity[exam && exam.id]) || []);
+  const out = new Set();
   if(!exam) return out;
+  const rec = DB.activity && DB.activity[exam.id];
+  if(Array.isArray(rec)) rec.forEach(d=>out.add(d));
+  else if(rec && rec.last && rec.count>0){ const c = new Date(rec.last+'T00:00:00'); for(let i=0;i<rec.count;i++){ out.add(toLocalISODate(c)); c.setDate(c.getDate()-1); } }
   const activeIds = activeExamSubjectIds();
   DB.studyLogs.forEach(l=>{ if(activeIds.includes(l.subjectId) && l.date) out.add(l.date); });
   DB.revisions.forEach(r=>{ if(activeIds.includes(r.subjectId) && r.status==='completed' && r.completedDate) out.add(r.completedDate); });
