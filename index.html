@@ -412,8 +412,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-3';
-const APP_BUILT = '2026-11-04T16:30:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.04-4';
+const APP_BUILT = '2026-11-04T16:51:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -605,6 +605,8 @@ function sectionSubjects(sectionId){ return DB.subjects.filter(s=>s.sectionId===
 function activeExamSubjectIds(){ const exam=getActiveExam(); if(!exam) return []; return examSubjects(exam.id).map(s=>s.id); }
 function studyLogsForActiveExam(){ const ids=activeExamSubjectIds(); return DB.studyLogs.filter(l=>ids.includes(l.subjectId)); }
 function revisionsForActiveExam(){ const ids=activeExamSubjectIds(); return DB.revisions.filter(r=>ids.includes(r.subjectId)); }
+function subjFolderPathText(id){ const s=DB.subjects.find(x=>x.id===id); if(!s||!s.folderId) return ''; const p=sfPath(s.folderId).map(f=>f.name); return p.length?p.join(' › '):''; }
+function subjTitleHTML(id){ const p=subjFolderPathText(id); return `<span style="flex:1;min-width:0;"><b>${esc(subjectName(id))}</b>${p?`<div class="ink-dim fs-12">📁 ${esc(p)}</div>`:''}</span>`; }
 function subjectName(id){ const s=DB.subjects.find(x=>x.id===id); return s? s.name : '-'; }
 
 function durationPickerHTML(prefix, totalSeconds){
@@ -1297,21 +1299,33 @@ function sfPath(id){ const out=[]; let f=sfAll().find(x=>x.id===id), g=0; while(
 function sfDescIds(id){ let ids=[id]; sfAll().filter(f=>f.parentId===id).forEach(f=>{ ids=ids.concat(sfDescIds(f.id)); }); return ids; }
 function sfSubjectsDeep(f){ const ids=new Set(sfDescIds(f.id)); return DB.subjects.filter(x=>x.sectionId===f.sectionId && ids.has(x.folderId)); }
 function sfOpen(id){ subjFolderId = id||null; renderMain(); mqScrollTop(); }
+function folderCardHTML(pct, titleHTML, subLine, editCode, navCode, detailsHTML){
+  return `<div class="card cursor-pointer" onclick="${navCode}">
+    ${progressCardHeader(pct, titleHTML, editCode)}
+    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${subLine}</div>
+    <details class="fc-det" onclick="event.stopPropagation()" style="margin-top:8px;">
+      <summary class="ink-dim" style="text-align:center; cursor:pointer; font-size:12.5px; font-weight:700; list-style:none; padding:4px;">▾ વિગત જુઓ</summary>
+      <div style="margin-top:8px;">${detailsHTML}</div>
+    </details>
+  </div>`;
+}
 function sfFolderCard(f){
   const subs = sfSubjectsDeep(f);
   let tot=0, done=0; subs.forEach(x=>{ const tp=subjectTopics(x.id); tot+=tp.length; done+=tp.filter(t=>t.status==='completed').length; });
   const pct = tot ? Math.round(done/tot*100) : 0;
   const nF = sfChildren(f.sectionId, f.id).length;
-  return `<div class="card cursor-pointer" onclick="if(bookClickOK()) sfOpen('${f.id}')" style="margin-bottom:12px;">
-    ${progressCardHeader(pct, '📁 '+esc(f.name), `openSFolderForm('${f.id}')`)}
-    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px;">
+  const ids = new Set(subs.map(x=>x.id));
+  const revs = DB.revisions.filter(r=>ids.has(r.subjectId)); const rDone = revs.filter(r=>r.status==='completed').length;
+  const det = `<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
       <div class="subject-mini-stat"><b>${nF}</b><span>ફોલ્ડર</span></div>
       <div class="subject-mini-stat"><b>${subs.length}</b><span>વિષય</span></div>
       <div class="subject-mini-stat"><b>${done}</b><span>પૂર્ણ ચેપ્ટર</span></div>
-      <div class="subject-mini-stat"><b>${tot-done}</b><span>બાકી ચેપ્ટર</span></div>
-    </div>
-    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">ખોલવા ટેપ કરો →</div>
-  </div>`;
+      <div class="subject-mini-stat"><b>${tot-done}</b><span>બાકી ચેપ્ટર</span></div></div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;">
+      <div class="subject-mini-stat"><b>${revs.length}</b><span>કુલ રિવિઝન</span></div>
+      <div class="subject-mini-stat"><b>${rDone}</b><span>પૂર્ણ રિવિઝન</span></div>
+      <div class="subject-mini-stat"><b>${revs.length-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
+  return folderCardHTML(pct, '📁 '+esc(f.name), `${nF?nF+' ફોલ્ડર · ':''}${subs.length} વિષય — ખોલવા ટેપ કરો →`, `openSFolderForm('${f.id}')`, `sfOpen('${f.id}')`, det).replace('<div class="card cursor-pointer"','<div class="card cursor-pointer" style="margin-bottom:12px;"');
 }
 function renderSectionDetail(sectionId){
   const sec = DB.sections.find(x=>x.id===sectionId);
@@ -1321,12 +1335,11 @@ function renderSectionDetail(sectionId){
   const path = sfPath(subjFolderId);
   const subs = DB.subjects.filter(x=>x.sectionId===sec.id && (x.folderId||null)===(subjFolderId||null));
   const folders = sfChildren(sec.id, subjFolderId);
-  const crumb = `<div class="mq-crumb">📁 <a onclick="sfOpen(null)" style="cursor:pointer;${path.length?'text-decoration:underline;':''}">${esc(sec.name)}</a>${sec.totalMarks?` <span class="badge badge-primary">${sec.totalMarks} ગુણ</span>`:''}${path.map((f,i)=>' › '+(i<path.length-1?`<a onclick="sfOpen('${f.id}')" style="cursor:pointer;text-decoration:underline;">${esc(f.name)}</a>`:esc(f.name))).join('')}</div>`;
+  const crumb = `<div class="mq-crumb">📁 <a onclick="sfOpen(null)" style="cursor:pointer;${path.length?'text-decoration:underline;':''}">${esc(sec.name)}</a>${path.map((f,i)=>' › '+(i<path.length-1?`<a onclick="sfOpen('${f.id}')" style="cursor:pointer;text-decoration:underline;">${esc(f.name)}</a>`:esc(f.name))).join('')}</div>`;
   const hdr = `<div class="mq-topbar">
      ${backButtonHTML(cur ? `sfOpen(${cur.parentId?`'${cur.parentId}'`:'null'})` : "sectionDetailId=null; renderMain();")}
      <span class="flex-gap-6">
        ${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ</button>`:''}
-       <button class="btn btn-sm btn-secondary" onclick="openSectionForm('${sec.id}','${sec.examId}')">✎</button>
        <button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button>
        <button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>
      </span>
@@ -2438,7 +2451,7 @@ function calendarDayDetailHTML(dateStr){
       const grouped = groupStudyLogsByChapter(bySubject[sid].entries);
       return `<div class="card">
         <div class="item item-static">
-          <b>${esc(subjectName(sid))}</b>
+          ${subjTitleHTML(sid)}
         </div>
         ${grouped.chapterGroups.map(g=>studyChapterAccordion(g.topicId, g.items)).join('')}
         <div class="mt-8">${grouped.freeform.map(it=>`<div class="item" onclick="openStudyForm('${it.logId}')"><span>${esc(it.label)}</span></div>`).join('')}</div>
@@ -2462,7 +2475,7 @@ function calendarDayDetailHTML(dateStr){
       const pendingCount = bySubject[sid].filter(r=>r.status==='pending').length;
       return `<div class="card">
         <div class="item item-static">
-          <b>${esc(subjectName(sid))}</b>
+          ${subjTitleHTML(sid)}
           ${pendingCount>0 ? `<button class="btn btn-sm btn-primary" onclick="completeAllRevisionsForSubject('${sid}','${dateStr}')">✓ બધા પૂર્ણ કરો</button>` : ''}
         </div>
         ${chapterGroups.map(g=>revisionChapterAccordion(g.topicId, g.items)).join('')}
@@ -4068,29 +4081,16 @@ function mqFolderBookHTML(f){
   const ids = new Set(tests.map(t=>t.id));
   const revs = (DB.qrevs||[]).filter(r=>ids.has(r.testId));
   const rDone = revs.filter(r=>r.status==='completed').length;
-  const rPct = revs.length ? Math.round(rDone/revs.length*100) : 0;
-  const nav = `if(bookClickOK()){ mqOpenFolder('${f.id}'); }`;
-  const edit = `openQFolderForm('${f.id}')`;
-  const front = `<div class="card cursor-pointer" onclick="${nav}">
-    ${progressCardHeader(pct, '📁 '+esc(f.name), edit)}
-    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:14px;">
+  const det = `<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
       <div class="subject-mini-stat"><b>${nT}</b><span>કુલ ટેસ્ટ</span></div>
       <div class="subject-mini-stat"><b>${attempted}</b><span>આપેલી</span></div>
       <div class="subject-mini-stat"><b>${nT-attempted}</b><span>બાકી</span></div>
-      <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--primary) 16%, transparent);"><b>${totalTimes}</b><span>કુલ વખત</span></div>
-    </div>
-    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${nF?nF+' સબફોલ્ડર · ':''}ખોલવા ટેપ કરો → · રિવિઝન માટે સ્વાઇપ કરો</div>
-  </div>`;
-  const back = `<div class="card cursor-pointer" onclick="${nav}">
-    ${progressCardHeader(rPct, esc(f.name), edit)}
-    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
+      <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--primary) 16%, transparent);"><b>${totalTimes}</b><span>કુલ વખત</span></div></div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;">
       <div class="subject-mini-stat"><b>${revs.length}</b><span>કુલ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rDone}</b><span>પૂર્ણ રિવિઝન</span></div>
-      <div class="subject-mini-stat"><b>${revs.length-rDone}</b><span>બાકી રિવિઝન</span></div>
-    </div>
-    <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">ખોલવા ટેપ કરો → · ટેસ્ટ માટે સ્વાઇપ કરો</div>
-  </div>`;
-  return `<div class="sub-book-wrap">${bookHTML('qf_'+f.id, [front, back], 'book-card')}</div>`;
+      <div class="subject-mini-stat"><b>${revs.length-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
+  return `<div style="margin-bottom:12px;">${folderCardHTML(pct, '📁 '+esc(f.name), `${nF?nF+' સબફોલ્ડર · ':''}${nT} ટેસ્ટ — ખોલવા ટેપ કરો →`, `openQFolderForm('${f.id}')`, `mqOpenFolder('${f.id}')`, det)}</div>`;
 }
 function dashboardQuizPages(exam){
   const tests = DB.qtests.filter(t=>t.examId===mqExamId());
@@ -4207,11 +4207,11 @@ function mqFolderGroupedHTML(items){
   items.forEach(it=>{
     const t = it.t, chain = mqFolderChain(t.folderId);
     const topId = chain[0] ? chain[0].id : '_none';
-    const subId = chain[1] ? chain[1].id : '_direct';
+    const subId = chain.length>1 ? chain[chain.length-1].id : '_direct';
     if(!tops[topId]){ tops[topId] = {name: chain[0]?chain[0].name:'', subs:{}, subOrder:[]}; topOrder.push(topId); }
     const T = tops[topId];
-    if(!T.subs[subId]){ T.subs[subId] = {name: chain[1]?chain[1].name:(chain[0]?'':'MCQ ટેસ્ટ'), items:[]}; T.subOrder.push(subId); }
-    T.subs[subId].items.push(Object.assign({}, it, {rest: chain.slice(2).map(f=>f.name).join(' › ')}));
+    if(!T.subs[subId]){ T.subs[subId] = {name: chain.length>1 ? '📁 '+chain.slice(1).map(f=>f.name).join(' › ') : (chain[0]?'':'MCQ ટેસ્ટ'), items:[]}; T.subOrder.push(subId); }
+    T.subs[subId].items.push(Object.assign({}, it, {rest:''}));
   });
   const card = (S)=>{
     S.items.sort((a,b)=>a.t.name.localeCompare(b.t.name,'gu',{numeric:true}));
