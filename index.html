@@ -206,9 +206,6 @@ a{color:inherit;}
 [data-theme="dark"] .badge-danger{color:var(--danger);}
 .badge-primary{background:rgba(46,58,168,0.15); color:#2E3AA8;}
 [data-theme="dark"] .badge-primary{color:var(--primary);}
-.tt-day-tabs{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;}
-.tt-day-btn{flex:0 0 auto; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--ink-dim); font-size:13px; font-weight:700; cursor:pointer;}
-.tt-day-btn.active{background:var(--primary); color:#fff; border-color:var(--primary);}
 
 .progress-track{height:8px; border-radius:999px; background:var(--surface2); overflow:hidden;}
 .progress-fill{height:100%; background:var(--primary); border-radius:999px; transition:width .3s;}
@@ -405,17 +402,18 @@ const STORAGE_KEY = 'examPathData_v1';
 function defaultData(){
   return {
     exams:[], subjects:[], topics:[], revisions:[], sections:[],
-    studyLogs:[], timetable:[], chapterTimetable:[], subtopics:[], qfolders:[], sfolders:[], qtests:[], qrevs:[],
+    studyLogs:[], activity:{}, subtopics:[], qfolders:[], sfolders:[], qtests:[], qrevs:[],
     settings:{theme:'light', brandName:'ExamPath', sortPrefs:{sections:'default', subjects:{}, topics:{}}}
   };
 }
 function normalizeData(parsed){
   const merged = Object.assign(defaultData(), parsed);
+  delete merged.timetable; delete merged.chapterTimetable; delete merged.mockTests; /* હવે વપરાતા નથી */
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-9';
-const APP_BUILT = '2026-11-04T18:27:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.05-1';
+const APP_BUILT = '2026-11-05T05:20:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -484,6 +482,7 @@ function dataCorruptAlert(){
 let _saveTimer = null, _savePending = false, _lastSaveStr = '';
 function save(){
   if(_dataLocked) return;
+  try{ if(DB.settings && DB.settings.compactOn) compactHistory(); }catch(e){ console.error('compact failed', e); }
   _savePending = true;
   try{ localStorage.setItem('examPathTheme', (DB.settings||{}).theme||'light'); }catch(e){}
   clearTimeout(_saveTimer);
@@ -543,9 +542,127 @@ function daysLeftColor(d){
   if(d>=10) return getVar('--warning');
   return getVar('--danger');
 }
+/* ===== ઇતિહાસ ટૂંકો (compact) — જૂનો ડેટા સાચવાતો નથી, ફક્ત છેલ્લી તારીખ + કેટલી વાર ===== */
+function mqTimes(t){ return (t.timesBase||0) + (t.attempts||[]).length; }
+function mqBest(t){ return Math.max(t.bestPct||0, ...(t.attempts||[]).map(a=>a.pct||0)); }
+function revBase(subjectIds){
+  const set = new Set(subjectIds); let n = 0;
+  DB.topics.forEach(t=>{ if(set.has(t.subjectId)) n += (t.revCount||0); });
+  DB.subtopics.forEach(x=>{ if(set.has(x.subjectId)) n += (x.revCount||0); });
+  return n;
+}
+function qrevBase(testIds){ const set = new Set(testIds); let n = 0; DB.qtests.forEach(t=>{ if(set.has(t.id)) n += (t.revCount||0); }); return n; }
+function topicStudyInfo(t){
+  const today = todayStr(); let n = t.studyCount||0, last = t.lastStudy||'';
+  const subIds = new Set(DB.subtopics.filter(x=>x.topicId===t.id).map(x=>x.id));
+  DB.studyLogs.forEach(l=>{
+    if(!l.date || l.date>today) return;
+    const hit = (l.topicIds && l.topicIds.includes(t.id)) || l.topicId===t.id || (l.subtopicIds && l.subtopicIds.some(i=>subIds.has(i)));
+    if(hit){ n++; if(l.date>last) last = l.date; }
+  });
+  return {n, last};
+}
+function topicRevInfo(t){
+  let n = t.revCount||0, last = t.lastRev||'';
+  DB.subtopics.forEach(x=>{ if(x.topicId===t.id){ n += (x.revCount||0); if((x.lastRev||'')>last) last = x.lastRev; } });
+  DB.revisions.forEach(r=>{ if(r.topicId===t.id && r.status==='completed'){ n++; const d=r.completedDate||r.dueDate; if(d>last) last = d; } });
+  return {n, last};
+}
+function compactHistory(){
+  const today = todayStr();
+  const stat = {rev:0, qrev:0, logs:0, att:0};
+  const topicBy = {}; DB.topics.forEach(x=>topicBy[x.id]=x);
+  const subBy = {}; DB.subtopics.forEach(x=>subBy[x.id]=x);
+  const subjBy = {}; DB.subjects.forEach(x=>subjBy[x.id]=x);
+  const testBy = {}; DB.qtests.forEach(x=>testBy[x.id]=x);
+  DB.activity = DB.activity || {};
+  const act = (examId, d)=>{ if(!examId || !d) return; const a = DB.activity[examId] = DB.activity[examId] || []; if(!a.includes(d)) a.push(d); };
+  const bump = (e, cnt, last, d)=>{ e[cnt] = (e[cnt]||0)+1; if(d && d>(e[last]||'')) e[last] = d; };
+  DB.revisions = DB.revisions.filter(r=>{
+    if(r.status!=='completed') return true;
+    const d = r.completedDate || r.dueDate || '';
+    if(d >= today) return true;
+    const e = r.subtopicId ? subBy[r.subtopicId] : topicBy[r.topicId];
+    if(e){ bump(e,'revCount','lastRev',d); const sj = subjBy[r.subjectId||e.subjectId]; act(sj && sj.examId, d); }
+    stat.rev++; return false;
+  });
+  DB.qrevs = (DB.qrevs||[]).filter(r=>{
+    if(r.status!=='completed') return true;
+    const d = r.completedDate || r.dueDate || '';
+    if(d >= today) return true;
+    const t = testBy[r.testId];
+    if(t){ bump(t,'revCount','lastRev',d); act(t.examId, d); }
+    stat.qrev++; return false;
+  });
+  DB.studyLogs = DB.studyLogs.filter(l=>{
+    if(!l.date || l.date >= today) return true;
+    const ents = [];
+    (l.topicIds && l.topicIds.length ? l.topicIds : (l.topicId?[l.topicId]:[])).forEach(id=>{ if(topicBy[id]) ents.push(topicBy[id]); });
+    (l.subtopicIds||[]).forEach(id=>{ if(subBy[id]) ents.push(subBy[id]); });
+    if(!ents.length && subjBy[l.subjectId]) ents.push(subjBy[l.subjectId]);
+    ents.forEach(e=>bump(e,'studyCount','lastStudy',l.date));
+    const sj = subjBy[l.subjectId]; act(sj && sj.examId, l.date);
+    stat.logs++; return false;
+  });
+  DB.qtests.forEach(t=>{
+    const a = t.attempts || [];
+    if(a.length<=1 && !a.some(x=>x.answers)) { return; }
+    const keepIdx = a.length-1;
+    const kept = [];
+    a.forEach((x,i)=>{
+      if(i===keepIdx || x.date===today){ kept.push(x); }
+      else { t.timesBase = (t.timesBase||0)+1; t.bestPct = Math.max(t.bestPct||0, x.pct||0); act(t.examId, x.date); stat.att++; }
+    });
+    kept.forEach(x=>{ if(x.date<today){ act(t.examId, x.date); } delete x.answers; });
+    t.attempts = kept;
+  });
+  return stat;
+}
+function compactPreview(){
+  const real = DB;
+  try{
+    const before = JSON.stringify(real).length;
+    DB = JSON.parse(JSON.stringify(real));
+    const st = compactHistory();
+    const after = JSON.stringify(DB).length;
+    return {st, before, after};
+  } finally { DB = real; }
+}
+function openCompactSheet(){
+  const {st, before, after} = compactPreview();
+  const kb = n=>Math.round(n/1024)+' KB';
+  const total = st.rev+st.qrev+st.logs+st.att;
+  openSheet(`<h3>🧹 જૂનો ઇતિહાસ ટૂંકો કરો</h3>
+    <div class="ink-dim fs-12 mb-6" style="line-height:1.6;">હવેથી ફક્ત <b>છેલ્લી તારીખ</b> અને <b>કેટલી વાર</b> સચવાશે. જૂના દિવસોનો વિગતવાર રેકોર્ડ ભૂંસાશે (આજનો અને આવનારા દિવસનો ડેટા અકબંધ). પાછું લાવી શકાશે નહીં — એટલે પહેલા બેકઅપ ડાઉનલોડ થશે.</div>
+    <div class="card" style="margin:8px 0;">
+      <div class="item cursor-default"><span>અભ્યાસ લોગ</span><b>${st.logs}</b></div>
+      <div class="item cursor-default"><span>પૂર્ણ ટોપિક રિવિઝન</span><b>${st.rev}</b></div>
+      <div class="item cursor-default"><span>પૂર્ણ ટેસ્ટ રિવિઝન</span><b>${st.qrev}</b></div>
+      <div class="item cursor-default"><span>જૂના ટેસ્ટ પ્રયત્નો</span><b>${st.att}</b></div>
+      <div class="item cursor-default"><span>ડેટા સાઈઝ</span><b>${kb(before)} → ${kb(after)}</b></div>
+    </div>
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="compactNow()">⬇️ બેકઅપ ડાઉનલોડ કરીને ટૂંકો કરો</button></div>
+    ${total===0?'<div class="ink-dim fs-12" style="margin-top:8px;">હાલ ભૂંસવા જેવું કંઈ નથી, પણ ચાલુ કરશો તો આગળથી આપોઆપ ટૂંકું રહેશે.</div>':''}`);
+}
+function compactNow(){
+  exportBackup();
+  DB.settings.compactOn = true;
+  const st = compactHistory();
+  save(); closeSheet(); renderMain();
+  toast(`ટૂંકો થયું ✅ (${st.logs+st.rev+st.qrev+st.att} રેકોર્ડ) — હવે આપોઆપ ટૂંકો રહેશે`);
+}
+function compactStartupPrompt(){
+  try{
+    if(DB.settings.compactOn || localStorage.getItem('examPathCompactAsked')) return;
+    const {st} = compactPreview();
+    if(st.rev+st.qrev+st.logs+st.att < 20) return;
+    localStorage.setItem('examPathCompactAsked','1');
+    openCompactSheet();
+  }catch(e){}
+}
 /* અભ્યાસ ગણાય તેવા બધા દિવસ: અભ્યાસ લોગ + પૂર્ણ રિવિઝન + MCQ ટેસ્ટ આપેલી + પૂર્ણ MCQ રિવિઝન */
 function activityDates(exam){
-  const out = new Set();
+  const out = new Set((DB.activity && DB.activity[exam && exam.id]) || []);
   if(!exam) return out;
   const activeIds = activeExamSubjectIds();
   DB.studyLogs.forEach(l=>{ if(activeIds.includes(l.subjectId) && l.date) out.add(l.date); });
@@ -682,7 +799,7 @@ async function refreshStorageEstimate(){
   }catch(e){}
 }
 function storageMB(chars){ return chars>=1073741824 ? (chars/1073741824).toFixed(1)+' GB' : (chars/1048576).toFixed(2)+' MB'; }
-const STORAGE_LABELS = {topics:'ટોપિક', subtopics:'સબ-ટોપિક', subjects:'વિષયો', sections:'વિભાગો', exams:'પરીક્ષાઓ', revisions:'રિવિઝન', studyLogs:'અભ્યાસ લોગ', timetable:'ટાઈમટેબલ', chapterTimetable:'ચેપ્ટર ટાઈમટેબલ', qfolders:'MCQ ફોલ્ડર', sfolders:'વિષય ફોલ્ડર', qtests:'MCQ ટેસ્ટ (પ્રશ્નો)', qrevs:'MCQ રિવિઝન', mockTests:'જૂના મોક ગુણ', settings:'સેટિંગ્સ / ફોટો'};
+const STORAGE_LABELS = {topics:'ટોપિક', subtopics:'સબ-ટોપિક', subjects:'વિષયો', sections:'વિભાગો', exams:'પરીક્ષાઓ', revisions:'રિવિઝન', studyLogs:'અભ્યાસ લોગ', qfolders:'MCQ ફોલ્ડર', sfolders:'વિષય ફોલ્ડર', qtests:'MCQ ટેસ્ટ (પ્રશ્નો)', qrevs:'MCQ રિવિઝન', settings:'સેટિંગ્સ / ફોટો'};
 function storageBreakdown(){
   return Object.keys(DB).map(k=>({k, label: STORAGE_LABELS[k]||k, size: JSON.stringify(DB[k]).length})).filter(x=>x.size>2).sort((a,b)=>b.size-a.size);
 }
@@ -850,7 +967,7 @@ function buildNav(){
   ).join('');
 }
 function showTab(id){
-  if((id==='exams'||id==='timetable') && currentTab!==id){ lastMainTab = currentTab; }
+  if(id==='exams' && currentTab!==id){ lastMainTab = currentTab; }
   currentTab = id;
   if(id==='calendar'){ calMode='study'; calKind='topic'; calGridExpanded=false; }
   if(id!=='exams'){ topicDetailId=null; sectionDetailId=null; subjFolderId=null; }
@@ -859,7 +976,7 @@ function showTab(id){
   document.getElementById('main').scrollIntoView({behavior:'instant', block:'start'});
 }
 function renderMain(){
-  const map = {dashboard:renderDashboard, exams:renderExams, mock:renderMock, calendar:renderCalendar, settings:renderSettings, timetable:renderTimetable};
+  const map = {dashboard:renderDashboard, exams:renderExams, mock:renderMock, calendar:renderCalendar, settings:renderSettings};
   const mainEl = document.getElementById('main');
   mainEl.innerHTML = map[currentTab]();
   /* બીજા પેજ/સ્ક્રીન પર જતાં સ્ક્રોલ ઉપરથી શરૂ થાય; એ જ સ્ક્રીનમાં ફરી દોરતાં જગ્યા જળવાય */
@@ -950,8 +1067,9 @@ function renderDashboard(){
   const inProgressTopics = topics.filter(t=>t.status==='studying');
 
   const allRevs = revisionsForActiveExam();
-  const revTotal = allRevs.length;
-  const revDone = allRevs.filter(r=>r.status==='completed').length;
+  const revBaseAll = revBase(activeExamSubjectIds());
+  const revTotal = allRevs.length + revBaseAll;
+  const revDone = allRevs.filter(r=>r.status==='completed').length + revBaseAll;
   const revPct = revTotal ? Math.round(revDone/revTotal*100) : 0;
   const revPending = revTotal-revDone;
   const revUpcoming = allRevs.filter(r=>r.status==='pending' && r.dueDate>=today).length;
@@ -1009,7 +1127,6 @@ function renderDashboard(){
      ${dashHeadHTML(streakInfo, exam)}
    </div>
 
-   ${dashboardNowCard()}
 
    ${dashStatsHTML(`   <div class="stat-grid">
      ${statCard('📖', topicsDoneTodayCount, 'આજે અભ્યાસ ટોપિક', "calSelectedDate=todayStr(); showTab('calendar');", '')}
@@ -1247,7 +1364,7 @@ function sortSubjectsList(subs, sectionKey){
     const topics = subjectTopics(s.id);
     const topicsPct = topics.length ? topics.filter(t=>t.status==='completed').length/topics.length*100 : 0;
     const revs = DB.revisions.filter(r=>r.subjectId===s.id);
-    const revPct = revs.length ? revs.filter(r=>r.status==='completed').length/revs.length*100 : 0;
+    const rb = revBase([s.id]); const revPct = (revs.length+rb) ? (revs.filter(r=>r.status==='completed').length+rb)/(revs.length+rb)*100 : 0;
     return {s, topicsPct, revPct};
   });
   if(mode==='topics_desc') return withStats.sort((a,b)=>b.topicsPct-a.topicsPct).map(x=>x.s);
@@ -1319,16 +1436,16 @@ function sfFolderCard(f){
   const pct = tot ? Math.round(done/tot*100) : 0;
   const nF = sfChildren(f.sectionId, f.id).length;
   const ids = new Set(subs.map(x=>x.id));
-  const revs = DB.revisions.filter(r=>ids.has(r.subjectId)); const rDone = revs.filter(r=>r.status==='completed').length;
+  const revs = DB.revisions.filter(r=>ids.has(r.subjectId)); const rBase = revBase([...ids]); const rDone = revs.filter(r=>r.status==='completed').length + rBase; const rTotal = revs.length + rBase;
   const det = `<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
       <div class="subject-mini-stat"><b>${nF}</b><span>ફોલ્ડર</span></div>
       <div class="subject-mini-stat"><b>${subs.length}</b><span>વિષય</span></div>
       <div class="subject-mini-stat"><b>${done}</b><span>પૂર્ણ ચેપ્ટર</span></div>
       <div class="subject-mini-stat"><b>${tot-done}</b><span>બાકી ચેપ્ટર</span></div></div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;">
-      <div class="subject-mini-stat"><b>${revs.length}</b><span>કુલ રિવિઝન</span></div>
+      <div class="subject-mini-stat"><b>${rTotal}</b><span>કુલ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rDone}</b><span>પૂર્ણ રિવિઝન</span></div>
-      <div class="subject-mini-stat"><b>${revs.length-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
+      <div class="subject-mini-stat"><b>${rTotal-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
   return folderCardHTML(pct, '📁 '+esc(f.name), `${nF?nF+' ફોલ્ડર · ':''}${subs.length} વિષય — ખોલવા ટેપ કરો →`, `openSFolderForm('${f.id}')`, `sfOpen('${f.id}')`, det).replace('<div class="card cursor-pointer"','<div class="card cursor-pointer" style="margin-bottom:12px;"');
 }
 function renderSectionDetail(sectionId){
@@ -1396,8 +1513,10 @@ function subjectSlideCard(s){
   const completed = topics.filter(t=>t.status==='completed').length;
   const pct = topics.length ? Math.round(completed/topics.length*100) : 0;
   const revs = DB.revisions.filter(r=>r.subjectId===s.id);
-  const revDone = revs.filter(r=>r.status==='completed').length;
-  const revPct = revs.length ? Math.round(revDone/revs.length*100) : 0;
+  const rb = revBase([s.id]);
+  const revDone = revs.filter(r=>r.status==='completed').length + rb;
+  const revTot = revs.length + rb;
+  const revPct = revTot ? Math.round(revDone/revTot*100) : 0;
   const nav = `if(bookClickOK()){ topicDetailId='${s.id}'; renderMain(); }`;
   const edit = `openSubjectForm('${s.id}','${s.examId}')`;
   const front = `<div class="card cursor-pointer" onclick="${nav}">
@@ -1412,9 +1531,9 @@ function subjectSlideCard(s){
   const back = `<div class="card cursor-pointer" onclick="${nav}">
       ${progressCardHeader(revPct, esc(s.name), edit)}
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
-        <div class="subject-mini-stat"><b>${revs.length}</b><span>કુલ રિવિઝન</span></div>
+        <div class="subject-mini-stat"><b>${revTot}</b><span>કુલ રિવિઝન</span></div>
         <div class="subject-mini-stat"><b>${revDone}</b><span>પૂર્ણ રિવિઝન</span></div>
-        <div class="subject-mini-stat"><b>${revs.length-revDone}</b><span>બાકી રિવિઝન</span></div>
+        <div class="subject-mini-stat"><b>${revTot-revDone}</b><span>બાકી રિવિઝન</span></div>
       </div>
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો → · ટોપિક માટે સ્વાઇપ કરો</div>
   </div>`;
@@ -1605,7 +1724,15 @@ function topicRow(t){
       <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
       ${btn}
     </div>
+    ${topicMetaHTML(t)}
   </div>`;
+}
+function topicMetaHTML(t){
+  const st = topicStudyInfo(t), rv = topicRevInfo(t);
+  const parts = [];
+  if(st.n) parts.push(`📖 ${st.n} વાર${st.last?' · '+formatDateShort(st.last):''}`);
+  if(rv.n) parts.push(`🔁 ${rv.n} વાર${rv.last?' · '+formatDateShort(rv.last):''}`);
+  return parts.length ? `<div class="ink-dim fs-12" style="padding:0 0 8px 4px;">${parts.join(' &nbsp;·&nbsp; ')} <span style="opacity:.7;">(છેલ્લી તારીખ)</span></div>` : '';
 }
 function moveTopic(id, dir){
   const list = DB.topics;
@@ -1919,8 +2046,6 @@ function cascadeDeleteSubjectData(subjectId){
   DB.revisions = DB.revisions.filter(r=>r.subjectId!==subjectId);
   DB.topics = DB.topics.filter(t=>t.subjectId!==subjectId);
   DB.studyLogs = DB.studyLogs.filter(l=>l.subjectId!==subjectId);
-  DB.timetable = DB.timetable.filter(x=>x.subjectId!==subjectId);
-  DB.chapterTimetable = DB.chapterTimetable.filter(x=>x.subjectId!==subjectId);
 }
 function deleteExam(id){
   if(!confirm('આ પરીક્ષા અને તેના તમામ વિભાગ/વિષય/ટોપિક/સબ-ટોપિક/રિવિઝન/અભ્યાસ/ટાઈમટેબલ/MCQ ટેસ્ટ — બધું ડિલીટ થશે. ચાલુ રાખવું છે?'))return;
@@ -1930,6 +2055,7 @@ function deleteExam(id){
   DB.sections = DB.sections.filter(x=>x.examId!==id);
   DB.qfolders = (DB.qfolders||[]).filter(f=>f.examId!==id);
   DB.sfolders = (DB.sfolders||[]).filter(f=>f.examId!==id);
+  if(DB.activity) delete DB.activity[id];
   { const gone = new Set((DB.qtests||[]).filter(t=>t.examId===id).map(t=>t.id)); DB.qrevs = (DB.qrevs||[]).filter(r=>!gone.has(r.testId)); }
   DB.qtests = (DB.qtests||[]).filter(t=>t.examId!==id);
   DB.exams = DB.exams.filter(x=>x.id!==id);
@@ -2327,20 +2453,6 @@ function dotsForDate(dateStr){
   const isOverdue = dateStr<today && pendingCount>0;
   return {studyCount, pendingCount, isOverdue};
 }
-function sortSubjectIdsByTimetable(subjectIds, dateStr){
-  const exam = getActiveExam();
-  if(!exam) return subjectIds;
-  const day = dayKeyForDate(dateStr);
-  const blocks = timetableForDay(exam.id, day);
-  const order = {};
-  blocks.forEach((b,idx)=>{ if(!(b.subjectId in order)) order[b.subjectId] = idx; });
-  return [...subjectIds].sort((a,b)=>{
-    const oa = (a in order) ? order[a] : Infinity;
-    const ob = (b in order) ? order[b] : Infinity;
-    if(oa!==ob) return oa-ob;
-    return 0;
-  });
-}
 function groupSubjectIdsBySection(subjectIds){
   const exam = getActiveExam();
   const sections = exam ? examSections(exam.id) : [];
@@ -2398,7 +2510,7 @@ function calendarDayDetailHTML(dateStr){
       if(!bySubject[l.subjectId]) bySubject[l.subjectId] = {entries:[]};
       bySubject[l.subjectId].entries.push(l);
     });
-    const subjectIds = sortSubjectIdsByTimetable(Object.keys(bySubject), dateStr);
+    const subjectIds = Object.keys(bySubject);
     if(!subjectIds.length) return emptyRow('આ દિવસે કોઈ અભ્યાસ નથી');
     const subjectCardHTML = (sid)=>{
       const grouped = groupStudyLogsByChapter(bySubject[sid].entries);
@@ -2418,7 +2530,7 @@ function calendarDayDetailHTML(dateStr){
     const sid = r.subjectId || 'unknown';
     (bySubject[sid] = bySubject[sid]||[]).push(r);
   });
-  const subjectIds = sortSubjectIdsByTimetable(Object.keys(bySubject), dateStr);
+  const subjectIds = Object.keys(bySubject);
   let topicCards;
   if(!subjectIds.length){
     topicCards = emptyRow('આ દિવસે કોઈ ટોપિક રિવિઝન નથી');
@@ -2548,280 +2660,6 @@ function toggleAccordion(wrapId, caretEl){
 }
 
 /* ===================== TIMETABLE ===================== */
-const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
-const DAY_LABELS = {mon:'સોમ',tue:'મંગળ',wed:'બુધ',thu:'ગુરુ',fri:'શુક્ર',sat:'શનિ',sun:'રવિ'};
-let ttSelectedDay = null;
-let ttMode = 'time';
-function todayDayKey(){
-  const map = ['sun','mon','tue','wed','thu','fri','sat'];
-  return map[new Date().getDay()];
-}
-function formatTime12(t){
-  if(!t) return '';
-  const [h,m] = t.split(':').map(Number);
-  const period = h>=12 ? 'PM' : 'AM';
-  let h12 = h%12; if(h12===0) h12=12;
-  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
-}
-function timeDurationLabel(start, end){
-  const [sh,sm] = start.split(':').map(Number);
-  const [eh,em] = end.split(':').map(Number);
-  let mins = (eh*60+em) - (sh*60+sm);
-  if(mins<0) mins += 24*60;
-  const h = Math.floor(mins/60), m = mins%60;
-  return `${h} કલાક ${m} મિનિટ`;
-}
-function timetableForDay(examId, day){
-  const subIds = examSubjects(examId).map(s=>s.id);
-  return DB.timetable.filter(t=>t.day===day && subIds.includes(t.subjectId)).sort((a,b)=>a.startTime.localeCompare(b.startTime));
-}
-function currentOrNextTopic(subjectId){
-  const topics = subjectTopics(subjectId);
-  let t = topics.find(x=>x.status==='studying');
-  if(t) return t;
-  return topics.find(x=>x.status!=='completed') || null;
-}
-function subjectRevisionDueToday(subjectId){
-  const today = todayStr();
-  const revs = DB.revisions.filter(r=>r.subjectId===subjectId && r.status==='pending' && r.dueDate<=today);
-  if(!revs.length) return null;
-  revs.sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  const t = DB.topics.find(x=>x.id===revs[0].topicId);
-  return t ? t.name : null;
-}
-function timetableBlockNow(){
-  const exam = getActiveExam();
-  if(!exam) return null;
-  const day = todayDayKey();
-  const now = new Date();
-  const nowStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  const blocks = timetableForDay(exam.id, day);
-  return blocks.find(b=>b.startTime<=nowStr && nowStr<b.endTime) || null;
-}
-function dashboardNowCard(){
-  const block = timetableBlockNow();
-  if(!block) return '';
-  const s = DB.subjects.find(x=>x.id===block.subjectId);
-  if(!s) return '';
-  const sec = s.sectionId ? DB.sections.find(x=>x.id===s.sectionId) : null;
-  const curTopic = currentOrNextTopic(s.id);
-  const revTopicName = subjectRevisionDueToday(s.id);
-  return `<div class="card" style="background:var(--surface2); cursor:pointer;" onclick="showTab('timetable')">
-    <div class="item item-static">
-      <span class="badge badge-primary">🔴 હમણાં</span>
-      <span class="ink-dim fs-12">${formatTime12(block.startTime)} - ${formatTime12(block.endTime)}</span>
-    </div>
-    <div style="margin-top:8px; font-size:15px; font-weight:800;">${sec?`<span class="ink-dim" style="font-weight:600; font-size:12px; display:block;">📂 ${esc(sec.name)}</span>`:''}${esc(s.name)}</div>
-    ${curTopic ? `<div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:8px;">
-      <span style="font-size:13.5px;">${esc(curTopic.name)}</span>
-      <span class="badge ${curTopic.status==='studying'?'badge-warning':'badge-grey'}">${curTopic.status==='studying'?'ચાલુ 🟡':'આગળનો 🔴'}</span>
-    </div>` : `<div class="mt-8"><span class="badge badge-success">બધા ટોપિક પૂર્ણ 🎉</span></div>`}
-    ${revTopicName ? `<div style="margin-top:6px; display:flex; align-items:center; justify-content:space-between; gap:6px;"><span style="font-size:13px;">${esc(revTopicName)}</span><span class="badge badge-danger">🔁 રિવિઝન</span></div>` : ''}
-  </div>`;
-}
-function dayKeyForDate(dateStr){
-  const map = ['sun','mon','tue','wed','thu','fri','sat'];
-  const d = new Date(dateStr+'T00:00:00');
-  return map[d.getDay()];
-}
-function renderTimetable(){
-  const exam = getActiveExam();
-  if(!exam){
-    return `${backButtonHTML("showTab(lastMainTab);")}
-    <div class="mt-10">${emptyState('📋','પહેલા પરીક્ષા ઉમેરો','ટાઈમટેબલ બનાવવા માટે પહેલા એક પરીક્ષા સિલેક્ટ કરો.','પરીક્ષા ઉમેરો','openExamForm(null)')}</div>`;
-  }
-  if(!ttSelectedDay) ttSelectedDay = todayDayKey();
-  const modeToggle = `<div style="display:flex; gap:8px; margin:10px 0 12px 0;">
-    <button class="btn btn-sm ${ttMode==='time'?'btn-primary':'btn-secondary'} flex-1" onclick="ttMode='time'; renderMain();">⏰ સમય પ્રમાણે</button>
-    <button class="btn btn-sm ${ttMode==='chapter'?'btn-primary':'btn-secondary'} flex-1" onclick="ttMode='chapter'; renderMain();">📖 ચેપ્ટર પ્રમાણે</button>
-  </div>`;
-  if(ttMode==='chapter'){
-    const chapEntries = chapterTimetableForDay(exam.id, ttSelectedDay);
-    return `
-     ${backButtonHTML("showTab(lastMainTab);")}
-     <div class="section-header" style="margin-top:10px; margin-bottom:0;">
-       <h2 class="m-0">ટાઈમટેબલ 📋</h2>
-       <span class="flex-gap-6">
-         ${chapEntries.length>1?`<button class="btn btn-sm btn-secondary" onclick="openChapterTimetableReorder()">ક્રમ બદલો</button>`:''}
-         <button class="btn btn-primary btn-sm" onclick="openChapterTimetableForm(null)">+ ઉમેરો</button>
-       </span>
-     </div>
-     ${modeToggle}
-     <div class="tt-day-tabs">${DAY_KEYS.map(d=>`<button class="tt-day-btn ${ttSelectedDay===d?'active':''}" onclick="ttSelectedDay='${d}'; renderMain();">${DAY_LABELS[d]}${d===todayDayKey()?' •':''}</button>`).join('')}</div>
-     <div class="mt-12">
-       ${chapEntries.length ? chapEntries.map(e=>chapterQueueCard(e)).join('') : emptyState('📖', DAY_LABELS[ttSelectedDay]+'વારે કંઈ નથી', 'આ વારે વિષય ઉમેરો','+ ઉમેરો','openChapterTimetableForm(null)')}
-     </div>
-    `;
-  }
-  const blocks = timetableForDay(exam.id, ttSelectedDay);
-  return `
-   ${backButtonHTML("showTab(lastMainTab);")}
-   <div class="section-header" style="margin-top:10px; margin-bottom:8px;">
-     <h2 class="m-0">ટાઈમટેબલ 📋</h2>
-     <button class="btn btn-primary btn-sm" onclick="openTimetableForm(null)">+ ઉમેરો</button>
-   </div>
-   ${modeToggle}
-   <div class="tt-day-tabs">${DAY_KEYS.map(d=>`<button class="tt-day-btn ${ttSelectedDay===d?'active':''}" onclick="ttSelectedDay='${d}'; renderMain();">${DAY_LABELS[d]}${d===todayDayKey()?' •':''}</button>`).join('')}</div>
-   <div class="mt-12">${blocks.length ? `<div class="mt-12">${blocks.map(b=>timetableRow(b)).join('')}</div>` : `<div class="mt-12">${emptyState('📋', DAY_LABELS[ttSelectedDay]+'વારે કંઈ નથી', 'આ વારનું ટાઈમટેબલ ઉમેરો','+ ઉમેરો','openTimetableForm(null)')}</div>`}</div>
-  `;
-}
-function chapterTimetableForDay(examId, day){
-  const subIds = examSubjects(examId).map(s=>s.id);
-  return DB.chapterTimetable.filter(e=>e.day===day && subIds.includes(e.subjectId));
-}
-function moveChapterTimetableEntry(id, dir){
-  const list = DB.chapterTimetable;
-  const e = list.find(x=>x.id===id);
-  if(!e) return;
-  const groupIdx = [];
-  list.forEach((x,i)=>{ if(x.day===e.day) groupIdx.push(i); });
-  const pos = groupIdx.findIndex(i=>list[i].id===id);
-  const swapPos = pos + dir;
-  if(swapPos<0 || swapPos>=groupIdx.length) return;
-  const i1 = groupIdx[pos], i2 = groupIdx[swapPos];
-  const tmp = list[i1]; list[i1] = list[i2]; list[i2] = tmp;
-  save(); renderMain();
-}
-function openChapterTimetableReorder(){
-  const exam = getActiveExam();
-  if(!exam) return;
-  const entries = chapterTimetableForDay(exam.id, ttSelectedDay);
-  openSheet(`
-    <h3>ક્રમ બદલો — ${DAY_LABELS[ttSelectedDay]}વાર</h3>
-    <div class="scroll-list-sm">${entries.map((e,i)=>{
-      const s = DB.subjects.find(x=>x.id===e.subjectId);
-      return `<div class="item cursor-default">
-        <span>${s?esc(s.name):'?'}</span>
-        <span class="flex-gap-4">
-          <button class="btn btn-sm btn-secondary" ${i===0?'disabled':''} onclick="moveChapterTimetableEntry('${e.id}',-1); openChapterTimetableReorder();">▲</button>
-          <button class="btn btn-sm btn-secondary" ${i===entries.length-1?'disabled':''} onclick="moveChapterTimetableEntry('${e.id}',1); openChapterTimetableReorder();">▼</button>
-        </span>
-      </div>`;
-    }).join('')}</div>
-  `);
-}
-function chapterQueueCard(entry){
-  const s = DB.subjects.find(x=>x.id===entry.subjectId);
-  if(!s){
-    return `<div class="card" style="margin-bottom:12px;">${emptyRow('વિષય મળ્યો નથી')}</div>`;
-  }
-  const topics = subjectTopics(s.id);
-  const total = topics.length;
-  const completedTopics = topics.filter(t=>t.status==='completed');
-  const current = currentOrNextTopic(s.id);
-  const pct = total ? Math.round(completedTopics.length/total*100) : 0;
-  const previewCount = 3;
-  const preview = completedTopics.slice(0, previewCount);
-  const rest = completedTopics.slice(previewCount);
-  const wrapId = 'chq_'+entry.id;
-  const completedHTML = completedTopics.length ? `
-    <div class="ink-dim" style="font-size:12px; margin-top:10px; margin-bottom:4px;">✅ પૂર્ણ થયેલા (${completedTopics.length})</div>
-    ${preview.map(t=>`<div style="padding:5px 0; text-decoration:line-through; color:var(--ink-dim); font-size:13.5px;" onclick="navigateToSubjectTopics('${s.id}','${t.id}')">${esc(t.name)}</div>`).join('')}
-    ${rest.length ? `
-      <div id="${wrapId}" class="hidden">${rest.map(t=>`<div style="padding:5px 0; text-decoration:line-through; color:var(--ink-dim); font-size:13.5px;" onclick="navigateToSubjectTopics('${s.id}','${t.id}')">${esc(t.name)}</div>`).join('')}</div>
-      <div class="ink-dim" style="font-size:12px; margin-top:4px; cursor:pointer; font-weight:700;" onclick="toggleChapterHistory('${wrapId}', this)">▼ ${rest.length} વધુ પૂર્ણ ચેપ્ટર જુઓ</div>
-    ` : ''}
-  ` : '';
-  return `<div class="card" style="margin-bottom:12px;">
-    <div class="item" style="border:none; padding:0; cursor:default;">
-      <b>${esc(s.name)}</b>
-      <span style="display:flex; align-items:center; gap:8px;">
-        <span class="ink-dim fs-12">${completedTopics.length}/${total} પૂર્ણ</span>
-        <button class="btn btn-sm btn-danger" onclick="deleteChapterTimetableEntry('${entry.id}')">🗑️</button>
-      </span>
-    </div>
-    <div class="progress-track mt-8"><div class="progress-fill" style="width:${pct}%"></div></div>
-    ${current ? `<div class="item" style="border:none; padding:0; margin-top:10px; cursor:pointer;" onclick="navigateToSubjectTopics('${s.id}','${current.id}')">
-        <span class="ink-dim fs-125">📍 આગામી ચેપ્ટર</span>
-        <span class="badge badge-primary">${esc(current.name)}</span>
-      </div>` : `<div class="mt-10"><span class="badge badge-success">બધા ચેપ્ટર પૂર્ણ 🎉</span></div>`}
-    ${completedHTML}
-  </div>`;
-}
-function toggleChapterHistory(wrapId, linkEl){
-  const el = document.getElementById(wrapId);
-  if(!el) return;
-  const nowHidden = el.classList.toggle('hidden');
-  linkEl.textContent = linkEl.textContent.replace(nowHidden?'▲':'▼', nowHidden?'▼':'▲');
-}
-function openChapterTimetableForm(id){
-  const exam = getActiveExam();
-  if(!exam) return;
-  const sections = examSections(exam.id);
-  if(!sections.length){ toast('પહેલા વિભાગ અને વિષય ઉમેરો','error'); return; }
-  const allSubs = examSubjects(exam.id);
-  if(!allSubs.length){ toast('પહેલા વિષય ઉમેરો','error'); return; }
-  const e = id ? DB.chapterTimetable.find(x=>x.id===id) : null;
-  const existingSubject = e ? DB.subjects.find(x=>x.id===e.subjectId) : null;
-  const initialSectionId = existingSubject ? (existingSubject.sectionId||'') : '';
-  openSheet(`
-    <h3>${e?'એડિટ':'નવો વિષય'} — ${DAY_LABELS[ttSelectedDay]}વાર 📖</h3>
-    <div class="field"><label>વિભાગ</label><select id="f_chtt_section" onchange="updateChapterTimetableSubjectOptions()">
-      ${sections.map(sec=>`<option value="${sec.id}" ${(initialSectionId===sec.id || (!initialSectionId && sec.id===sections[0].id))?'selected':''}>📂 ${esc(sec.name)}</option>`).join('')}
-    </select></div>
-    <div class="field"><label>વિષય</label><select id="f_chtt_subject"></select></div>
-    <div class="sheet-actions">
-      ${e?`<button class="btn btn-danger" onclick="deleteChapterTimetableEntry('${id}')">ડિલીટ</button>`:''}
-      <button class="btn btn-primary btn-block" onclick="saveChapterTimetableEntry(${e?`'${id}'`:'null'})">સેવ કરો</button>
-    </div>
-  `);
-  updateChapterTimetableSubjectOptions(e?e.subjectId:null);
-}
-function updateChapterTimetableSubjectOptions(preselectSubjectId){
-  const exam = getActiveExam();
-  const sectionEl = document.getElementById('f_chtt_section');
-  const subjectEl = document.getElementById('f_chtt_subject');
-  if(!exam || !sectionEl || !subjectEl) return;
-  const sectionId = sectionEl.value;
-  const allSubs = examSubjects(exam.id);
-  const subs = allSubs.filter(s=>s.sectionId===sectionId);
-  subjectEl.innerHTML = subs.length ? subs.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('') : `<option value="">આ વિભાગમાં કોઈ વિષય નથી</option>`;
-  if(preselectSubjectId && subs.some(s=>s.id===preselectSubjectId)){
-    subjectEl.value = preselectSubjectId;
-  }
-}
-function saveChapterTimetableEntry(id){
-  const subjectId = val('f_chtt_subject');
-  if(!subjectId){ toast('વિષય પસંદ કરો','error'); return; }
-  const dup = DB.chapterTimetable.find(x=>x.day===ttSelectedDay && x.subjectId===subjectId && x.id!==id);
-  if(dup){ toast('આ વિષય આ વારે પહેલેથી ઉમેરેલો છે','error'); return; }
-  if(id){ const e=DB.chapterTimetable.find(x=>x.id===id); Object.assign(e,{subjectId}); }
-  else DB.chapterTimetable.push({id:uid(), day:ttSelectedDay, subjectId});
-  save(); closeSheet(); renderMain(); toast('સેવ થયું');
-}
-function deleteChapterTimetableEntry(id){
-  if(!confirm('ડિલીટ કરવું છે?'))return;
-  DB.chapterTimetable = DB.chapterTimetable.filter(x=>x.id!==id);
-  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
-}
-function timetableRow(b){
-  const s = DB.subjects.find(x=>x.id===b.subjectId);
-  const sec = s && s.sectionId ? DB.sections.find(x=>x.id===s.sectionId) : null;
-  let topicHTML;
-  let curTopic = null;
-  if(!s){
-    topicHTML = `<div class="ink-dim" style="font-size:12.5px; margin-top:6px;">વિષય મળ્યો નથી</div>`;
-  } else {
-    curTopic = currentOrNextTopic(s.id);
-    if(curTopic){
-      const isStudying = curTopic.status==='studying';
-      topicHTML = `<div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:8px;">
-        <span style="font-size:13.5px;">${esc(curTopic.name)}</span>
-        <span class="badge ${isStudying?'badge-warning':'badge-grey'}">${isStudying?'ચાલુ 🟡':'આગળનો 🔴'}</span>
-      </div>`;
-    } else {
-      topicHTML = `<div class="mt-8"><span class="badge badge-success">બધા ટોપિક પૂર્ણ 🎉</span></div>`;
-    }
-  }
-  const subjectBlock = `<div style="margin-top:6px; font-size:14.5px; font-weight:800;">${sec?`<span class="ink-dim" style="font-weight:600; font-size:12px;">📂 ${esc(sec.name)}</span><br>`:''}${s?esc(s.name):'?'}</div>${topicHTML}`;
-  return `<div class="card">
-    <div class="item item-static">
-      <span><b>${formatTime12(b.startTime)} - ${formatTime12(b.endTime)}</b> <span class="ink-dim fs-12">(${timeDurationLabel(b.startTime,b.endTime)})</span></span>
-      <button class="btn btn-sm btn-secondary" onclick="openTimetableForm('${b.id}')">✎</button>
-    </div>
-    ${s ? `<div onclick="navigateToSubjectTopics('${s.id}'${curTopic?`,'${curTopic.id}'`:''})" class="cursor-pointer">${subjectBlock}</div>` : subjectBlock}
-  </div>`;
-}
 function navigateToSection(sectionId){
   topicDetailId = null;
   sectionDetailId = sectionId; subjFolderId = null;
@@ -2842,58 +2680,6 @@ function navigateToRevisionDate(dateStr, revisionId){
   calMode = 'revision';
   renderMain();
 }
-function openTimetableForm(id){
-  const exam = getActiveExam();
-  if(!exam) return;
-  const sections = examSections(exam.id);
-  if(!sections.length){ toast('પહેલા વિભાગ અને વિષય ઉમેરો','error'); return; }
-  const allSubs = examSubjects(exam.id);
-  if(!allSubs.length){ toast('પહેલા વિષય ઉમેરો','error'); return; }
-  const b = id ? DB.timetable.find(x=>x.id===id) : null;
-  const existingSubject = b ? DB.subjects.find(x=>x.id===b.subjectId) : null;
-  const initialSectionId = existingSubject ? (existingSubject.sectionId||'') : '';
-  openSheet(`
-    <h3>${b?'ટાઈમટેબલ એડિટ':'નવો ટાઈમ-બ્લોક'} — ${DAY_LABELS[ttSelectedDay]}વાર ⏰</h3>
-    <div class="field"><label>વિભાગ</label><select id="f_tt_section" onchange="updateTimetableSubjectOptions()">
-      ${sections.map(sec=>`<option value="${sec.id}" ${(initialSectionId===sec.id || (!initialSectionId && sec.id===sections[0].id))?'selected':''}>📂 ${esc(sec.name)}</option>`).join('')}
-    </select></div>
-    <div class="field"><label>વિષય</label><select id="f_tt_subject"></select></div>
-    <div class="field"><label>શરૂઆતનો સમય</label><input type="time" id="f_start" value="${b?b.startTime:'09:00'}"></div>
-    <div class="field"><label>પૂરો થવાનો સમય</label><input type="time" id="f_end" value="${b?b.endTime:'10:00'}"></div>
-    <div class="sheet-actions">
-      ${b?`<button class="btn btn-danger" onclick="deleteTimetableBlock('${id}')">ડિલીટ</button>`:''}
-      <button class="btn btn-primary btn-block" onclick="saveTimetableBlock(${b?`'${id}'`:'null'})">સેવ કરો</button>
-    </div>
-  `);
-  updateTimetableSubjectOptions(b?b.subjectId:null);
-}
-function updateTimetableSubjectOptions(preselectSubjectId){
-  const exam = getActiveExam();
-  const sectionEl = document.getElementById('f_tt_section');
-  const subjectEl = document.getElementById('f_tt_subject');
-  if(!exam || !sectionEl || !subjectEl) return;
-  const sectionId = sectionEl.value;
-  const allSubs = examSubjects(exam.id);
-  const subs = allSubs.filter(s=>s.sectionId===sectionId);
-  subjectEl.innerHTML = subs.length ? subs.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('') : `<option value="">આ વિભાગમાં કોઈ વિષય નથી</option>`;
-  if(preselectSubjectId && subs.some(s=>s.id===preselectSubjectId)){
-    subjectEl.value = preselectSubjectId;
-  }
-}
-function saveTimetableBlock(id){
-  const start=val('f_start'), end=val('f_end');
-  const subjectId = val('f_tt_subject');
-  if(!start||!end||!subjectId){ toast('સમય અને વિષય પસંદ કરો','error'); return; }
-  if(id){ const b=DB.timetable.find(x=>x.id===id); Object.assign(b,{startTime:start,endTime:end,subjectId}); }
-  else DB.timetable.push({id:uid(), day:ttSelectedDay, startTime:start, endTime:end, subjectId});
-  save(); closeSheet(); renderMain(); toast('સેવ થયું');
-}
-function deleteTimetableBlock(id){
-  if(!confirm('ડિલીટ કરવું છે?'))return;
-  DB.timetable = DB.timetable.filter(x=>x.id!==id);
-  save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
-}
-
 /* ===================== SETTINGS ===================== */
 function renderSettings(){
   const theme = DB.settings.theme;
@@ -2902,11 +2688,10 @@ function renderSettings(){
    ${card('થીમ', `<div class="item cursor-default"><span>ડાર્ક મોડ</span><label class="switch"><input type="checkbox" ${theme==='dark'?'checked':''} onchange="toggleTheme(this.checked)"><span class="slider"></span></label></div>`)}
    ${card('નોટિફિકેશન 🔔', `
      <div class="item cursor-default"><span>સ્ટેટસ</span><b>${notificationStatusText()}</b></div>
-     <div class="ink-dim fs-12 mt-8 mb-6">Timetable નો ચાલુ ટોપિક, બાકી/ઓવરડ્યુ રિવિઝન, અને સ્ટ્રીક રિમાઇન્ડર — app ખુલ્લી હોય ત્યારે મળશે. (App સંપૂર્ણ બંધ હોય ત્યારે નહીં — એ free રીતે શક્ય નથી.)</div>
+     <div class="ink-dim fs-12 mt-8 mb-6">બાકી/ઓવરડ્યુ રિવિઝન, અને સ્ટ્રીક રિમાઇન્ડર — app ખુલ્લી હોય ત્યારે મળશે. (App સંપૂર્ણ બંધ હોય ત્યારે નહીં — એ free રીતે શક્ય નથી.)</div>
      ${(('Notification' in window) && Notification.permission==='default') ? `<button class="btn btn-primary btn-block" onclick="requestNotificationPermission()">🔔 નોટિફિકેશન ચાલુ કરો</button>` : ''}
      ${(('Notification' in window) && Notification.permission==='granted') ? `<button class="btn btn-secondary btn-block" onclick="showAppNotification('ટેસ્ટ ✅','આ એક ટેસ્ટ નોટિફિકેશન છે','test')">ટેસ્ટ નોટિફિકેશન મોકલો</button>` : ''}
    `)}
-   ${card('ટૂલ્સ', `<button class="btn btn-secondary btn-block" onclick="showTab('timetable')">📋 મારું ટાઈમટેબલ</button>`)}
    ${card('સ્ટોરેજ 💾', storageCardHTML())}
    ${card('ડેટા', `
      ${lockCardHTML()}
@@ -2914,6 +2699,7 @@ function renderSettings(){
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('બેકઅપ એક્સપોર્ટ કરવા માટે', exportBackup)">⬇️ બેકઅપ એક્સપોર્ટ કરો</button>
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('બેકઅપ ઇમ્પોર્ટ કરવા માટે', importPick)">⬆️ બેકઅપ ઇમ્પોર્ટ કરો</button>
      <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackup(event)">
+     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('ઇતિહાસ ટૂંકો કરવા માટે', openCompactSheet)">🧹 જૂનો ઇતિહાસ ટૂંકો કરો ${(DB.settings&&DB.settings.compactOn)?'(✓ ચાલુ)':''}</button>
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="openStructExport()">📐 ફક્ત માળખું એક્સપોર્ટ (નવી પરીક્ષા માટે)</button>
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="structImportPick()">📥 માળખું ઇમ્પોર્ટ → નવી પરીક્ષા</button>
      <input type="file" id="structFile" accept="application/json" style="display:none" onchange="structImportRead(event)">
@@ -2957,11 +2743,7 @@ function cleanOrphanedData(){
     if(l.topicIds) l.topicIds = l.topicIds.filter(id=>topicIds.has(id));
     if(l.subtopicIds) l.subtopicIds = l.subtopicIds.filter(id=>subtopicIds.has(id));
   });
-  const beforeTT = DB.timetable.length;
-  DB.timetable = DB.timetable.filter(x=>subjectIds.has(x.subjectId));
-  const beforeCT = DB.chapterTimetable.length;
-  DB.chapterTimetable = DB.chapterTimetable.filter(x=>subjectIds.has(x.subjectId));
-  const removed = (beforeSections-DB.sections.length) + (beforeSubjects-DB.subjects.length) + (beforeTopics-DB.topics.length) + (beforeSubtopics-DB.subtopics.length) + (beforeRevisions-DB.revisions.length) + (beforeLogs-DB.studyLogs.length) + (beforeTT-DB.timetable.length) + (beforeCT-DB.chapterTimetable.length);
+  const removed = (beforeSections-DB.sections.length) + (beforeSubjects-DB.subjects.length) + (beforeTopics-DB.topics.length) + (beforeSubtopics-DB.subtopics.length) + (beforeRevisions-DB.revisions.length) + (beforeLogs-DB.studyLogs.length);
   save(); renderMain();
   toast(removed>0 ? `સાફ થયું — ${removed} જૂના રેકોર્ડ કાઢ્યા 🧹` : 'બધું પહેલેથી ચોખ્ખું છે ✅');
 }
@@ -3402,7 +3184,7 @@ function mqCmp(mode, a, b){
 }
 function mqTestCardHTML(t, showPath){
   const last = (t.attempts||[]).slice(-1)[0];
-  const best = (t.attempts||[]).reduce((a,x)=>Math.max(a,x.pct),0);
+  const best = mqBest(t);
   const hasKey = t.questions.some(q=>q.ans!=null);
   const path = showPath ? mqFolderPath(t.folderId).join(' › ') : '';
   const hl = (highlightQTestId===t.id) ? ' row-highlight' : '';
@@ -3410,7 +3192,7 @@ function mqTestCardHTML(t, showPath){
     <div class="mq-row"><span class="mq-ico">📄</span>
       <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">${esc(t.name)}</div>
       ${path?`<div class="ink-dim" style="font-size:12px;">📁 ${esc(path)}</div>`:''}
-      <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${(t.attempts||[]).length?` · ${t.attempts.length} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div></div>
+      <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${mqTimes(t)?` · ${mqTimes(t)} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div></div>
       ${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}
       <button class="btn btn-sm btn-secondary" onclick="openQTestForm('${t.id}')">✎</button></div>
     ${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">છેલ્લી: ${last.correct}/${last.total} સાચા${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</div>`:''}
@@ -4070,11 +3852,13 @@ function mqCompleteRev(id){
 }
 function mqRevLineHTML(t){
   const revs = (DB.qrevs||[]).filter(r=>r.testId===t.id).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  const done = revs.filter(r=>r.status==='completed').length;
+  const done = revs.filter(r=>r.status==='completed').length + (t.revCount||0);
+  const tot = revs.length + (t.revCount||0);
   const next = revs.find(r=>r.status==='pending');
   const overdue = next && next.dueDate<todayStr();
-  return `<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-    <button class="btn btn-sm btn-secondary" style="flex:1;" onclick="openQTestRevisionSheet('${t.id}')">🔁 રિવિઝન તારીખો${revs.length?` (${done}/${revs.length})`:''}</button>
+  let last = t.lastRev || ''; revs.forEach(r=>{ if(r.status==='completed'){ const d=r.completedDate||r.dueDate; if(d>last) last=d; } });
+  return `${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">🔁 છેલ્લું રિવિઝન: ${formatDate(last)}</div>`:''}<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+    <button class="btn btn-sm btn-secondary" style="flex:1;" onclick="openQTestRevisionSheet('${t.id}')">🔁 રિવિઝન તારીખો${tot?` (${done}/${tot})`:''}</button>
     ${next?`<span class="badge ${overdue?'badge-danger':'badge-warning'}">${overdue?'મોડું · ':'આગામી · '}${formatDateShort(next.dueDate)}</span>`:''}</div>`;
 }
 function openQTestRevisionSheet(testId){
@@ -4115,20 +3899,22 @@ function mqFolderBookHTML(f){
   const tests = mqFolderTestsDeep(f.id);
   const nT = tests.length, nF = mqFolders(f.id).length;
   const attempted = tests.filter(t=>(t.attempts||[]).length).length;
-  const totalTimes = tests.reduce((a,t)=>a+(t.attempts||[]).length,0);
+  const totalTimes = tests.reduce((a,t)=>a+mqTimes(t),0);
   const pct = nT ? Math.round(attempted/nT*100) : 0;
   const ids = new Set(tests.map(t=>t.id));
   const revs = (DB.qrevs||[]).filter(r=>ids.has(r.testId));
-  const rDone = revs.filter(r=>r.status==='completed').length;
+  const rBase = qrevBase(ids);
+  const rDone = revs.filter(r=>r.status==='completed').length + rBase;
+  const rTot = revs.length + rBase;
   const det = `<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
       <div class="subject-mini-stat"><b>${nT}</b><span>કુલ ટેસ્ટ</span></div>
       <div class="subject-mini-stat"><b>${attempted}</b><span>આપેલી</span></div>
       <div class="subject-mini-stat"><b>${nT-attempted}</b><span>બાકી</span></div>
       <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--primary) 16%, transparent);"><b>${totalTimes}</b><span>કુલ વખત</span></div></div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;">
-      <div class="subject-mini-stat"><b>${revs.length}</b><span>કુલ રિવિઝન</span></div>
+      <div class="subject-mini-stat"><b>${rTot}</b><span>કુલ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rDone}</b><span>પૂર્ણ રિવિઝન</span></div>
-      <div class="subject-mini-stat"><b>${revs.length-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
+      <div class="subject-mini-stat"><b>${rTot-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
   return `<div style="margin-bottom:12px;">${folderCardHTML(pct, '📁 '+esc(f.name), `${nF?nF+' સબફોલ્ડર · ':''}${nT} ટેસ્ટ — ખોલવા ટેપ કરો →`, `openQFolderForm('${f.id}')`, `mqOpenFolder('${f.id}')`, det)}</div>`;
 }
 function dashboardQuizPages(exam){
@@ -4138,14 +3924,16 @@ function dashboardQuizPages(exam){
   const lastPcts = attempted.map(t=>t.attempts[t.attempts.length-1].pct);
   const avg = lastPcts.length ? Math.round(lastPcts.reduce((a,b)=>a+b,0)/lastPcts.length) : 0;
   const today = todayStr();
-  const totalTimesAll = tests.reduce((a,t)=>a+(t.attempts||[]).length,0);
+  const totalTimesAll = tests.reduce((a,t)=>a+mqTimes(t),0);
   const pct = Math.round(attempted.length/tests.length*100);
   const revs = qrevsForActiveExam();
-  const rDone = revs.filter(r=>r.status==='completed').length;
+  const rBaseAll = qrevBase(tests.map(t=>t.id));
+  const rDone = revs.filter(r=>r.status==='completed').length + rBaseAll;
+  const rTotAll = revs.length + rBaseAll;
   const rPend = revs.filter(r=>r.status==='pending');
   const rOver = rPend.filter(r=>r.dueDate<today).length;
   const rUp = rPend.length - rOver;
-  const rPct = revs.length ? Math.round(rDone/revs.length*100) : 0;
+  const rPct = rTotAll ? Math.round(rDone/rTotAll*100) : 0;
   const open = `if(bookClickOK()){ mqFolderId=null; mqSession=null; showTab('mock'); }`;
   const top = (title)=>`<div class="hero-top"><div><div class="hero-exam-name">${title}</div><div class="hero-exam-date">${esc(exam.name)} · 📅 ${formatDate(exam.date)}</div></div><button class="btn btn-sm" onclick="${open}">ખોલો</button></div>`;
   const p2 = `<div class="hero-card hero-quiz">${top('🧠 MCQ ટેસ્ટ')}
@@ -4158,7 +3946,7 @@ function dashboardQuizPages(exam){
   const p3 = `<div class="hero-card hero-qrev">${top('🔁 ટેસ્ટ રિવિઝન')}
      <div class="hero-ring-row">${ringSVG(rPct, null, 'રિવિઝન')}
        <div class="hero-ring-stats">
-         <div class="ring-stat"><span>રિવિઝન પૂર્ણ</span><b><span class="hero-count" data-target="${rDone}">0</span>/${revs.length}</b></div>
+         <div class="ring-stat"><span>રિવિઝન પૂર્ણ</span><b><span class="hero-count" data-target="${rDone}">0</span>/${rTotAll}</b></div>
          <div class="ring-stat"><span>બાકી · પાછલા</span><b class="hero-count" data-target="${rOver}" style="color:${rOver?'#FFB4A8':'#fff'};">0</b></div>
          <div class="ring-stat"><span>બાકી · આજ/આવનારા</span><b class="hero-count" data-target="${rUp}">0</b></div>
        </div></div></div>`;
@@ -4679,16 +4467,6 @@ function checkNotifications(){
   const log = getNotifyLog();
   let changed = false;
 
-  const block = timetableBlockNow();
-  if(block && log.lastTimetableBlockId !== block.id){
-    const s = DB.subjects.find(x=>x.id===block.subjectId);
-    const curTopic = s ? currentOrNextTopic(s.id) : null;
-    showAppNotification('🔴 હમણાં ચાલુ: '+(s?s.name:'રીડિંગ'), curTopic ? curTopic.name : 'રીડિંગ સમય', 'now-block');
-    log.lastTimetableBlockId = block.id; changed = true;
-  } else if(!block && log.lastTimetableBlockId){
-    log.lastTimetableBlockId = null; changed = true;
-  }
-
   if(!log.revisionsNotified){
     const pending = revisionsForActiveExam().filter(r=>r.dueDate===todayStr() && r.status==='pending').length;
     if(pending>0) showAppNotification('🔁 આજની રિવિઝન', pending+' રિવિઝન બાકી છે', 'due-today');
@@ -4783,6 +4561,7 @@ async function init(){
   setInterval(checkNotifications, 60000);
   try{ storageCheck(JSON.stringify(DB).length); refreshStorageEstimate(); }catch(e){}
   setTimeout(()=>checkForUpdate(false), 4000);
+  if(DB.settings.compactOn){ try{ compactHistory(); save(); }catch(e){} } else setTimeout(compactStartupPrompt, 2500);
   setInterval(()=>checkForUpdate(false), 30*60*1000);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(false); });
 }
