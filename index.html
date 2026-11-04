@@ -412,8 +412,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.04-5';
-const APP_BUILT = '2026-11-04T17:30:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.04-6';
+const APP_BUILT = '2026-11-04T17:57:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -942,7 +942,6 @@ function renderDashboard(){
   const todayRevisionList = revisionsForActiveExam().filter(r=>r.status==='pending' && r.dueDate===today);
   const todayStudyList = studyLogsForActiveExam().filter(l=>l.date===today);
   const inProgressTopics = topics.filter(t=>t.status==='studying');
-  const importantPendingTopics = topics.filter(t=>(t.importance||0)>0 && t.status!=='completed').sort((a,b)=>(b.importance||0)-(a.importance||0));
 
   const allRevs = revisionsForActiveExam();
   const revTotal = allRevs.length;
@@ -1024,7 +1023,7 @@ function renderDashboard(){
      over:`${overdueRevisionList.length ? `<div class="card">     <div class="card-title">ઓવરડ્યુ રિવિઝન ⏰ <span class="ink-dim fw-400">(ટેપ કરી કેલેન્ડરમાં જુઓ)</span></div>
      <div class="scroll-list-sm">${overdueRevisionList.map(r=>dashboardOverdueRevisionRow(r)).join('')}</div>
    </div>` : ''}`
-   }, `${importantPendingTopics.length ? card('⭐ મહત્વના બાકી ટોપિક <span class="ink-dim fw-400">(પેપર એનાલિસિસ પ્રમાણે)</span>', `<div class="scroll-list-sm">${importantPendingTopics.map(t=>dashboardImportantTopicRow(t)).join('')}</div>`) : ''}${priorityList.length ? card('વેઈટેજ પ્રમાણે અગ્રતા 🎯', priorityList.slice(0,5).map(p=>`<div class="item" onclick="navigateToSection('${p.section.id}')"><span>📂 ${esc(p.section.name)} <span class="ink-dim">(${p.section.totalMarks} ગુણ)</span></span><span class="badge badge-warning">${p.remaining} બાકી</span></div>`).join('')) : ''}`)}
+   }, `${priorityList.length ? card('વેઈટેજ પ્રમાણે અગ્રતા 🎯', priorityList.slice(0,5).map(p=>`<div class="item" onclick="navigateToSection('${p.section.id}')"><span>📂 ${esc(p.section.name)} <span class="ink-dim">(${p.section.totalMarks} ગુણ)</span></span><span class="badge badge-warning">${p.remaining} બાકી</span></div>`).join('')) : ''}`)}
 
   `;
 }
@@ -1192,7 +1191,7 @@ function renderExamDetail(examId){
 const SORT_OPTIONS = {
   sections: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['pct_desc','% પૂર્ણ ↓'],['pct_asc','% પૂર્ણ ↑']],
   subjects: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['topics_desc','% ટોપિક ↓'],['topics_asc','% ટોપિક ↑'],['revision_desc','% રિવિઝન ↓'],['revision_asc','% રિવિઝન ↑']],
-  topics: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['star_desc','⭐ સ્ટાર પ્રમાણે'],['status_done_first','પૂર્ણ પહેલા'],['status_pending_first','બાકી પહેલા']]
+  topics: [['default','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['status_done_first','પૂર્ણ પહેલા'],['status_pending_first','બાકી પહેલા']]
 };
 function getSortPref(level, key){
   const sp = DB.settings.sortPrefs;
@@ -1255,7 +1254,6 @@ function sortTopicsList(topics, subjectKey){
   const mode = getSortPref('topics', subjectKey);
   if(mode==='default') return topics;
   if(mode==='name') return [...topics].sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true}));
-  if(mode==='star_desc') return [...topics].sort((a,b)=>(b.importance||0)-(a.importance||0));
   const rank = {completed:0, studying:1, not_started:2};
   const rankRev = {completed:2, studying:1, not_started:0};
   if(mode==='status_done_first') return [...topics].sort((a,b)=>rank[a.status]-rank[b.status]);
@@ -1463,7 +1461,7 @@ function renderTopicDetail(subjectId){
        <button class="btn btn-sm btn-primary" onclick="openTopicEditForm(null,'${s.id}')">+ ટોપિક</button>
      </div>
      <h3 style="margin:10px 0 8px 0;">બધા ટોપિક</h3>
-     ${topics.length ? filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList', s.id) : ''}
+     ${topics.length ? filterSortToolbarHTML('topics','topicSearchInput','filterTopicsList', s.id) + topicTabSegHTML() : ''}
    </div>
    ${topics.length ? `<div id="topicsListWrap">${sortTopicsList(topics, s.id).map(t=>topicRow(t)).join('')}</div>` : emptyRow('કોઈ ટોપિક નથી')}
   `;
@@ -1545,16 +1543,6 @@ function openSectionReorder(examId){
     <div class="scroll-list-sm" id="reorderList">${sectionReorderListHTML(examId)}</div>
   `);
 }
-function dashboardImportantTopicRow(t){
-  const s = DB.subjects.find(x=>x.id===t.subjectId);
-  return `<div class="item cursor-pointer" onclick="navigateToSubjectTopics('${t.subjectId}','${t.id}')">
-    <span class="flex-col">
-      <b>${s?esc(s.name):''}</b>
-      <span class="ink-dim fs-125">${esc(t.name)}${t.importanceNote?` · ${esc(t.importanceNote)}`:''}</span>
-    </span>
-    <span class="ink-dim fs-125">${topicImportanceStars(t.importance)}</span>
-  </div>`;
-}
 function dashboardTopicRow(t){
   const s = DB.subjects.find(x=>x.id===t.subjectId);
   const cls = t.status==='completed' ? 'badge-success' : (t.status==='studying' ? 'badge-warning' : 'badge-grey');
@@ -1606,33 +1594,22 @@ function dashboardTodayStudyRow(l){
     <span class="badge badge-success">પૂર્ણ ✓</span>
   </div>`;
 }
-function topicImportanceStars(level){
-  return '⭐'.repeat(Math.max(0, Math.min(3, level||0)));
+let topicTab = 'edit'; /* ચેપ્ટરની બાજુનું બટન કયું કામ કરે: edit / sub / rev */
+function topicTabSegHTML(){
+  return `<div class="seg seg-sm" style="margin-top:8px;">${[['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન']].map(([k,l])=>`<button class="${topicTab===k?'on':''}" onclick="topicTab='${k}'; renderMain();">${l}</button>`).join('')}</div>`;
 }
 function topicRow(t){
   const statusDot = t.status==='completed' ? '🟢' : (t.status==='studying' ? '🟡' : '🔴');
   const highlight = (highlightTopicId===t.id) ? ' row-highlight' : '';
-  const subs = subtopicsForTopic(t.id);
-  const stars = topicImportanceStars(t.importance);
-  const wrapId = 'topicdd_'+t.id;
-  const shouldExpand = isAccordionOpen(wrapId);
+  let btn;
+  if(topicTab==='sub'){ const n = subtopicsForTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicSubtopicManageForm('${t.id}')">📑${n?` ${n}`:''}</button>`; }
+  else if(topicTab==='rev'){ btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicRevisionForm('${t.id}')">🔁</button>`; }
+  else btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>`;
   return `<div class="topic-row${highlight}" data-search="${esc(t.name.toLowerCase())}" id="topic-${t.id}">
     <div class="topic-row-top">
       <span onclick="cycleTopicStatus('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px;">${statusDot}</span>
       <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
-      ${stars ? `<span class="ink-dim fs-12" style="flex-shrink:0;">${stars}</span>` : ''}
-      <span onclick="toggleAccordion('${wrapId}', this.querySelector('.accordion-caret'))" class="ink-dim" style="flex-shrink:0; cursor:pointer; padding:0 4px; font-size:12px;"><span class="accordion-caret">${shouldExpand?'▲':'▼'}</span></span>
-      <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>
-    </div>
-    <div id="${wrapId}" class="${shouldExpand?'':'hidden'}">
-      <div class="flex-gap-6 mt-8" style="flex-wrap:wrap;">
-        <span class="badge badge-grey" onclick="openTopicSubtopicManageForm('${t.id}')">📑 સબ-ટોપિક${subs.length?` (${subs.length})`:''}</span>
-        <span class="badge badge-grey" onclick="openTopicRevisionForm('${t.id}')">🔁 રિવિઝન</span>
-      </div>
-      ${starRatingHTML(t.id, t.importance)}
-      <div class="mt-8 cursor-pointer" onclick="openTopicNoteForm('${t.id}')">
-        <span class="ink-dim fs-12">📅 ${t.importanceNote ? esc(t.importanceNote) : 'નોંધ ઉમેરો (કયા વર્ષમાં પુછાયું)'}</span>
-      </div>
+      ${btn}
     </div>
   </div>`;
 }
@@ -2040,20 +2017,7 @@ function nextRevisionLabel(topicId, subtopicId, excludeId){
   const next = [...list].sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
   return `${revisionStageLabel(next.stage)} — ${formatDate(next.dueDate)}`;
 }
-function starRatingHTML(topicId, level){
-  level = level||0;
-  let stars = '';
-  for(let i=1;i<=3;i++){
-    stars += `<span onclick="setTopicImportance('${topicId}', ${i})" style="font-size:22px; line-height:1; cursor:pointer;">${i<=level?'⭐':'☆'}</span>`;
-  }
-  return `<div class="mt-8" style="display:flex; gap:4px; align-items:center;">${stars}${level>0?`<span onclick="setTopicImportance('${topicId}', 0)" class="ink-dim fs-12 cursor-pointer" style="margin-left:8px;">સાફ કરો</span>`:''}</div>`;
-}
-function setTopicImportance(id, level){
-  const t = DB.topics.find(x=>x.id===id);
-  if(!t) return;
-  t.importance = level;
-  save(); renderMain();
-}
+
 function openTopicEditForm(id, subjectId){
   const t = id ? DB.topics.find(x=>x.id===id) : null;
   openSheet(`
@@ -2084,24 +2048,6 @@ function deleteTopic(id){
     if(l.subtopicIds && subIds.length) l.subtopicIds = l.subtopicIds.filter(sid=>!subIds.includes(sid));
   });
   save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
-}
-function openTopicNoteForm(id){
-  const t = DB.topics.find(x=>x.id===id);
-  if(!t) return;
-  openSheet(`
-    <h3>નોંધ — કયા વર્ષોમાં પુછાયું</h3>
-    <div class="ink-dim fs-12 mb-6">પેપર એનાલિસિસ માટે — દા.ત. 2024, 2021, 2018</div>
-    <div class="field"><input type="text" id="f_importance_note" value="${t.importanceNote?esc(t.importanceNote):''}" placeholder="2024, 2021, 2018"></div>
-    <div class="sheet-actions">
-      <button class="btn btn-primary btn-block" onclick="saveTopicNote('${id}')">સેવ કરો</button>
-    </div>
-  `);
-}
-function saveTopicNote(id){
-  const t = DB.topics.find(x=>x.id===id);
-  if(!t) return;
-  t.importanceNote = val('f_importance_note');
-  save(); closeSheet(); renderMain(); toast('સેવ થયું');
 }
 function openTopicSubtopicManageForm(topicId){
   const t = DB.topics.find(x=>x.id===topicId);
