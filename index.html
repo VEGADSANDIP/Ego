@@ -420,8 +420,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.05-7';
-const APP_BUILT = '2026-11-05T16:00:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.05-8';
+const APP_BUILT = '2026-11-05T17:35:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1022,9 +1022,12 @@ function showTab(id){
 function renderMain(){
   const map = {dashboard:renderDashboard, exams:renderExams, mock:renderMock, calendar:renderCalendar, settings:renderSettings};
   const mainEl = document.getElementById('main');
+  const _oldTr = [...mainEl.querySelectorAll('.hs-sticky')].map(e=>e._tr||0);
   mainEl.innerHTML = map[currentTab]();
   /* બીજા પેજ/સ્ક્રીન પર જતાં સ્ક્રોલ ઉપરથી શરૂ થાય; એ જ સ્ક્રીનમાં ફરી દોરતાં જગ્યા જળવાય */
   const viewKey = [currentTab, topicDetailId, sectionDetailId, subjFolderId, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0, mqSession?(mqSession.start+'/'+(mqSession.pos||0)):''].join('|');
+  /* એ જ પેજમાં ફરી દોરતાં (ટેબ બદલતાં) સરકી ગયેલું હેડર પાછું નીચે ન આવે */
+  if(viewKey === window.__lastViewKey && _oldTr.some(v=>v<0)){ mainEl.querySelectorAll('.hs-sticky').forEach((el,i)=>{ const tr=Math.max(_oldTr[i]||0, -(el.offsetHeight+8)); if(tr<0){ el._tr=tr; el.style.transform=`translateY(${tr}px)`; el.style.pointerEvents = tr < -(el.offsetHeight+8)*0.5 ? 'none':''; } }); }
   if(viewKey !== window.__lastViewKey){
     window.__lastViewKey = viewKey;
     /* પહેલાં જે પેજ પર જ્યાં અટક્યા હતા, પાછા આવતાં ત્યાં જ ખૂલે (ટેસ્ટ ચાલુ હોય ત્યારે નહીં) */
