@@ -412,8 +412,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.05-4';
-const APP_BUILT = '2026-11-05T05:53:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.05-5';
+const APP_BUILT = '2026-11-05T06:04:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3232,11 +3232,11 @@ function mqTestCardHTML(t, showPath){
   const hl = (highlightQTestId===t.id) ? ' row-highlight' : '';
   const B = (label, code, primary)=>`<button class="btn btn-sm ${primary?'btn-primary':'btn-secondary'}" style="flex-shrink:0;" onclick="${code}">${label}</button>`;
   const side = {
-    test: B('⏱ ટેસ્ટ', `openMqSet('${t.id}','test')`, true),
-    practice: B('✍ પ્રેક્ટિસ', `openMqSet('${t.id}','practice')`, true),
-    read: B('📖 વાંચન', `mqStart('${t.id}','read')`, true),
-    pdf: B('📄 PDF', `openMqPdf('${t.id}')`, true),
-    rev: B('🔁 તારીખો', `openQTestRevisionSheet('${t.id}')`, true),
+    test: B('⏱', `openMqSet('${t.id}','test')`, true),
+    practice: B('✍', `openMqSet('${t.id}','practice')`, true),
+    read: B('📖', `mqStart('${t.id}','read')`, true),
+    pdf: B('📄', `openMqPdf('${t.id}')`, true),
+    rev: B('🔁', `openQTestRevisionSheet('${t.id}')`, true),
     edit: B('✎', `openQTestForm('${t.id}')`, false)
   }[mqTab] || '';
   return `<div class="card${hl}" id="qtest-${t.id}" data-search="${esc(t.name.toLowerCase())}">
@@ -3879,9 +3879,10 @@ function mqRevLineHTML(t){
   const next = revs.find(r=>r.status==='pending');
   const overdue = next && next.dueDate<todayStr();
   let last = t.lastRev || ''; revs.forEach(r=>{ if(r.status==='completed'){ const d=r.completedDate||r.dueDate; if(d>last) last=d; } });
-  return `${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">🔁 છેલ્લું રિવિઝન: ${formatDate(last)}</div>`:''}<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-    <button class="btn btn-sm btn-secondary" style="flex:1;" onclick="openQTestRevisionSheet('${t.id}')">🔁 રિવિઝન તારીખો${tot?` (${done}/${tot})`:''}</button>
-    ${next?`<span class="badge ${overdue?'badge-danger':'badge-warning'}">${overdue?'મોડું · ':'આગામી · '}${formatDateShort(next.dueDate)}</span>`:''}</div>`;
+  const bits = [];
+  if(last) bits.push(`🔁 છેલ્લું રિવિઝન: ${formatDate(last)}`);
+  if(tot) bits.push(`${done}/${tot} પૂર્ણ`);
+  return (bits.length||next)?`<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;"><span class="ink-dim" style="font-size:12px;flex:1;min-width:0;">${bits.join(' · ')}</span>${next?`<span class="badge ${overdue?'badge-danger':'badge-warning'}">${overdue?'મોડું · ':'આગામી · '}${formatDateShort(next.dueDate)}</span>`:''}</div>`:'';
 }
 function openQTestRevisionSheet(testId){
   const t = mqGetTest(testId); if(!t) return;
