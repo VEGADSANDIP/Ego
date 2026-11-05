@@ -420,8 +420,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.05-6';
-const APP_BUILT = '2026-11-05T11:10:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.05-7';
+const APP_BUILT = '2026-11-05T16:00:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1015,7 +1015,6 @@ function buildNav(){
 function showTab(id){
   if(id==='exams' && currentTab!==id){ lastMainTab = currentTab; }
   currentTab = id;
-  if(id==='calendar'){ calMode='study'; calKind='topic'; calGridExpanded=false; }
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
   renderMain();
   document.getElementById('main').scrollIntoView({behavior:'instant', block:'start'});
@@ -1025,13 +1024,13 @@ function renderMain(){
   const mainEl = document.getElementById('main');
   mainEl.innerHTML = map[currentTab]();
   /* બીજા પેજ/સ્ક્રીન પર જતાં સ્ક્રોલ ઉપરથી શરૂ થાય; એ જ સ્ક્રીનમાં ફરી દોરતાં જગ્યા જળવાય */
-  const viewKey = [currentTab, topicDetailId, sectionDetailId, subjFolderId, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0].join('|');
+  const viewKey = [currentTab, topicDetailId, sectionDetailId, subjFolderId, mqFolderId, mqSession?(mqSession.mode+(mqSession.finished?'F':'')):'', mqSession?1:0, mqSession?(mqSession.start+'/'+(mqSession.pos||0)):''].join('|');
   if(viewKey !== window.__lastViewKey){
     window.__lastViewKey = viewKey;
     /* પહેલાં જે પેજ પર જ્યાં અટક્યા હતા, પાછા આવતાં ત્યાં જ ખૂલે (ટેસ્ટ ચાલુ હોય ત્યારે નહીં) */
     const mem = window.__scrollMem || {};
-    mainEl.scrollTop = (!mqSession && mem[viewKey]) ? mem[viewKey] : 0;
-    window.__lastScrollSet = (!mqSession && mem[viewKey]) ? mem[viewKey] : 0;
+    mainEl.scrollTop = mem[viewKey] ? mem[viewKey] : 0;
+    window.__lastScrollSet = mem[viewKey] ? mem[viewKey] : 0;
     if(window.__hdrShow) window.__hdrShow();
   }
   afterRender(currentTab); ringInitAll();
@@ -1159,7 +1158,7 @@ function renderDashboard(){
   let heroBookMarkup;
   if(dashStatTab==='mcq'){
     let qp = dashboardQuizPages(exam);
-    if(!qp.length) qp = [`<div class="hero-card hero-quiz"><div class="hero-top"><div><div class="hero-exam-name">🧠 MCQ ટેસ્ટ</div><div class="hero-exam-date">${esc(exam.name)}</div></div><button class="btn btn-sm" onclick="mqFolderId=null; mqSession=null; showTab('mock');">ખોલો</button></div><div style="margin-top:18px; opacity:.9;">હજી કોઈ MCQ ટેસ્ટ ઉમેરી નથી. ઉપર "ખોલો" દબાવી ટેસ્ટ ઉમેરો.</div></div>`];
+    if(!qp.length) qp = [`<div class="hero-card hero-quiz"><div class="hero-top"><div><div class="hero-exam-name">🧠 MCQ ટેસ્ટ</div><div class="hero-exam-date">${esc(exam.name)}</div></div><button class="btn btn-sm" onclick="if(mqNavReset()) mqFolderId=null; showTab('mock');">ખોલો</button></div><div style="margin-top:18px; opacity:.9;">હજી કોઈ MCQ ટેસ્ટ ઉમેરી નથી. ઉપર "ખોલો" દબાવી ટેસ્ટ ઉમેરો.</div></div>`];
     heroBookMarkup = bookHTML('hero_mcq', qp);
   } else {
     heroBookMarkup = bookHTML('hero_study', [heroCard0, heroCard1]);
@@ -1174,8 +1173,8 @@ function renderDashboard(){
 
 
    ${dashStatsHTML(`   <div class="stat-grid">
-     ${statCard('📖', topicsDoneTodayCount, 'આજે અભ્યાસ ટોપિક', "calSelectedDate=todayStr(); showTab('calendar');", '')}
-     ${statCard('🔁', `${revisionsDoneTodayCount}/${revisionsDueToday.length}`, 'આજની રિવિઝન', "calSelectedDate=todayStr(); showTab('calendar'); calMode='revision'; renderMain();", '')}
+     ${statCard('📖', topicsDoneTodayCount, 'આજે અભ્યાસ ટોપિક', "calSelectedDate=todayStr(); calMode='study'; calKind='topic'; showTab('calendar');", '')}
+     ${statCard('🔁', `${revisionsDoneTodayCount}/${revisionsDueToday.length}`, 'આજની રિવિઝન', "calSelectedDate=todayStr(); calKind='topic'; showTab('calendar'); calMode='revision'; renderMain();", '')}
      ${statCard('⏰', overdueRevisions, 'ઓવરડ્યુ રિવિઝન')}
      ${statCard('📘', total-completed, 'બાકી ટોપિક')}
    </div>`)}
@@ -3887,9 +3886,14 @@ function mqAttemptsCardHTML(dateStr){
   if(!list.length) return '';
   return `<div class="card mt-14"><div class="item item-static"><b>🧠 MCQ ટેસ્ટ આપી</b></div>${list.map(({t,a})=>`<div class="item" onclick="mqGoToTest('${t.id}')"><span style="flex:1;">${esc(t.name)} <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':'ટેસ્ટ'}</span></span><span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span></div>`).join('')}</div>`;
 }
+
+/* ચાલુ ટેસ્ટ/પ્રેક્ટિસ હોય તો બીજે ક્યાંકથી ક્લિક કરતાં તે બંધ ન થાય */
+function mqRunning(){ return !!(mqSession && !mqSession.finished && mqSession.mode!=='read'); }
+function mqNavReset(){ if(mqRunning()){ toast('ટેસ્ટ ચાલુ છે — MCQ ટેબમાં ચાલુ રાખો','info'); return false; } mqSession=null; return true; }
 function mqGoToTest(testId){
   const t = mqGetTest(testId); if(!t) return;
-  mqFolderId = t.folderId || null; mqSession = null; mqQuery = '';
+  if(!mqNavReset()){ showTab('mock'); return; }
+  mqFolderId = t.folderId || null; mqQuery = '';
   highlightQTestId = t.id;
   showTab('mock');
 }
@@ -3990,7 +3994,7 @@ function dashboardQuizPages(exam){
   const rOver = rPend.filter(r=>r.dueDate<today).length;
   const rUp = rPend.length - rOver;
   const rPct = rTotAll ? Math.round(rDone/rTotAll*100) : 0;
-  const open = `if(bookClickOK()){ mqFolderId=null; mqSession=null; showTab('mock'); }`;
+  const open = `if(bookClickOK()){ if(mqNavReset()) mqFolderId=null; showTab('mock'); }`;
   const top = (title)=>`<div class="hero-top"><div><div class="hero-exam-name">${title}</div><div class="hero-exam-date">${esc(exam.name)} · 📅 ${formatDate(exam.date)}</div></div><button class="btn btn-sm" onclick="${open}">ખોલો</button></div>`;
   const p2 = `<div class="hero-card hero-quiz">${top('🧠 MCQ ટેસ્ટ')}
      <div class="hero-ring-row">${ringSVG(pct, null, 'ટેસ્ટ')}
@@ -4020,7 +4024,7 @@ function dashMcqStats(){
      ${statCard('🧠', mqAttemptsOn(today).length, 'આજે આપેલી ટેસ્ટ', "calSelectedDate=todayStr(); showTab('calendar'); calKind='mcq'; calMode='study'; renderMain();", '')}
      ${statCard('🔁', `${doneToday}/${dueToday.length}`, 'આજની રિવિઝન ટેસ્ટ', "calSelectedDate=todayStr(); showTab('calendar'); calKind='mcq'; calMode='revision'; renderMain();", '')}
      ${statCard('⏰', overdue, 'ઓવરડ્યુ રિવિઝન ટેસ્ટ')}
-     ${statCard('📝', left, 'બાકી ટેસ્ટ', "mqFolderId=null; mqSession=null; showTab('mock');", '')}
+     ${statCard('📝', left, 'બાકી ટેસ્ટ', "if(mqNavReset()) mqFolderId=null; showTab('mock');", '')}
    </div>`;
 }
 function dashStatsHTML(studyGrid){
@@ -4564,7 +4568,7 @@ function initHideOnScroll(){
     const y = main.scrollTop, dy = y - last;
     last = y;
     if(mqSession && mqSession.mode==='read') mqUpdateReadTitle();
-    if(window.__lastViewKey !== undefined && !mqSession){ (window.__scrollMem = window.__scrollMem || {})[window.__lastViewKey] = y; }
+    if(window.__lastViewKey !== undefined){ (window.__scrollMem = window.__scrollMem || {})[window.__lastViewKey] = y; }
     if(!dy) return;
     const els = main.querySelectorAll('.hs-sticky');
     if(y <= 20){ window.__hdrShow(); return; }
