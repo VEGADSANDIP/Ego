@@ -126,6 +126,14 @@ a{color:inherit;}
 .hero-dots{display:flex; justify-content:center; gap:7px; margin:2px 0 12px;}
 .hero-dots i{width:7px; height:7px; border-radius:50%; background:var(--ink); opacity:.25; transition:all .3s;}
 .hero-dots i.on{opacity:.9; width:18px; border-radius:4px;}
+
+/* રિંગ જેવી ટેબ પટ્ટી: એક લીટી, ડાબે-જમણે ફરે, વચ્ચેનું ટેબ ચાલુ */
+.ring{position:relative; margin:8px 0 12px; background:var(--surface2); border-radius:14px; overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 82%,transparent 100%); mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 82%,transparent 100%);}
+.ring::before{content:''; position:absolute; left:32%; width:36%; top:5px; bottom:5px; background:var(--surface); border-radius:10px; box-shadow:var(--shadow); pointer-events:none;}
+.ring-track{position:relative; display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; padding:6px 0; perspective:500px; touch-action:pan-x pan-y;}
+.ring-track::-webkit-scrollbar{display:none;}
+.ring-track button{flex:0 0 36%; scroll-snap-align:center; scroll-snap-stop:always; border:none; background:transparent; color:var(--ink); font-weight:800; font-size:14.5px; font-family:inherit; padding:11px 4px; white-space:nowrap; transform-origin:center; will-change:transform,opacity;}
 .seg{display:flex; background:var(--surface2); border-radius:12px; padding:4px; gap:4px; margin-bottom:14px;}
 .seg button{flex:1; border:none; background:transparent; color:var(--ink-dim); padding:10px 6px; border-radius:9px; font-weight:700; font-size:13.5px; font-family:inherit;}
 .seg-sm button{font-size:12px; padding:9px 2px;}
@@ -412,8 +420,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.05-5';
-const APP_BUILT = '2026-11-05T06:04:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.05-6';
+const APP_BUILT = '2026-11-05T11:10:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1026,7 +1034,7 @@ function renderMain(){
     window.__lastScrollSet = (!mqSession && mem[viewKey]) ? mem[viewKey] : 0;
     if(window.__hdrShow) window.__hdrShow();
   }
-  afterRender(currentTab);
+  afterRender(currentTab); ringInitAll();
   /* સામગ્રી (બુક/કાર્ડ) પછીથી ગોઠવાય તો પણ યાદ રાખેલી સ્થિતિએ જ પહોંચે */
   const want = window.__lastScrollSet || 0;
   if(want > 0){ [60,200,450].forEach(ms=>setTimeout(()=>{ const m=document.getElementById('main'); if(m && window.__lastViewKey===viewKey && m.scrollTop < want-1 && m.scrollHeight-m.clientHeight >= want){ m.scrollTop = want; } }, ms)); }
@@ -1745,9 +1753,7 @@ function dashboardTodayStudyRow(l){
   </div>`;
 }
 let topicTab = 'edit'; /* ચેપ્ટરની બાજુનું બટન કયું કામ કરે: edit / sub / rev / status */
-function topicTabSegHTML(){
-  return `<div class="seg seg-sm" style="margin-top:8px;">${[['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન'],['status','🚦 સ્ટેટસ']].map(([k,l])=>`<button class="${topicTab===k?'on':''}" onclick="topicTab='${k}'; renderMain();">${l}</button>`).join('')}</div>`;
-}
+function topicTabSegHTML(){ return ringHTML('topicRing', [['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન'],['status','🚦 સ્ટેટસ']], topicTab, "topicTab='%K'; renderMain();"); }
 function topicRow(t){
   const statusDot = t.status==='completed' ? '🟢' : (t.status==='studying' ? '🟡' : '🔴');
   const highlight = (highlightTopicId===t.id) ? ' row-highlight' : '';
@@ -3221,9 +3227,36 @@ function mqCmp(mode, a, b){
 }
 let mqTab = 'test'; /* ટેસ્ટની બાજુનું બટન કયું કામ કરે */
 const MQ_TABS = [['test','⏱ ટેસ્ટ'],['practice','✍ પ્રેક્ટિસ'],['read','📖 વાંચન'],['pdf','📄 PDF'],['rev','🔁 રિવિઝન'],['edit','✎ એડિટ']];
-function mqTabSegHTML(){
-  return `<div class="seg seg-sm" style="margin-top:8px; display:grid; grid-template-columns:repeat(3,1fr);">${MQ_TABS.map(([k,l])=>`<button class="${mqTab===k?'on':''}" onclick="mqTab='${k}'; renderMain();">${l}</button>`).join('')}</div>`;
+
+/* ===== રિંગ ટેબ ===== */
+function ringHTML(id, items, active, setCode){
+  let b=''; for(let c=0;c<5;c++){ items.forEach(([k,l])=>{ b+=`<button data-k="${k}" ${c===2&&k===active?'data-act="1"':''}>${l}</button>`; }); }
+  return `<div class="ring" id="${id}" data-active="${active}" data-set="${esc(setCode)}" data-n="${items.length}"><div class="ring-track">${b}</div></div>`;
 }
+function ringInitAll(){
+  document.querySelectorAll('.ring').forEach(el=>{
+    const tr = el.querySelector('.ring-track'); const btns=[...tr.children]; const n=+el.dataset.n;
+    const centerOf = b=>b.offsetLeft - tr.offsetLeft + b.offsetWidth/2;
+    const setW = ()=> btns[n].offsetLeft - btns[0].offsetLeft;
+    const fx = ()=>{ const mid=tr.scrollLeft+tr.clientWidth/2, half=tr.clientWidth/2;
+      btns.forEach(b=>{ const d=(centerOf(b)-mid)/half; const a=Math.min(Math.abs(d),1.2);
+        b.style.opacity=(1-a*0.75).toFixed(2); b.style.transform=`rotateY(${(-d*38).toFixed(1)}deg) scale(${(1-a*0.22).toFixed(2)})`; }); };
+    const center = (b,smooth)=>{ tr.scrollTo({left:centerOf(b)-tr.clientWidth/2, behavior:smooth?'smooth':'instant'}); };
+    const act = btns.find(b=>b.dataset.act); tr.style.scrollSnapType='none'; center(act,false); fx();
+    requestAnimationFrame(()=>{ tr.style.scrollSnapType=''; fx(); });
+    let tm=null, ready=false; setTimeout(()=>{ready=true;},250);
+    const settle = ()=>{
+      const mid=tr.scrollLeft+tr.clientWidth/2; let best=btns[0],bd=1e9;
+      btns.forEach(b=>{ const d=Math.abs(centerOf(b)-mid); if(d<bd){bd=d;best=b;} });
+      const W=setW(), lo=W*1.5, hi=W*3.5;
+      if(tr.scrollLeft<lo||tr.scrollLeft>hi){ const sh = tr.scrollLeft<lo ? W : -W; tr.style.scrollSnapType='none'; tr.scrollLeft+=sh; requestAnimationFrame(()=>{tr.style.scrollSnapType='';}); }
+      if(best.dataset.k!==el.dataset.active){ el.dataset.active=best.dataset.k; (new Function(el.dataset.set.replace('%K',best.dataset.k)))(); }
+    };
+    tr.addEventListener('scroll',()=>{ fx(); if(!ready) return; clearTimeout(tm); tm=setTimeout(settle,150); },{passive:true});
+    btns.forEach(b=>b.addEventListener('click',()=>{ if(b.dataset.k!==el.dataset.active) center(b,true); }));
+  });
+}
+function mqTabSegHTML(){ return ringHTML('mqRing', MQ_TABS, mqTab, "mqTab='%K'; renderMain();"); }
 function mqTestCardHTML(t, showPath){
   const last = (t.attempts||[]).slice(-1)[0];
   const best = mqBest(t);
