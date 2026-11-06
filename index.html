@@ -420,8 +420,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.05-8';
-const APP_BUILT = '2026-11-05T17:35:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.06-1';
+const APP_BUILT = '2026-11-06T17:48:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1869,6 +1869,7 @@ function openRevisionCalendarSheet(entityType, id){
     <div class="ink-dim fs-12 mb-6">કેલેન્ડરમાં જે-જે તારીખે રિવિઝન કરવું હોય ત્યાં ટેપ કરી ✓ કરો. ${limitLine}</div>
     <div id="revisionPickerCal">${renderRevisionPickerCalendar()}</div>
     <div class="ink-dim fs-12" style="margin-top:8px;" id="revisionPickerCount"></div>
+    <div class="ink-dim fs-12" style="margin-top:4px;">રિવિઝન જરૂરી નથી — તારીખ વગર પણ "પૂર્ણ કરો" દબાવી શકાય.</div>
     <div class="sheet-actions" style="margin-top:14px;">
       <button class="btn btn-primary btn-block" onclick="confirmRevisionPicker()">✓ પૂર્ણ કરો</button>
     </div>
@@ -2039,7 +2040,7 @@ function confirmRevisionPicker(){
     toast('રિવિઝન તારીખો અપડેટ થઈ 🔁');
     return;
   }
-  if(!dates.length){ toast('ઓછામાં ઓછી એક તારીખ પસંદ કરો','error'); return; }
+  /* રિવિઝન તારીખ વગર પણ પૂર્ણ કરી શકાય */
   if(entityType==='topic'){
     const t = DB.topics.find(x=>x.id===id);
     if(!t) return;
@@ -2049,7 +2050,7 @@ function confirmRevisionPicker(){
     addAutoStudyLog(t.subjectId, t.id, null);
     save(); closeSheet(); renderMain();
     const nextLabel = nextRevisionLabel(t.id, null);
-    toast(nextLabel ? `ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁 · આગામી: ${nextLabel}` : `ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁`);
+    toast(!dates.length ? 'ટોપિક પૂર્ણ! ✓ (રિવિઝન વગર)' : nextLabel ? `ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁 · આગામી: ${nextLabel}` : `ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁`);
   } else {
     const st = DB.subtopics.find(x=>x.id===id);
     if(!st) return;
@@ -2060,7 +2061,7 @@ function confirmRevisionPicker(){
     save(); renderMain();
     openTopicRevisionForm(st.topicId);
     const nextLabel = nextRevisionLabel(st.topicId, st.id);
-    toast(nextLabel ? `સબ-ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁 · આગામી: ${nextLabel}` : `સબ-ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁`);
+    toast(!dates.length ? 'સબ-ટોપિક પૂર્ણ! ✓ (રિવિઝન વગર)' : nextLabel ? `સબ-ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁 · આગામી: ${nextLabel}` : `સબ-ટોપિક પૂર્ણ! ${dates.length} રિવિઝન તારીખ સેટ કરી 🔁`);
   }
 }
 function openExamForm(id){
