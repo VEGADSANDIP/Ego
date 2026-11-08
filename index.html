@@ -471,8 +471,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.08-6';
-const APP_BUILT = '2026-11-08T17:23:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.08-7';
+const APP_BUILT = '2026-11-08T17:35:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4546,7 +4546,7 @@ function deleteMapPlace(id){
   DB.mapPlaces = (DB.mapPlaces||[]).filter(p=>p.id!==id); save(); closeSheet(); mapRefresh();
 }
 /* ---- PDF ---- */
-function mapPrintList(){
+function mapPrintListLegacy(){
   const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
   const cn = mapCatName(mapCat); const stT = mapSt==='__IN' ? 'ભારત' : mapStName(mapSt);
   const title = `${cn} — ${stT}${mapDist?' › '+mapDistName(mapDist):''}${mapTal?' › '+mapTal:''}`;
@@ -4626,9 +4626,9 @@ function mpPage(list, title, pid, regions, keyOf, dims, portrait){
     return `<div class="pq pdet" id="${pid}-${i}"><div class="pmp-h" style="margin-top:0;">📍 ${esc(d.n)} (${arr.length}) <a class="pback" href="#${pid}">← નકશા પર પાછા</a></div>${ord.map(p=>`<div class="pq"><b>${esc(p.name)}</b>${p.taluka?` <span>— ${esc(p.taluka)}</span>`:''}${p.note?`<div class="pmp-note">${esc(p.note)}</div>`:''}</div>`).join('')}</div>`; }).join('');
   return `<div class="psec pmapPage ${portrait?'pmapPort':''}" id="${pid}"><div class="ph"><h1>${esc(title)}</h1><div>કુલ સ્થળ: ${list.length}${over.length?' · લાલ ↓ વાળા જિલ્લા પર ટેપ કરો → વિગત':''}</div></div>${svg}</div>${over.length?`<div class="psec pnew pdetwrap"><div class="ph"><h1>${esc(title)} — નકશામાં ન સમાયેલી વિગત</h1></div><div class="pqs">${det}</div></div>`:''}`;
 }
-function mapPrintPdf(){
+function mapPrintMapLegacy(){
   if(!mapCat){ toast('પહેલા વિભાગ બનાવો','error'); return; }
-  if(mapIsOther() || (mapQuery||'').trim() || (mapSt==='Gujarat' && (mapDist||mapTal))){ mapPrintList(); return; }
+  if(mapIsOther() || (mapQuery||'').trim() || (mapSt==='Gujarat' && (mapDist||mapTal))){ mapPrintListLegacy(); return; }
   const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
   const c = mapCatsOf().find(x=>x.id===mapCat); const ind = mapSt==='__IN';
   const title = `${c.icon||'📌'} ${c.name} — ${ind?'ભારત':'ગુજરાત'}`;
@@ -4639,6 +4639,149 @@ function mapPrintPdf(){
   pa.innerHTML = html; const oldTitle = document.title; document.title = title;
   const done = ()=>{ document.title = oldTitle; pa.innerHTML=''; window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done); setTimeout(()=>window.print(), 150);
+}
+
+
+/* ===================== સીધી PDF ડાઉનલોડ (પેજ = ચિત્ર + ટેપ-લિંક) ===================== */
+function mpFam(){ return getComputedStyle(document.body).fontFamily || 'sans-serif'; }
+function mpLayout(list, regions, keyOf){
+  const byD = {}; list.forEach(p=>{ const k=keyOf(p); (byD[k]=byD[k]||[]).push(p); });
+  const ordOf = arr=> mapSort==='name' ? arr.slice().sort((a,b)=>mapByName(a.name,b.name)) : arr;
+  const mk = (d,wt)=>ordOf(byD[d.k]||[]).map(p=>wt&&p.taluka?`${p.name} (${p.taluka})`:p.name);
+  return regions.map((d,i)=>{ const arr = byD[d.k]||[]; if(!arr.length) return {d,i,has:false};
+    const fit = mpFit(d,mk(d,true)) || mpFit(d,mk(d,false)) || mpFit(d,mk(d,false),5.0);
+    return {d,i,has:true,fit,items:ordOf(arr)}; });
+}
+function mpDrawMap(ctx, res, ox, oy, sc, o){
+  o = o||{}; const fam = mpFam();
+  ctx.save(); ctx.translate(ox,oy); ctx.scale(sc,sc); ctx.lineJoin='round';
+  res.forEach(r=>{ const pth = new Path2D(r.d.d); const hl = o.hl===r.i;
+    ctx.fillStyle = hl ? '#f59e0b' : (r.has ? '#fde9a8' : '#ffffff'); ctx.fill(pth,'evenodd');
+    ctx.strokeStyle = hl ? '#c2410c' : '#555'; ctx.lineWidth = hl ? 2.2 : 0.7; ctx.stroke(pth); });
+  ctx.textBaseline='middle';
+  if(!o.noText) res.forEach(r=>{
+    if(!r.has){ const bb=mapBBox(r.d.d,r.d.bk); const f=5.2; ctx.font=`${f}px ${fam}`; if(ctx.measureText(r.d.n).width < (bb.x1-bb.x0)*0.8){ ctx.fillStyle='#999'; ctx.textAlign='center'; ctx.fillText(r.d.n, r.d.x, r.d.y); } return; }
+    if(!r.fit){ ctx.font=`800 ${MP_MIN}px ${fam}`; ctx.fillStyle='#a00'; ctx.textAlign='center'; ctx.fillText(r.d.n+' ↓', r.d.x, r.d.y); return; }
+    ctx.textAlign='left'; const f=r.fit;
+    f.lines.forEach((l,k)=>{ ctx.font = `${l.head?'800 ':''}${f.f}px ${fam}`; ctx.fillStyle = l.head ? '#7a1f00' : '#000'; ctx.fillText(l.t, f.x, f.y+(k+0.5)*f.lh); });
+  });
+  if(o.hlName){ const r=res[o.hl]; ctx.font=`800 9px ${fam}`; ctx.fillStyle='#7a1f00'; ctx.textAlign='center'; ctx.fillText(r.d.n, r.d.x, r.d.y); }
+  ctx.restore();
+}
+function mpWrapPx(ctx, txt, maxW){
+  const words = String(txt).split(/\s+/); const out=[]; let cur='';
+  words.forEach(w=>{ const t=cur?cur+' '+w:w; if(cur && ctx.measureText(t).width>maxW){ out.push(cur); cur=w; } else cur=t; });
+  if(cur) out.push(cur); return out;
+}
+function mpRRect(ctx,x,y,w,h,r){ ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x,y,w,h,r); else ctx.rect(x,y,w,h); }
+/* જિલ્લાની બધી માહિતી — બોક્સમાં */
+function mpDrawCallout(ctx, r, x, y, w, h, title){
+  const fam = mpFam(); const pad=36;
+  const build = fs=>{ const L=[]; const iw=w-pad*2;
+    ctx.font=`800 ${fs*1.25}px ${fam}`; mpWrapPx(ctx,`📍 ${r.d.n} (${r.items.length})`,iw).forEach(t=>L.push({t,f:fs*1.25,b:1,c:'#7a1f00'}));
+    r.items.forEach(p=>{ ctx.font=`800 ${fs}px ${fam}`; const nm=p.name+(p.taluka?` (${p.taluka})`:''); mpWrapPx(ctx,'• '+nm,iw).forEach((t,k)=>L.push({t:(k?'   ':'')+t,f:fs,b:1,c:'#000',gap:k===0?fs*0.35:0}));
+      if(p.note){ ctx.font=`${fs*0.86}px ${fam}`; mpWrapPx(ctx,p.note,iw-fs).forEach(t=>L.push({t:'     '+t,f:fs*0.86,c:'#444',gap:0})); } });
+    let H=pad*2; L.forEach(l=>{ H+=l.f*1.32+(l.gap||0); }); return {L,H}; };
+  let fs=58, b=build(fs); while(b.H>h && fs>14){ fs-=2; b=build(fs); }
+  h = Math.min(h, b.H);
+  mpRRect(ctx,x,y,w,h,28); ctx.fillStyle='#fffaf0'; ctx.fill(); ctx.strokeStyle='#c2410c'; ctx.lineWidth=5; ctx.stroke();
+  let cy=y+pad; ctx.textBaseline='top'; ctx.textAlign='left';
+  b.L.forEach(l=>{ cy+=(l.gap||0); ctx.font=`${l.b?'800 ':''}${l.f}px ${fam}`; ctx.fillStyle=l.c; ctx.fillText(l.t,x+pad,cy); cy+=l.f*1.32; });
+  return h;
+}
+async function mpCanvasJpg(c){ const blob = await new Promise(r=>c.toBlob(r,'image/jpeg',0.88)); return new Uint8Array(await blob.arrayBuffer()); }
+function mpBuildPdf(pages){
+  const enc = new TextEncoder(); const parts=[]; let off=0; const offs={};
+  const push = b=>{ if(typeof b==='string') b=enc.encode(b); parts.push(b); off+=b.length; };
+  const n = pages.length; const annBase = 3+3*n; let annN = annBase; const annObjs=[];
+  const pageObj = i=>3+3*i;
+  pages.forEach((pg,i)=>{ pg.annRefs=[]; (pg.links||[]).forEach(L=>{ const k=pg.wpt/pg.pw; const x1=L.x*k, x2=(L.x+L.w)*k, y1=pg.hpt-(L.y+L.h)*k, y2=pg.hpt-L.y*k;
+    annObjs.push({n:annN, s:`<< /Type /Annot /Subtype /Link /Rect [${x1.toFixed(1)} ${y1.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}] /Border [0 0 0] /Dest [${pageObj(L.to)} 0 R /Fit] >>`}); pg.annRefs.push(annN); annN++; }); });
+  push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  offs[1]=off; push(`1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`);
+  offs[2]=off; push(`2 0 obj\n<< /Type /Pages /Count ${n} /Kids [${pages.map((_,i)=>pageObj(i)+' 0 R').join(' ')}] >>\nendobj\n`);
+  pages.forEach((pg,i)=>{ const po=pageObj(i), co=po+1, io=po+2;
+    offs[po]=off; push(`${po} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pg.wpt.toFixed(2)} ${pg.hpt.toFixed(2)}] /Resources << /XObject << /Im0 ${io} 0 R >> >> /Contents ${co} 0 R${pg.annRefs.length?` /Annots [${pg.annRefs.map(r=>r+' 0 R').join(' ')}]`:''} >>\nendobj\n`);
+    const cs = `q ${pg.wpt.toFixed(2)} 0 0 ${pg.hpt.toFixed(2)} 0 0 cm /Im0 Do Q`;
+    offs[co]=off; push(`${co} 0 obj\n<< /Length ${cs.length} >>\nstream\n${cs}\nendstream\nendobj\n`);
+    offs[io]=off; push(`${io} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${pg.pw} /Height ${pg.ph} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${pg.jpg.length} >>\nstream\n`); push(pg.jpg); push('\nendstream\nendobj\n'); });
+  annObjs.forEach(a=>{ offs[a.n]=off; push(`${a.n} 0 obj\n${a.s}\nendobj\n`); });
+  const total = annN; const xo = off; let x = `xref\n0 ${total}\n0000000000 65535 f \n`;
+  for(let k=1;k<total;k++) x += String(offs[k]).padStart(10,'0')+' 00000 n \n';
+  push(x+`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xo}\n%%EOF`);
+  return new Blob(parts,{type:'application/pdf'});
+}
+function mpDownload(blob, name){
+  const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },4000);
+}
+const MPP = {L:{pw:2339,ph:1654,wpt:841.89,hpt:595.28}, P:{pw:1654,ph:2339,wpt:595.28,hpt:841.89}};
+async function mapDownloadMapPdf(list, ind, title){
+  const fam = mpFam();
+  const regions = ind ? IN_MAP.s.map(o=>({...o,bk:'S:'+o.k})) : GJ_MAP.d.map(d=>({...d,bk:d.k}));
+  const dims = ind ? {w:IN_MAP.w,h:IN_MAP.h} : {w:GJ_MAP.w,h:GJ_MAP.h};
+  const res = mpLayout(list, regions, ind ? (p=>mapStOf(p)) : (p=>p.district));
+  const over = res.filter(r=>r.has && !r.fit); const pg0 = ind ? MPP.P : MPP.L; const pages=[];
+  const mk = ()=>{ const c=document.createElement('canvas'); c.width=pg0.pw; c.height=pg0.ph; const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); return {c,ctx}; };
+  /* પેજ 1 — નકશો */
+  { const {c,ctx}=mk(); const W=c.width,H=c.height;
+    ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.font=`800 64px ${fam}`; ctx.fillText(title, W/2, 40);
+    ctx.font=`34px ${fam}`; ctx.fillStyle='#444'; ctx.fillText(`કુલ સ્થળ: ${list.length}${over.length?' · લાલ ↓ વાળા જિલ્લા/રાજ્ય પર ટેપ કરો → માહિતી બહાર ખૂલશે':''}`, W/2, 120);
+    ctx.fillStyle='#000'; ctx.fillRect(60,172,W-120,3);
+    const aw=W-120, ah=H-230; const sc=Math.min(aw/dims.w, ah/dims.h); const ox=(W-dims.w*sc)/2, oy=190+(ah-dims.h*sc)/2;
+    mpDrawMap(ctx,res,ox,oy,sc);
+    const links=[]; over.forEach((r,k)=>{ const bb=mapBBox(r.d.d,r.d.bk); links.push({x:ox+bb.x0*sc,y:oy+bb.y0*sc,w:(bb.x1-bb.x0)*sc,h:(bb.y1-bb.y0)*sc,to:1+k}); });
+    pages.push({...pg0, jpg:await mpCanvasJpg(c), links}); }
+  /* પેજ 2.. — દરેક "↓" જિલ્લા માટે બહાર નીકળતું બોક્સ */
+  for(let k=0;k<over.length;k++){ const r=over[k]; const {c,ctx}=mk(); const W=c.width,H=c.height;
+    ctx.fillStyle='#000'; ctx.textAlign='left'; ctx.textBaseline='top'; ctx.font=`800 52px ${fam}`; ctx.fillText(title, 60, 40);
+    const bw=420, bh=84, bx=W-60-bw, by=36; mpRRect(ctx,bx,by,bw,bh,20); ctx.fillStyle='#e8eefc'; ctx.fill(); ctx.strokeStyle='#3b5bdb'; ctx.lineWidth=4; ctx.stroke();
+    ctx.fillStyle='#1d3ea8'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font=`800 38px ${fam}`; ctx.fillText('← નકશા પર પાછા', bx+bw/2, by+bh/2);
+    ctx.fillStyle='#000'; ctx.fillRect(60,150,W-120,3);
+    let ox,oy,sc,bxx,byy,bww,bhh;
+    if(!ind){ sc=Math.min((W*0.5)/dims.w,(H-260)/dims.h); ox=60; oy=190+((H-260)-dims.h*sc)/2; bxx=ox+dims.w*sc+70; byy=190; bww=W-60-bxx; bhh=H-250; }
+    else { sc=Math.min((W-120)/dims.w,(H*0.5)/dims.h); ox=(W-dims.w*sc)/2; oy=180; byy=oy+dims.h*sc+40; bxx=60; bww=W-120; bhh=H-byy-60; }
+    mpDrawMap(ctx,res,ox,oy,sc,{hl:r.i,hlName:true,noText:true});
+    bhh = mpDrawCallout(ctx,r,bxx,byy,bww,bhh);
+    const px=ox+r.d.x*sc, py=oy+r.d.y*sc; const tx = ind ? Math.min(Math.max(px,bxx+60),bxx+bww-60) : bxx; const ty = ind ? byy : Math.min(Math.max(py,byy+60),byy+bhh-60);
+    ctx.strokeStyle='#c2410c'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(tx,ty); ctx.stroke();
+    ctx.fillStyle='#c2410c'; ctx.beginPath(); ctx.arc(px,py,12,0,7); ctx.fill();
+    pages.push({...pg0, jpg:await mpCanvasJpg(c), links:[{x:bx,y:by,w:bw,h:bh,to:0},{x:ox,y:oy,w:dims.w*sc,h:dims.h*sc,to:0}]}); }
+  return mpBuildPdf(pages);
+}
+/* વિગતવાળી યાદી PDF (પેજ મુજબ ચિત્ર) */
+async function mapDownloadListPdf(title, groups){
+  const pg=MPP.P; const fam=mpFam(); const pages=[]; const M=110; let c,ctx,y;
+  const newPage=async(first)=>{ if(c) pages.push({...pg,jpg:await mpCanvasJpg(c),links:[]}); c=document.createElement('canvas'); c.width=pg.pw; c.height=pg.ph; ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); ctx.textBaseline='top'; ctx.textAlign='left'; y=M;
+    if(first){ ctx.fillStyle='#000'; ctx.font=`800 62px ${fam}`; mpWrapPx(ctx,title,pg.pw-2*M).forEach(t=>{ ctx.fillText(t,M,y); y+=80; }); ctx.fillRect(M,y+4,pg.pw-2*M,3); y+=34; } };
+  await newPage(true); const maxY=pg.ph-M; const iw=pg.pw-2*M;
+  for(const g of groups){
+    if(g.head){ if(y+120>maxY) await newPage(false); y+=14; ctx.font=`800 44px ${fam}`; ctx.fillStyle='#7a1f00'; ctx.fillText(`${g.head} (${g.items.length})`,M,y); y+=62; ctx.fillStyle='#ccc'; ctx.fillRect(M,y-6,iw,2); y+=12; }
+    for(const it of g.items){
+      ctx.font=`800 36px ${fam}`; const nl = mpWrapPx(ctx,it.name+(it.loc?`  — ${it.loc}`:''),iw); ctx.font=`31px ${fam}`; const ntl = it.note?mpWrapPx(ctx,it.note,iw-40):[];
+      const h = nl.length*50 + ntl.length*44 + 26; if(y+h>maxY) await newPage(false);
+      ctx.font=`800 36px ${fam}`; ctx.fillStyle='#000'; nl.forEach(t=>{ ctx.fillText(t,M,y); y+=50; });
+      ctx.font=`31px ${fam}`; ctx.fillStyle='#444'; ntl.forEach(t=>{ ctx.fillText(t,M+40,y); y+=44; }); y+=26; } }
+  pages.push({...pg,jpg:await mpCanvasJpg(c),links:[]});
+  return mpBuildPdf(pages);
+}
+async function mapPrintPdf(){
+  if(!mapCat){ toast('પહેલા વિભાગ બનાવો','error'); return; }
+  const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
+  const c = mapCatsOf().find(x=>x.id===mapCat); const q=(mapQuery||'').trim();
+  const asList = mapIsOther() || q || (mapSt==='Gujarat' && (mapDist||mapTal));
+  try{
+    toast('PDF બની રહી છે…');
+    let blob, name;
+    if(!asList){ const ind=mapSt==='__IN'; name=`${c.name} — ${ind?'ભારત':'ગુજરાત'}`; blob = await mapDownloadMapPdf(list, ind, `${c.icon||'📌'} ${name}`); }
+    else {
+      const stT = mapSt==='__IN' ? 'ભારત' : mapStName(mapSt); name = `${c.name} — ${stT}${mapDist?' › '+mapDistName(mapDist):''}${mapTal?' › '+mapTal:''}`;
+      const g={}; list.forEach(p=>{ const k = mapSt==='__IN' ? (mapStOf(p)==='Gujarat' ? 'ગુજરાત › '+mapDistName(p.district) : mapStName(mapStOf(p))) : ((mapDist||mapIsOther()) ? '' : mapDistName(p.district)); (g[k]=g[k]||[]).push(p); });
+      const groups = Object.keys(g).sort(mapByName).map(k=>({head:k, items:(mapSort==='name'?g[k].slice().sort((a,b)=>mapByName(a.name,b.name)):g[k]).map(p=>({name:p.name, loc:[(mapSt==='__IN'||q)?mapPlaceLoc(p):'',p.taluka].filter(Boolean).join(' › '), note:p.note||''}))}));
+      blob = await mapDownloadListPdf(`${c.icon||'📌'} ${name}`, groups);
+    }
+    const dt=new Date(), z=n=>String(n).padStart(2,'0'); mpDownload(blob, `ExamPath_${(mapSt==='__IN'?'India':String(mapSt).replace(/[^A-Za-z]+/g,''))}${mapDist?'_'+String(mapDist).replace(/[^A-Za-z]+/g,''):''}_${dt.getFullYear()}${z(dt.getMonth()+1)}${z(dt.getDate())}-${z(dt.getHours())}${z(dt.getMinutes())}.pdf`); toast('PDF ડાઉનલોડ થઈ ✅');
+  }catch(e){ console.error(e); toast('સીધી PDF ન બની — છાપવાની રીત વાપરું છું','error'); if(asList) mapPrintListLegacy(); else mapPrintMapLegacy(); }
 }
 
 /* ---- ઘણાં સ્થળ એકસાથે (પેસ્ટ → પ્રિવ્યૂ → ઉમેરો) ---- */
