@@ -140,17 +140,17 @@ a{color:inherit;}
 .mp-chips::-webkit-scrollbar{display:none;}
 .mp-chip{flex:0 0 auto; border:none; background:var(--surface2); color:var(--ink); padding:8px 13px; border-radius:999px; font-weight:700; font-size:13px; font-family:inherit; cursor:pointer;}
 .mp-chip.on{background:var(--primary); color:var(--primary-ink);}
-.mp-svg{width:100%; height:auto; display:block; touch-action:pan-y; user-select:none; -webkit-user-select:none; border-radius:10px;}
-.mp-svg path{fill:var(--surface2); stroke:var(--ink-dim); stroke-opacity:.55; stroke-width:.9; vector-effect:non-scaling-stroke; stroke-linejoin:round; cursor:pointer;}
-.mp-svg path.has{fill:var(--primary);}
-.mp-svg path.sel{fill:var(--surface2); fill-opacity:1;}
-.mp-svg path.sel{stroke:var(--accent); stroke-opacity:1; stroke-width:2.6;}
-.mp-svg path.tal{fill:var(--accent); fill-opacity:0; stroke-opacity:.8; stroke-width:1; stroke-dasharray:3 2;}
-.mp-svg path.tal.has{fill-opacity:.2;}
-.mp-svg path.tal.sel{stroke:var(--accent); stroke-opacity:1; stroke-dasharray:none; stroke-width:2.6; fill:var(--accent); fill-opacity:.4;}
+.mp-svg{width:100%; height:auto; display:block; touch-action:pan-y; user-select:none; -webkit-user-select:none; border-radius:10px; background:#fff;}
+.mp-svg path{fill:#fff; stroke:#555; stroke-opacity:1; stroke-width:.9; vector-effect:non-scaling-stroke; stroke-linejoin:round; cursor:pointer;}
+.mp-svg path.has{fill:#fde9a8;}
+.mp-svg path.sel{fill:#f8cd5c; fill-opacity:1; stroke:#c2410c; stroke-opacity:1; stroke-width:2.6;}
+.mp-svg path.tal{fill:#e08a00; fill-opacity:0; stroke:#666; stroke-opacity:.9; stroke-width:1; stroke-dasharray:3 2;}
+.mp-svg path.tal.has{fill-opacity:.28;}
+.mp-svg path.tal.sel{stroke:#c2410c; stroke-opacity:1; stroke-dasharray:none; stroke-width:2.6; fill:#e08a00; fill-opacity:.5;}
 .mp-b{pointer-events:none;} .mp-b circle{fill:var(--accent);} .mp-b text{fill:#1B1E2B; font-weight:800; text-anchor:middle; dominant-baseline:central;}
-.mp-lbl{pointer-events:none; text-anchor:middle; dominant-baseline:central; fill:var(--ink); font-weight:700; paint-order:stroke; stroke:var(--surface); stroke-width:3px; stroke-linejoin:round; opacity:.9;}
+.mp-lbl{pointer-events:none; text-anchor:middle; dominant-baseline:central; fill:#222; font-weight:700; paint-order:stroke; stroke:#fff; stroke-width:3px; stroke-linejoin:round; opacity:.95;}
 .mp-lbl.tl{font-weight:600;}
+.mp-tb{font-weight:500; opacity:.8;}
 .mp-zoom{position:absolute; right:6px; top:6px; display:flex; flex-direction:column; gap:6px;}
 .mp-zoom button{width:36px; height:36px; border:none; border-radius:10px; background:var(--surface2); color:var(--ink); font-size:18px; font-weight:800; cursor:pointer; box-shadow:var(--shadow);}
 .mp-grp{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:10px; overflow:hidden;}
@@ -470,8 +470,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.08-4';
-const APP_BUILT = '2026-11-08T11:10:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.08-5';
+const APP_BUILT = '2026-11-08T11:20:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4279,7 +4279,7 @@ function renderGujMap(){
   const ring = ringHTML('mapRing', [['all',`બધા (${all.length})`], ...cats.map(c=>[c.id, `${esc(c.icon||'📌')} ${esc(c.name)} (${all.filter(p=>p.catId===c.id).length})`])], mapCat, "mapCat='%K'; renderMain();");
   /* જિલ્લા */
   const paths = GJ_MAP.d.map(d=>{ const n=cnt[d.k]||0; const sel = mapDist===d.k; const hasTal = sel && mapTalList(d.k).length;
-    return {sel, html:`<path class="${n?'has':''} ${sel?'sel':''}" ${hasTal?'style="pointer-events:none;"':''} ${n&&!sel?`style="fill-opacity:${(0.25+0.4*n/mx).toFixed(2)}"`:''} d="${d.d}" onclick="mapPickDist('${d.k}')"/>`}; });
+    return {sel, html:`<path class="${n?'has':''} ${sel?'sel':''}" ${hasTal?'style="pointer-events:none;"':''} d="${d.d}" onclick="mapPickDist('${d.k}')"/>`}; });
   const dPaths = paths.filter(p=>!p.sel).map(p=>p.html).join('') + paths.filter(p=>p.sel).map(p=>p.html).join('');
   /* તાલુકા (જિલ્લો પસંદ હોય ત્યારે) */
   let talPaths='', talLbls='';
@@ -4299,14 +4299,14 @@ function renderGujMap(){
   const manual = mapSort==='manual' && !q;
   const sibs = p=>list.filter(x=>mapGroupKey(x)===mapGroupKey(p));
   const leaf = !!q || !!mapTal;
-  const reorder = manual && mapReorder && !!mapTal;
+  const reorder = manual && mapReorder && !!mapDist;
   const card = p=>{ const sb = reorder ? sibs(p) : []; const i = sb.indexOf(p);
-    const pills = `${(!mapTal&&p.taluka)?`<span class="mp-pill">${esc(p.taluka)}</span>`:''}${(mapCat==='all'&&p.catId)?`<span class="mp-pill mp-pill2">${esc(mapCatName(p.catId))}</span>`:''}${(!mapDist)?`<span class="mp-pill mp-pill3">${esc(mapDistName(p.district))}</span>`:''}`;
+    const pills = `${(!mapTal&&p.taluka&&q)?`<span class="mp-pill">${esc(p.taluka)}</span>`:''}${(mapCat==='all'&&p.catId)?`<span class="mp-pill mp-pill2">${esc(mapCatName(p.catId))}</span>`:''}${(!mapDist)?`<span class="mp-pill mp-pill3">${esc(mapDistName(p.district))}</span>`:''}`;
     return `<div class="mp-it">
-      <div class="mp-it-h"><div style="flex:1;min-width:0;"><div class="mp-it-n">${esc(p.name)}</div>${pills?`<div class="mp-it-s">${pills}</div>`:''}</div>
+      <div class="mp-it-h"><div style="flex:1;min-width:0;"><div class="mp-it-n">${esc(p.name)}${(!mapTal&&p.taluka&&!q)?` <span class="mp-tb">(${esc(p.taluka)})</span>`:''}</div>${pills?`<div class="mp-it-s">${pills}</div>`:''}</div>
       ${reorder&&sb.length>1?`<div style="display:flex;gap:4px;flex-shrink:0;"><button class="btn btn-sm btn-secondary" style="padding:4px 10px;" ${i<=0?'disabled':''} onclick="mapMovePlace('${p.id}',-1)">▲</button><button class="btn btn-sm btn-secondary" style="padding:4px 10px;" ${i>=sb.length-1?'disabled':''} onclick="mapMovePlace('${p.id}',1)">▼</button></div>`:''}
       <button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openMapPlaceForm('${p.id}')">✎</button></div>
-      ${p.note?`<details class="mp-nd"><summary>વિગત વાંચો</summary><div class="mp-note">${esc(p.note)}</div></details>`:''}</div>`; };
+      ${p.note?`<details class="mp-nd" ${mapDist?'open':''}><summary>વિગત વાંચો</summary><div class="mp-note">${esc(p.note)}</div></details>`:''}</div>`; };
   const ord = arr=> mapSort==='name' ? arr.slice().sort((a,b)=>mapByName(a.name,b.name)) : arr;
   const navRow = (js, title, n)=>`<div class="mp-nav" onclick="${js}"><span class="mp-grp-t">${title}</span><span class="mp-grp-c">${n}</span><span class="mp-grp-a">›</span></div>`;
   let body = '';
@@ -4319,10 +4319,9 @@ function renderGujMap(){
     const g = {}; list.forEach(p=>{ g[p.district]=(g[p.district]||0)+1; });
     body = `<div class="mp-box">${Object.keys(g).sort((a,b)=>mapByName(mapDistName(a),mapDistName(b))).map(k=>navRow(`mapGoDist('${k}')`, `📍 ${esc(mapDistName(k))}`, g[k])).join('')}</div>`;
   } else if(!mapTal){
-    const g = {}; list.forEach(p=>{ const t=(p.taluka||'').trim()||'__none'; g[t]=(g[t]||0)+1; });
-    body = `<div class="mp-box">${Object.keys(g).sort((a,b)=>a==='__none'?1:b==='__none'?-1:mapByName(a,b)).map(k=>navRow(`mapGoTal(decodeURIComponent('${encodeURIComponent(k)}'))`, esc(k==='__none'?'તાલુકો નક્કી નથી':k), g[k])).join('')}</div>`;
+    body = `<div class="mp-gh">📍 ${esc(mapDistName(mapDist))} · ${list.length} સ્થળ</div><div class="mp-box">${ord(list).map(card).join('')}</div>`;
   } else { body = `<div class="mp-box">${ord(list).map(card).join('')}</div>`; }
-  const ctl = (mapTal && !q && mapSort==='manual' && list.length>1) ? `<div style="display:flex;margin-bottom:8px;"><button class="btn btn-sm ${mapReorder?'btn-primary':'btn-secondary'}" style="margin-left:auto;" onclick="mapReorder=!mapReorder; renderMain();">↕ ક્રમ બદલો</button></div>` : '';
+  const ctl = (mapDist && !q && mapSort==='manual' && list.length>1) ? `<div style="display:flex;margin-bottom:8px;"><button class="btn btn-sm ${mapReorder?'btn-primary':'btn-secondary'}" style="margin-left:auto;" onclick="mapReorder=!mapReorder; renderMain();">↕ ક્રમ બદલો</button></div>` : '';
   const v = mapCur();
   return pageTopHTML('', `<button class="btn btn-sm btn-secondary" onclick="openMapCatManage()">⚙ વિભાગ</button><button class="btn btn-sm btn-secondary" onclick="mapPrintPdf()">📄 PDF</button><button class="btn btn-sm btn-secondary" onclick="openMapBulk()">📥 ઘણા</button><button class="btn btn-sm btn-primary" onclick="openMapPlaceForm(null)">+ સ્થળ</button>`, '') + ring +
     `<div class="card" style="padding:12px;">${selLine}
