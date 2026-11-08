@@ -470,8 +470,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.08-3';
-const APP_BUILT = '2026-11-08T11:03:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.08-4';
+const APP_BUILT = '2026-11-08T11:10:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4563,19 +4563,19 @@ function mpPage(list, title, pid){
   GJ_MAP.d.forEach((d,i)=>{
     const has = !!(byD[d.k]||[]).length;
     const pth = `<path d="${d.d}" fill="${has?'#fde9a8':'#fff'}" stroke="#555" stroke-width="0.7" stroke-linejoin="round"/>`;
-    fills += has ? `<a href="#${pid}-${i}" xlink:href="#${pid}-${i}">${pth}</a>` : pth;
+    fills += `<!--P${i}-->${pth}<!--/P${i}-->`;
     if(!has){ const bb=mapBBox(d.d,d.k); const f=5.2; if(mpMeasure(d.n)*f < (bb.x1-bb.x0)*0.8) txt += `<text x="${d.x}" y="${d.y}" font-size="${f}" fill="#999" text-anchor="middle" dominant-baseline="middle">${esc(d.n)}</text>`; return; }
     let r = mpFit(d, mk(d,true)) || mpFit(d, mk(d,false)) || mpFit(d, mk(d,false), 5.0);
-    if(!r){ over.push(d); const bb=mapBBox(d.d,d.k); const f=MP_MIN; const t = `${d.n} (${byD[d.k].length}) ↓`; txt += `<text x="${d.x}" y="${d.y}" font-size="${f}" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#a00">${esc(d.n)} ↓</text>`; return; }
+    if(!r){ over.push(d); const ov_i=i; const bb=mapBBox(d.d,d.k); const f=MP_MIN; const t = `${d.n} (${byD[d.k].length}) ↓`; txt += `<text x="${d.x}" y="${d.y}" font-size="${f}" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#a00">${esc(d.n)} ↓</text>`; return; }
     txt += r.lines.map((l,k)=>`<text x="${(r.x).toFixed(1)}" y="${(r.y+(k+0.5)*r.lh).toFixed(1)}" font-size="${r.f.toFixed(2)}" ${l.head?'font-weight="800" fill="#7a1f00"':'fill="#000"'} dominant-baseline="middle" xml:space="preserve" style="white-space:pre">${esc(l.t).replace(/ /g,' ')}</text>`).join('');
   });
-  const svg = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${GJ_MAP.w} ${GJ_MAP.h}" style="width:100%;height:auto;max-height:150mm;display:block;margin:0 auto;">${fills}${txt}</svg>`;
-  let more='';
-  if(over.length){ more = `<div class="pmp-h">આ જિલ્લાની યાદી નકશામાં સમાતી નથી (↓)</div>` + `<div class="pqs">`+over.map(d=>`<div class="pq"><a href="#${pid}-${GJ_MAP.d.indexOf(d)}"><b>${esc(d.n)}</b></a>: ${esc(mk(d,true).join(' • '))}</div>`).join('')+`</div>`; }
-  const det = GJ_MAP.d.map((d,i)=>{ const arr=(byD[d.k]||[]); if(!arr.length) return '';
+  over.forEach(d=>{ const i=GJ_MAP.d.indexOf(d); fills = fills.replace(`<!--P${i}-->`,`<a href="#${pid}-${i}" xlink:href="#${pid}-${i}">`).replace(`<!--/P${i}-->`,'</a>'); });
+  fills = fills.replace(/<!--\/?P\d+-->/g,'');
+  const svg = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${GJ_MAP.w} ${GJ_MAP.h}" style="width:100%;height:auto;max-height:175mm;display:block;margin:0 auto;">${fills}${txt}</svg>`;
+  const det = over.map(d=>{ const i=GJ_MAP.d.indexOf(d); const arr=(byD[d.k]||[]);
     const ord = mapSort==='name'?arr.slice().sort((a,b)=>mapByName(a.name,b.name)):arr;
     return `<div class="pq pdet" id="${pid}-${i}"><div class="pmp-h" style="margin-top:0;">📍 ${esc(d.n)} (${arr.length}) <a class="pback" href="#${pid}">← નકશા પર પાછા</a></div>${ord.map(p=>`<div class="pq"><b>${esc(p.name)}</b>${p.taluka?` <span>— ${esc(p.taluka)}</span>`:''}${p.note?`<div class="pmp-note">${esc(p.note)}</div>`:''}</div>`).join('')}</div>`; }).join('');
-  return `<div class="psec pmapPage" id="${pid}"><div class="ph"><h1>${esc(title)}</h1><div>કુલ સ્થળ: ${list.length} · જિલ્લા પર ટેપ કરો → વિગત</div></div>${svg}${more}</div><div class="psec pnew pdetwrap"><div class="ph"><h1>${esc(title)} — જિલ્લા મુજબ વિગત</h1></div><div class="pqs">${det}</div></div>`;
+  return `<div class="psec pmapPage" id="${pid}"><div class="ph"><h1>${esc(title)}</h1><div>કુલ સ્થળ: ${list.length}${over.length?' · લાલ ↓ વાળા જિલ્લા પર ટેપ કરો → વિગત':''}</div></div>${svg}</div>${over.length?`<div class="psec pnew pdetwrap"><div class="ph"><h1>${esc(title)} — નકશામાં ન સમાયેલી વિગત</h1></div><div class="pqs">${det}</div></div>`:''}`;
 }
 function mapPrintPdf(){
   if(mapDist || mapTal || (mapQuery||'').trim()){ mapPrintList(); return; }
