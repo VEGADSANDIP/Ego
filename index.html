@@ -402,7 +402,10 @@ input:checked + .slider:before{transform:translateX(19px);}
 .mq-det{border-top:1px solid var(--border);}
 .mq-det>summary::-webkit-details-marker{display:none;}
 .mq-rhead{font-weight:800; font-size:15px; margin:14px 2px 8px; padding:8px 10px; border-radius:10px; background:color-mix(in srgb, var(--primary) 12%, transparent);}
+@page mapland{size:A4 landscape; margin:8mm;}
 @media print{
+  #printArea .pmapPage{page:mapland; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  #printArea .pmapPage .ph{margin-bottom:4pt; padding-bottom:3pt;} #printArea .pmapPage .ph h1{font-size:15pt; margin:0;}
   body>*:not(#printArea){display:none !important;}
   html,body{background:#fff !important; height:auto !important; overflow:visible !important;}
   #printArea{display:block !important; color:#000; background:#fff; font-family:inherit; font-size:11.5pt; line-height:1.4;}
@@ -465,8 +468,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.08-1';
-const APP_BUILT = '2026-11-08T10:43:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.08-2';
+const APP_BUILT = '2026-11-08T10:54:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4492,7 +4495,7 @@ function deleteMapPlace(id){
   DB.mapPlaces = (DB.mapPlaces||[]).filter(p=>p.id!==id); save(); closeSheet(); mapRefresh();
 }
 /* ---- PDF ---- */
-function mapPrintPdf(){
+function mapPrintList(){
   const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
   const cn = mapCat==='all' ? 'બધા વિભાગ' : mapCatName(mapCat);
   const title = `${cn}${mapDist?' — '+mapDistName(mapDist):''}${mapTal?' › '+mapTal:''}`;
@@ -4501,6 +4504,80 @@ function mapPrintPdf(){
   const keys = Object.keys(g).sort(mapByName);
   const body = keys.map(k=>`${k?`<div class="pmp-h">${esc(k)} (${g[k].length})</div>`:''}${(mapSort==='name'?g[k].slice().sort((a,b)=>mapByName(a.name,b.name)):g[k]).map(item).join('')}`).join('');
   const html = `<div class="psec"><div class="ph"><h1>${esc(title)}</h1><div>કુલ સ્થળ: ${list.length}</div></div>${body}</div>`;
+  let pa = document.getElementById('printArea');
+  if(!pa){ pa = document.createElement('div'); pa.id='printArea'; document.body.appendChild(pa); }
+  pa.innerHTML = html; const oldTitle = document.title; document.title = title;
+  const done = ()=>{ document.title = oldTitle; pa.innerHTML=''; window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done); setTimeout(()=>window.print(), 150);
+}
+
+/* ---- નકશા-PDF: માહિતી જિલ્લાની અંદર જ, પડોશી જિલ્લામાં ક્રોસ ન થાય ---- */
+const MP_MIN = 6.2, MP_MAX = 12;
+let _mpCtx = null;
+function mpMeasure(txt){ if(!_mpCtx){ _mpCtx = document.createElement('canvas').getContext('2d'); _mpCtx.font = '100px '+(getComputedStyle(document.body).fontFamily||'sans-serif'); } return _mpCtx.measureText(txt).width/100; }
+function mpPoly(d){ const rings=[]; d.split('M').forEach(r=>{ const n=r.match(/-?\d+(?:\.\d+)?/g); if(!n||n.length<6) return; const pts=[]; for(let i=0;i+1<n.length;i+=2) pts.push([+n[i],+n[i+1]]); rings.push(pts); }); return rings; }
+function mpMask(d, bb){
+  const rings = mpPoly(d); const X0=Math.floor(bb.x0), Y0=Math.floor(bb.y0), W=Math.ceil(bb.x1-bb.x0)+1, H=Math.ceil(bb.y1-bb.y0)+1;
+  const sat = new Int32Array((W+1)*(H+1));
+  for(let y=0;y<H;y++){ let row=0; for(let x=0;x<W;x++){ const px=X0+x+0.5, py=Y0+y+0.5; let ins=false;
+      for(const r of rings){ for(let a=0,b=r.length-1;a<r.length;b=a++){ const [xi,yi]=r[a],[xj,yj]=r[b]; if(((yi>py)!==(yj>py)) && (px < (xj-xi)*(py-yi)/(yj-yi)+xi)) ins=!ins; } }
+      row += ins?0:1; sat[(y+1)*(W+1)+x+1] = sat[y*(W+1)+x+1] + row; } }
+  return {X0,Y0,W,H,sat};
+}
+function mpFree(m,x,y,w,h){ /* લંબચોરસ પૂરેપૂરો જિલ્લાની અંદર? */
+  const x0=Math.floor(x-m.X0), y0=Math.floor(y-m.Y0), x1=Math.ceil(x+w-m.X0), y1=Math.ceil(y+h-m.Y0);
+  if(x0<0||y0<0||x1>m.W||y1>m.H) return false; const S=m.W+1, a=m.sat;
+  return a[y1*S+x1]-a[y0*S+x1]-a[y1*S+x0]+a[y0*S+x0]===0;
+}
+function mpWrap(txt, f, W){
+  const words = txt.split(/\s+/); const lines=[]; let cur='';
+  words.forEach(w=>{ const t = cur?cur+' '+w:w; if(cur && mpMeasure(t)*f > W){ lines.push(cur); cur='  '+w; } else cur=t; });
+  if(cur) lines.push(cur); return lines.map(l=>({t:l, w:mpMeasure(l)*f}));
+}
+/* એક જિલ્લા માટે સૌથી મોટા અક્ષરો કે જેમાં બધું અંદર સમાય */
+function mpFit(dist, items, fmin){ fmin = fmin||MP_MIN;
+  const bb = mapBBox(dist.d, dist.k); const m = mpMask(dist.d, bb);
+  const bw = bb.x1-bb.x0;
+  for(let f=MP_MAX; f>=fmin-0.001; f-=0.4){
+    for(const wf of [1, 0.75, 0.55, 0.42]){
+      const W = bw*wf; let lines=[]; const head = mpWrap(dist.n, f, W); head.forEach(l=>l.head=true); lines=lines.concat(head);
+      items.forEach(t=>{ mpWrap('• '+t, f, W).forEach(l=>lines.push(l)); });
+      const lh = f*1.22, H = lines.length*lh; if(H > bb.y1-bb.y0) continue;
+      const tw = Math.max(...lines.map(l=>l.w)); let best=null, bd=1e9;
+      for(let y=bb.y0; y+H<=bb.y1; y+=1.5){
+        for(let x=bb.x0; x+tw<=bb.x1; x+=1.5){
+          if(!mpFree(m,x,y,tw,H)) continue; /* દરેક લાઇન પણ ચેક — બહાર ન નીકળે */
+          let ok=true; for(let i=0;i<lines.length&&ok;i++) ok = mpFree(m,x,y+i*lh,lines[i].w,lh);
+          if(!ok) continue; const dd=Math.hypot(x+tw/2-dist.x, y+H/2-dist.y); if(dd<bd){ bd=dd; best={x,y}; } } }
+      if(best) return {f, lh, x:best.x, y:best.y, lines};
+    }
+  }
+  return null;
+}
+function mpPage(list, title){
+  const byD = {}; list.forEach(p=>{ (byD[p.district]=byD[p.district]||[]).push(p); });
+  let clips='', fills='', txt='', over=[];
+  const mk = (d,withTal)=>{ const arr=(byD[d.k]||[]); const ord = mapSort==='name'?arr.slice().sort((a,b)=>mapByName(a.name,b.name)):arr; return ord.map(p=>withTal&&p.taluka?`${p.name} (${p.taluka})`:p.name); };
+  GJ_MAP.d.forEach((d,i)=>{
+    const has = !!(byD[d.k]||[]).length;
+    fills += `<path d="${d.d}" fill="${has?'#fde9a8':'#fff'}" stroke="#555" stroke-width="0.7" stroke-linejoin="round"/>`;
+    if(!has){ const bb=mapBBox(d.d,d.k); const f=5.2; if(mpMeasure(d.n)*f < (bb.x1-bb.x0)*0.8) txt += `<text x="${d.x}" y="${d.y}" font-size="${f}" fill="#999" text-anchor="middle" dominant-baseline="middle">${esc(d.n)}</text>`; return; }
+    let r = mpFit(d, mk(d,true)) || mpFit(d, mk(d,false)) || mpFit(d, mk(d,false), 5.0);
+    if(!r){ over.push(d); const bb=mapBBox(d.d,d.k); const f=MP_MIN; const t = `${d.n} (${byD[d.k].length}) ↓`; txt += `<text x="${d.x}" y="${d.y}" font-size="${f}" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#a00">${esc(d.n)} ↓</text>`; return; }
+    txt += r.lines.map((l,k)=>`<text x="${(r.x).toFixed(1)}" y="${(r.y+(k+0.5)*r.lh).toFixed(1)}" font-size="${r.f.toFixed(2)}" ${l.head?'font-weight="800" fill="#7a1f00"':'fill="#000"'} dominant-baseline="middle" xml:space="preserve" style="white-space:pre">${esc(l.t).replace(/ /g,' ')}</text>`).join('');
+  });
+  const svg = `<svg viewBox="0 0 ${GJ_MAP.w} ${GJ_MAP.h}" style="width:100%;height:auto;max-height:170mm;display:block;margin:0 auto;">${fills}${txt}</svg>`;
+  let more='';
+  if(over.length){ more = `<div class="pmp-h">આ જિલ્લાની યાદી નકશામાં સમાતી નથી (↓)</div>` + `<div class="pqs">`+over.map(d=>`<div class="pq"><b>${esc(d.n)}</b>: ${esc(mk(d,true).join(' • '))}</div>`).join('')+`</div>`; }
+  return `<div class="psec pmapPage"><div class="ph"><h1>${esc(title)}</h1><div>કુલ સ્થળ: ${list.length}</div></div>${svg}${more}</div>`;
+}
+function mapPrintPdf(){
+  if(mapDist || mapTal || (mapQuery||'').trim()){ mapPrintList(); return; }
+  const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
+  const cats = mapCat==='all' ? mapCatsOf().filter(c=>list.some(p=>p.catId===c.id)) : [mapCatsOf().find(c=>c.id===mapCat)].filter(Boolean);
+  const pages = cats.map(c=>mpPage(list.filter(p=>p.catId===c.id), `${c.icon||'📌'} ${c.name} — ગુજરાત`));
+  const html = pages.map((h,i)=>i?h.replace('class="psec pmapPage"','class="psec pmapPage pnew"'):h).join('');
+  const title = mapCat==='all' ? 'ગુજરાત નકશો' : (cats[0]?cats[0].name:'')+' — ગુજરાત';
   let pa = document.getElementById('printArea');
   if(!pa){ pa = document.createElement('div'); pa.id='printArea'; document.body.appendChild(pa); }
   pa.innerHTML = html; const oldTitle = document.title; document.title = title;
