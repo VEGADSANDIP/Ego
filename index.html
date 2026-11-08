@@ -405,6 +405,8 @@ input:checked + .slider:before{transform:translateX(19px);}
 @page mapland{size:A4 landscape; margin:8mm;}
 @media print{
   #printArea .pmapPage{page:mapland; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  #printArea .pback{font-size:9pt; font-weight:400; margin-left:8pt; color:#0645ad !important; text-decoration:underline;}
+  #printArea .pdetwrap{page:auto;}
   #printArea .pmapPage .ph{margin-bottom:4pt; padding-bottom:3pt;} #printArea .pmapPage .ph h1{font-size:15pt; margin:0;}
   body>*:not(#printArea){display:none !important;}
   html,body{background:#fff !important; height:auto !important; overflow:visible !important;}
@@ -468,8 +470,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.08-2';
-const APP_BUILT = '2026-11-08T10:54:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.08-3';
+const APP_BUILT = '2026-11-08T11:03:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4554,28 +4556,32 @@ function mpFit(dist, items, fmin){ fmin = fmin||MP_MIN;
   }
   return null;
 }
-function mpPage(list, title){
+function mpPage(list, title, pid){
   const byD = {}; list.forEach(p=>{ (byD[p.district]=byD[p.district]||[]).push(p); });
   let clips='', fills='', txt='', over=[];
   const mk = (d,withTal)=>{ const arr=(byD[d.k]||[]); const ord = mapSort==='name'?arr.slice().sort((a,b)=>mapByName(a.name,b.name)):arr; return ord.map(p=>withTal&&p.taluka?`${p.name} (${p.taluka})`:p.name); };
   GJ_MAP.d.forEach((d,i)=>{
     const has = !!(byD[d.k]||[]).length;
-    fills += `<path d="${d.d}" fill="${has?'#fde9a8':'#fff'}" stroke="#555" stroke-width="0.7" stroke-linejoin="round"/>`;
+    const pth = `<path d="${d.d}" fill="${has?'#fde9a8':'#fff'}" stroke="#555" stroke-width="0.7" stroke-linejoin="round"/>`;
+    fills += has ? `<a href="#${pid}-${i}" xlink:href="#${pid}-${i}">${pth}</a>` : pth;
     if(!has){ const bb=mapBBox(d.d,d.k); const f=5.2; if(mpMeasure(d.n)*f < (bb.x1-bb.x0)*0.8) txt += `<text x="${d.x}" y="${d.y}" font-size="${f}" fill="#999" text-anchor="middle" dominant-baseline="middle">${esc(d.n)}</text>`; return; }
     let r = mpFit(d, mk(d,true)) || mpFit(d, mk(d,false)) || mpFit(d, mk(d,false), 5.0);
     if(!r){ over.push(d); const bb=mapBBox(d.d,d.k); const f=MP_MIN; const t = `${d.n} (${byD[d.k].length}) ↓`; txt += `<text x="${d.x}" y="${d.y}" font-size="${f}" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#a00">${esc(d.n)} ↓</text>`; return; }
     txt += r.lines.map((l,k)=>`<text x="${(r.x).toFixed(1)}" y="${(r.y+(k+0.5)*r.lh).toFixed(1)}" font-size="${r.f.toFixed(2)}" ${l.head?'font-weight="800" fill="#7a1f00"':'fill="#000"'} dominant-baseline="middle" xml:space="preserve" style="white-space:pre">${esc(l.t).replace(/ /g,' ')}</text>`).join('');
   });
-  const svg = `<svg viewBox="0 0 ${GJ_MAP.w} ${GJ_MAP.h}" style="width:100%;height:auto;max-height:170mm;display:block;margin:0 auto;">${fills}${txt}</svg>`;
+  const svg = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${GJ_MAP.w} ${GJ_MAP.h}" style="width:100%;height:auto;max-height:150mm;display:block;margin:0 auto;">${fills}${txt}</svg>`;
   let more='';
-  if(over.length){ more = `<div class="pmp-h">આ જિલ્લાની યાદી નકશામાં સમાતી નથી (↓)</div>` + `<div class="pqs">`+over.map(d=>`<div class="pq"><b>${esc(d.n)}</b>: ${esc(mk(d,true).join(' • '))}</div>`).join('')+`</div>`; }
-  return `<div class="psec pmapPage"><div class="ph"><h1>${esc(title)}</h1><div>કુલ સ્થળ: ${list.length}</div></div>${svg}${more}</div>`;
+  if(over.length){ more = `<div class="pmp-h">આ જિલ્લાની યાદી નકશામાં સમાતી નથી (↓)</div>` + `<div class="pqs">`+over.map(d=>`<div class="pq"><a href="#${pid}-${GJ_MAP.d.indexOf(d)}"><b>${esc(d.n)}</b></a>: ${esc(mk(d,true).join(' • '))}</div>`).join('')+`</div>`; }
+  const det = GJ_MAP.d.map((d,i)=>{ const arr=(byD[d.k]||[]); if(!arr.length) return '';
+    const ord = mapSort==='name'?arr.slice().sort((a,b)=>mapByName(a.name,b.name)):arr;
+    return `<div class="pq pdet" id="${pid}-${i}"><div class="pmp-h" style="margin-top:0;">📍 ${esc(d.n)} (${arr.length}) <a class="pback" href="#${pid}">← નકશા પર પાછા</a></div>${ord.map(p=>`<div class="pq"><b>${esc(p.name)}</b>${p.taluka?` <span>— ${esc(p.taluka)}</span>`:''}${p.note?`<div class="pmp-note">${esc(p.note)}</div>`:''}</div>`).join('')}</div>`; }).join('');
+  return `<div class="psec pmapPage" id="${pid}"><div class="ph"><h1>${esc(title)}</h1><div>કુલ સ્થળ: ${list.length} · જિલ્લા પર ટેપ કરો → વિગત</div></div>${svg}${more}</div><div class="psec pnew pdetwrap"><div class="ph"><h1>${esc(title)} — જિલ્લા મુજબ વિગત</h1></div><div class="pqs">${det}</div></div>`;
 }
 function mapPrintPdf(){
   if(mapDist || mapTal || (mapQuery||'').trim()){ mapPrintList(); return; }
   const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
   const cats = mapCat==='all' ? mapCatsOf().filter(c=>list.some(p=>p.catId===c.id)) : [mapCatsOf().find(c=>c.id===mapCat)].filter(Boolean);
-  const pages = cats.map(c=>mpPage(list.filter(p=>p.catId===c.id), `${c.icon||'📌'} ${c.name} — ગુજરાત`));
+  const pages = cats.map((c,ci)=>mpPage(list.filter(p=>p.catId===c.id), `${c.icon||'📌'} ${c.name} — ગુજરાત`, 'mp'+ci));
   const html = pages.map((h,i)=>i?h.replace('class="psec pmapPage"','class="psec pmapPage pnew"'):h).join('');
   const title = mapCat==='all' ? 'ગુજરાત નકશો' : (cats[0]?cats[0].name:'')+' — ગુજરાત';
   let pa = document.getElementById('printArea');
