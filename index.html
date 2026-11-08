@@ -465,8 +465,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.07-4';
-const APP_BUILT = '2026-11-07T18:44:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.08-1';
+const APP_BUILT = '2026-11-08T10:43:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4258,9 +4258,9 @@ function mapCatName(id){ const c=(DB.mapCats||[]).find(x=>x.id===id); return c ?
 function mapByName(a,b){ return String(a).localeCompare(String(b),'gu'); }
 function mapGroupKey(p){ return mapTal ? '_' : (!mapDist ? p.district : '_'); }
 function mapVisible(){
-  const q = (mapQuery||'').trim().toLowerCase();
+  const q = mapNorm(mapQuery||'');
   let list = mapPlacesAll().filter(p=>(mapCat==='all' || p.catId===mapCat) && (!mapDist || p.district===mapDist) && (!mapTal || (mapTal==='__none' ? !(p.taluka||'').trim() : (p.taluka||'').trim()===mapTal)));
-  if(q) list = list.filter(p=>[p.name,p.taluka,p.note,mapDistName(p.district)].join(' ').toLowerCase().includes(q));
+  if(q) list = list.filter(p=>mapNorm([p.name,p.taluka,p.note,mapDistName(p.district),p.district].join(' ')).includes(q));
   return list;
 }
 function renderGujMap(){
@@ -4324,13 +4324,22 @@ function renderGujMap(){
       <div style="position:relative;"><svg id="mpSvg" class="mp-svg" viewBox="${v.x} ${v.y} ${v.w} ${v.h}">${dPaths}${talPaths}<g>${dLbls}${talLbls}</g></svg>
       <div class="mp-zoom"><button onclick="mapZoomBtn(1.6)">＋</button><button onclick="mapZoomBtn(1/1.6)">－</button><button onclick="mapZoomReset()">⟲</button></div></div>
       </div>
-     <div style="display:flex;gap:8px;margin-bottom:10px;"><input type="text" id="mapSearch" value="${esc(mapQuery)}" placeholder="🔍 સ્થળ, તાલુકો કે વિગત શોધો..." oninput="mapQuery=this.value; mapSearchRender()" style="flex:1;min-width:0;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);font-size:14px;">
+     <div style="display:flex;gap:8px;margin-bottom:10px;"><input type="text" id="mapSearch" value="${esc(mapQuery)}" placeholder="🔍 સ્થળ, તાલુકો કે વિગત શોધો..." oninput="mapQuery=this.value; if(!this.__comp) mapSearchRender()" oncompositionstart="this.__comp=1" oncompositionend="this.__comp=0; mapQuery=this.value; mapSearchRender()" style="flex:1;min-width:0;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);font-size:14px;">
      <select onchange="mapSort=this.value; renderMain();" style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);font-size:13px;"><option value="manual" ${mapSort==='manual'?'selected':''}>મારો ક્રમ</option><option value="name" ${mapSort==='name'?'selected':''}>નામ A→Z</option></select></div>
-     ${ctl}<div id="mapList">${body}</div>`;
+     <div id="mapList">${ctl}${body}</div>`;
 }
 function mapSearchRender(){
-  const pos = document.getElementById('mapSearch').selectionStart; const m = document.getElementById('main'); const st = m.scrollTop;
-  renderMain(); const el = document.getElementById('mapSearch'); if(el){ el.focus(); try{ el.setSelectionRange(pos,pos); }catch(e){} } m.scrollTop = st;
+  const el = document.getElementById('mapList'); if(!el) return;
+  const t = document.createElement('div'); t.innerHTML = renderGujMap();
+  const n = t.querySelector('#mapList'); if(n) el.innerHTML = n.innerHTML;
+}
+/* ફક્ત યાદી/નકશો ફરી દોરો, સ્ક્રોલ અને ખુલ્લી શીટ જળવાય */
+function mapRefresh(){
+  const m = document.getElementById('main'); const st = m.scrollTop;
+  const q = document.getElementById('mapSearch'); const had = q && document.activeElement===q; const pos = q ? q.selectionStart : 0;
+  renderMain(); m.scrollTop = st;
+  [30,120].forEach(ms=>setTimeout(()=>{ const mm=document.getElementById('main'); if(mm && currentTab==='map' && Math.abs(mm.scrollTop-st)>1) mm.scrollTop=st; },ms));
+  if(had){ const e=document.getElementById('mapSearch'); if(e){ e.focus(); try{ e.setSelectionRange(pos,pos); }catch(x){} } }
 }
 /* ---- ઝૂમ / ખસેડવું ---- */
 function mapApplyView(){
@@ -4403,18 +4412,23 @@ function mapMovePlace(id, dir){
   const sb = mapVisible().filter(x=>mapGroupKey(x)===mapGroupKey(p)); const i = sb.indexOf(p), j = i+dir;
   if(i<0 || j<0 || j>=sb.length) return;
   const arr = DB.mapPlaces, a = arr.indexOf(p), b = arr.indexOf(sb[j]); [arr[a], arr[b]] = [arr[b], arr[a]];
-  save(); const st=document.getElementById('main').scrollTop; renderMain(); document.getElementById('main').scrollTop = st;
+  save(); mapRefresh();
 }
 function mapMoveCat(id, dir){
   const e = getActiveExam(); const cs = mapCatsOf(); const i = cs.findIndex(c=>c.id===id), j = i+dir; if(i<0||j<0||j>=cs.length) return;
-  const arr = DB.mapCats, a = arr.indexOf(cs[i]), b = arr.indexOf(cs[j]); [arr[a], arr[b]] = [arr[b], arr[a]]; save(); openMapCatManage(); renderMain();
+  const arr = DB.mapCats, a = arr.indexOf(cs[i]), b = arr.indexOf(cs[j]); [arr[a], arr[b]] = [arr[b], arr[a]]; save(); mapSheetRefresh(); mapRefresh();
+}
+let mapFromManage=false;
+function mapSheetRefresh(){
+  const sc = document.getElementById('sheetContent'); const pe = sc.parentElement; const a = sc.scrollTop, b = pe ? pe.scrollTop : 0;
+  openMapCatManage(); sc.scrollTop = a; if(pe) pe.scrollTop = b;
 }
 function openMapCatManage(){
   const cats = mapCatsOf();
   openSheet(`<h3>વિભાગો</h3>
-    ${cats.length ? cats.map((c,i)=>`<div class="item cursor-default" style="gap:8px;"><span style="flex:1;min-width:0;" onclick="closeSheet(); openMapCatForm('${c.id}')"><b>${esc(c.icon||'📌')} ${esc(c.name)}</b><div class="ink-dim fs-12">${(DB.mapPlaces||[]).filter(p=>p.catId===c.id).length} સ્થળ · ✎ એડિટ</div></span>
+    ${cats.length ? cats.map((c,i)=>`<div class="item cursor-default" style="gap:8px;"><span style="flex:1;min-width:0;" onclick="mapFromManage=true; openMapCatForm('${c.id}')"><b>${esc(c.icon||'📌')} ${esc(c.name)}</b><div class="ink-dim fs-12">${(DB.mapPlaces||[]).filter(p=>p.catId===c.id).length} સ્થળ · ✎ એડિટ</div></span>
       <button class="btn btn-sm btn-secondary" ${i===0?'disabled':''} onclick="mapMoveCat('${c.id}',-1)">▲</button><button class="btn btn-sm btn-secondary" ${i===cats.length-1?'disabled':''} onclick="mapMoveCat('${c.id}',1)">▼</button></div>`).join('') : '<div class="ink-dim" style="padding:10px 0;">હજી કોઈ વિભાગ નથી (જેમ કે મહેલ, કિલ્લો, મંદિર)</div>'}
-    <div class="sheet-actions" style="margin-top:12px;"><button class="btn btn-primary btn-block" onclick="closeSheet(); openMapCatForm(null)">+ નવો વિભાગ</button></div>`);
+    <div class="sheet-actions" style="margin-top:12px;"><button class="btn btn-primary btn-block" onclick="mapFromManage=true; openMapCatForm(null)">+ નવો વિભાગ</button></div>`);
 }
 function openMapCatForm(id){
   const c = id ? (DB.mapCats||[]).find(x=>x.id===id) : null;
@@ -4430,13 +4444,13 @@ function saveMapCat(id){
   if(mapCatsOf().find(c=>c.id!==id && c.name.trim().toLowerCase()===name.toLowerCase())){ toast('આ નામનો વિભાગ પહેલેથી છે','error'); return; }
   if(id){ const c=DB.mapCats.find(x=>x.id===id); if(c){ c.name=name; c.icon=icon; } }
   else { const c={id:uid(),examId:ex.id,name,icon}; (DB.mapCats=DB.mapCats||[]).push(c); mapCat=c.id; }
-  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+  save(); closeSheet(); mapRefresh(); toast('સેવ થયું'); if(mapFromManage){ mapFromManage=false; openMapCatManage(); }
 }
 function deleteMapCat(id){
   const n = (DB.mapPlaces||[]).filter(p=>p.catId===id).length;
   if(!confirm(n ? `આ વિભાગના ${n} સ્થળ પણ ડિલીટ થશે. ચાલુ રાખવું છે?` : 'આ વિભાગ ડિલીટ કરવો છે?')) return;
   DB.mapPlaces = (DB.mapPlaces||[]).filter(p=>p.catId!==id); DB.mapCats = (DB.mapCats||[]).filter(c=>c.id!==id);
-  if(mapCat===id) mapCat='all'; save(); closeSheet(); renderMain();
+  if(mapCat===id) mapCat='all'; save(); closeSheet(); mapRefresh(); if(mapFromManage){ mapFromManage=false; openMapCatManage(); }
 }
 /* ---- સ્થળ ફોર્મ (જિલ્લો પસંદ કરતાં જ તાલુકાની યાદી આવે) ---- */
 function mapTalFill(distKey, cur){
@@ -4471,11 +4485,11 @@ function saveMapPlace(id){
   const ex = getActiveExam(); if(!ex) return;
   if(id){ const p=DB.mapPlaces.find(x=>x.id===id); if(p) Object.assign(p,{name,catId,district,taluka,note}); }
   else (DB.mapPlaces=DB.mapPlaces||[]).push({id:uid(),examId:ex.id,catId,name,district,taluka,note});
-  save(); closeSheet(); renderMain(); toast('સેવ થયું');
+  save(); closeSheet(); mapRefresh(); toast('સેવ થયું');
 }
 function deleteMapPlace(id){
   if(!confirm('આ સ્થળ ડિલીટ કરવું છે?')) return;
-  DB.mapPlaces = (DB.mapPlaces||[]).filter(p=>p.id!==id); save(); closeSheet(); renderMain();
+  DB.mapPlaces = (DB.mapPlaces||[]).filter(p=>p.id!==id); save(); closeSheet(); mapRefresh();
 }
 /* ---- PDF ---- */
 function mapPrintPdf(){
