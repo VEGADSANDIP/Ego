@@ -479,8 +479,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.11-3';
-const APP_BUILT = '2026-11-11T15:01:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.11-4';
+const APP_BUILT = '2026-11-11T16:13:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4866,7 +4866,7 @@ function mapDownloadHtml(){
 <style>
 *{box-sizing:border-box} body{margin:0;font-family:${fam};background:#fff;color:#111}
 h1{font-size:18px;margin:10px 12px 2px} .sub{font-size:12px;color:#555;margin:0 12px 8px}
-#wrap{position:relative;width:100%;overflow:hidden;touch-action:manipulation}
+#wrap{position:relative;width:100%;touch-action:manipulation} html,body{overflow-x:hidden}
 svg{display:block;width:100%;height:auto} path{fill:#fff;stroke:#555;stroke-width:.7;stroke-linejoin:round} path.has{fill:#fde9a8;cursor:pointer} path.on{fill:#f59e0b;stroke:#c2410c;stroke-width:1.6}
 text{pointer-events:none;dominant-baseline:middle;font-family:${fam}} text.h{font-weight:800;fill:#7a1f00} text.t{fill:#000} text.e{fill:#999;text-anchor:middle} text.o{fill:#a00;font-weight:800;text-anchor:middle}
 #pop{position:absolute;display:none;background:#fffaf0;border:2px solid #c2410c;border-radius:12px;padding:10px 12px;box-shadow:0 4px 18px rgba(0,0,0,.3);overflow:auto;font-size:clamp(13px,3.4vw,17px);z-index:5}
@@ -4879,13 +4879,22 @@ text{pointer-events:none;dominant-baseline:middle;font-family:${fam}} text.h{fon
 <script>
 const D=${data}; const wrap=document.getElementById('wrap'),svg=document.getElementById('m'),pop=document.getElementById('pop'),ln=document.getElementById('ln'),L=document.getElementById('l'),dot=document.getElementById('dot'); let cur=-1;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function closePop(){ cur=-1; pop.style.display='none'; ln.setAttribute('width',0); ln.setAttribute('height',0); document.querySelectorAll('path.on').forEach(p=>p.classList.remove('on')); }
-function place(){ if(cur<0) return; const r=D.R[cur]; const sw=svg.getBoundingClientRect(), ww=wrap.getBoundingClientRect(); const k=sw.width/D.w; const cx=r.x*k, cy=r.y*k + (sw.top-ww.top);
-  const maxW=Math.min(ww.width*0.62,360); pop.style.width=maxW+'px'; pop.style.maxHeight=(ww.height-8)+'px'; pop.style.display='block';
-  const ph=pop.offsetHeight; const right = cx < ww.width*0.5; let left = right ? Math.min(cx+ww.width*0.06, ww.width-maxW-4) : Math.max(cx-ww.width*0.06-maxW, 4);
-  let top = Math.max(4, Math.min(cy-ph/2, ww.height-ph-4)); pop.style.left=left+'px'; pop.style.top=top+'px';
-  const ex = right ? left : left+maxW; const ey = Math.max(top+14, Math.min(cy, top+ph-14));
-  ln.setAttribute('width',ww.width); ln.setAttribute('height',ww.height); L.setAttribute('x1',cx); L.setAttribute('y1',cy); L.setAttribute('x2',ex); L.setAttribute('y2',ey); dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); }
+function closePop(){ cur=-1; pop.style.display='none'; wrap.style.minHeight=''; ln.setAttribute('width',0); ln.setAttribute('height',0); document.querySelectorAll('path.on').forEach(p=>p.classList.remove('on')); }
+function place(){ if(cur<0) return; const r=D.R[cur]; const el=svg.querySelector('path[data-i="'+cur+'"]'); const ww=wrap.getBoundingClientRect(), b=el.getBoundingClientRect(), sw=svg.getBoundingClientRect();
+  const bl=b.left-ww.left, br=b.right-ww.left, bt=b.top-ww.top, bb=b.bottom-ww.top, g=12, k=sw.width/D.w;
+  const px=r.x*k, py=r.y*k+(sw.top-ww.top);
+  const spR=ww.width-br-g, spL=bl-g; let mode, W;
+  if(Math.max(spR,spL)>=190){ mode = spR>=spL?'R':'L'; W=Math.min(360,(mode==='R'?spR:spL)-4); }
+  else { mode = (ww.height-bb)>=bt ? 'B':'T'; W=Math.min(ww.width-8,420); }
+  pop.style.width=W+'px'; pop.style.maxHeight=(mode==='R'||mode==='L' ? Math.max(ww.height-8,260) : Math.round(innerHeight*0.6))+'px'; pop.style.display='block';
+  const ph=pop.offsetHeight; let left, top;
+  if(mode==='R'){ left=br+g; top=(bt+bb)/2-ph/2; } else if(mode==='L'){ left=bl-g-W; top=(bt+bb)/2-ph/2; }
+  else { left=Math.min(Math.max((bl+br)/2-W/2,4),ww.width-W-4); top = mode==='B' ? bb+g : Math.max(4,bt-g-ph); }
+  if(mode==='R'||mode==='L') top=Math.max(4,Math.min(top,Math.max(4,ww.height-ph-4)));
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+  let ex,ey; if(mode==='R'){ ex=left; ey=Math.max(top+16,Math.min(py,top+ph-16)); } else if(mode==='L'){ ex=left+W; ey=Math.max(top+16,Math.min(py,top+ph-16)); } else { ex=Math.max(left+16,Math.min(px,left+W-16)); ey= mode==='B' ? top : top+ph; }
+  ln.setAttribute('width',ww.width); ln.setAttribute('height',Math.max(ww.height,top+ph+10)); L.setAttribute('x1',px); L.setAttribute('y1',py); L.setAttribute('x2',ex); L.setAttribute('y2',ey); dot.setAttribute('cx',px); dot.setAttribute('cy',py);
+  const need=top+ph+20; wrap.style.minHeight=Math.max(ww.height,need)+'px'; }
 function openPop(i){ const r=D.R[i]; cur=i; document.querySelectorAll('path.on').forEach(p=>p.classList.remove('on')); svg.querySelector('path[data-i="'+i+'"]').classList.add('on');
   pop.innerHTML='<button class="x" type="button" onclick="closePop()">✕</button><h2>📍 '+esc(r.n)+' ('+r.it.length+')</h2>'+r.it.map(p=>'<div class="i"><b>• '+esc(p.n)+'</b>'+(p.t?' <span>('+esc(p.t)+')</span>':'')+(p.o?'<div class="o">'+esc(p.o)+'</div>':'')+'</div>').join(''); place(); }
 svg.addEventListener('click',e=>{ const p=e.target.closest('path[data-i]'); if(!p){ closePop(); return; } const i=+p.dataset.i; if(!D.R[i]){ closePop(); return; } if(i===cur) closePop(); else openPop(i); });
