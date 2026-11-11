@@ -175,7 +175,15 @@ a{color:inherit;}
 .mp-nav{display:flex; align-items:center; gap:10px; padding:15px 16px; cursor:pointer; font-weight:800; font-size:16px; border-bottom:1px solid var(--border);} .mp-nav:last-child{border-bottom:none;} .mp-nav:active{background:var(--surface2);}
 .mp-nav .mp-grp-a{font-size:20px; line-height:1;}
 .mp-crumb{display:flex; align-items:center; gap:10px; margin-bottom:8px;} .mp-crumb-t{flex:1; min-width:0; font-size:14px; color:var(--ink-dim);} .mp-crumb-t span{cursor:pointer; color:var(--primary); font-weight:700;} .mp-crumb-t b{color:var(--ink);}
-.mp-gh{font-weight:800; font-size:13px; color:var(--ink-dim); margin:14px 2px 6px;}
+.mp-gh{font-weight:800; font-size:15px; color:var(--ink); margin:16px 2px 8px; padding-left:10px; border-left:4px solid var(--primary);}
+.mp-subring .ring{background:transparent; border:1px solid var(--border); margin:-4px 0 12px;} .mp-subring .ring-track button{font-size:13.5px !important; padding-top:6px !important; padding-bottom:6px !important;}
+.mp-crumb-t span{padding:3px 11px; border-radius:999px; background:color-mix(in srgb, var(--primary) 14%, transparent); font-size:13px;} .mp-crumb-t b{font-size:15px;}
+.mp-it{padding:14px 16px;} .mp-nd .mp-note{border-left:3px solid var(--primary); border-radius:0 10px 10px 0;}
+.mp-nav{padding:16px 18px;} .mp-nav .mp-grp-c{font-size:13px; padding:3px 12px;}
+.mc-main{background:var(--surface2); border-radius:14px; padding:10px; margin-bottom:12px;} .mc-h,.mc-k{display:flex; align-items:center; gap:8px;} .mc-t{flex:1; min-width:0; cursor:pointer;}
+.mc-n{font-weight:800; font-size:16px;} .mc-kn{font-weight:700; font-size:15px;} .mc-s{font-size:12px; color:var(--ink-dim); margin-top:2px;} .mc-mv{display:flex; gap:4px;}
+.mc-kids{margin:8px 0 6px 10px; padding-left:10px; border-left:3px solid var(--border);} .mc-k{padding:8px 0; border-bottom:1px solid var(--border);} .mc-k:last-child{border-bottom:none;}
+.mc-add{width:100%; margin-top:8px; padding:10px; border:1.5px dashed var(--border); border-radius:10px; background:transparent; color:var(--primary); font-weight:700; font-size:13.5px; cursor:pointer;}
 .mp-note{white-space:pre-wrap; line-height:1.65; font-size:14px;}
 .seg{display:flex; background:var(--surface2); border-radius:12px; padding:4px; gap:4px; margin-bottom:14px;}
 .seg button{flex:1; border:none; background:transparent; color:var(--ink-dim); padding:10px 6px; border-radius:9px; font-weight:700; font-size:13.5px; font-family:inherit;}
@@ -471,8 +479,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.11-1';
-const APP_BUILT = '2026-11-11T14:36:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.11-2';
+const APP_BUILT = '2026-11-11T14:46:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3379,7 +3387,7 @@ function mqPickRender(){
       <button class="btn btn-primary btn-sm" ${dis} onclick="mqPickGo('${ids}','test')">⏱ ટેસ્ટ</button>
       <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','practice')">✍ પ્રેક્ટિસ</button>
       <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','read')">📖 વાંચન</button>
-      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','pdf')">📄 PDF</button>
+      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','pdf')">PDF</button>
     </div>`);
   const l = document.getElementById('mqPickList'); if(l) l.scrollTop = sc;
   document.querySelectorAll('#mqPickList input[data-part]').forEach(i=>{ i.indeterminate = true; });
@@ -4278,24 +4286,35 @@ function mapKids(id){ return mapCatsOf().filter(c=>c.parentId===id); }
 function mapCatScopeCount(id){ return mapPlacesAll().filter(p=>p.catId===id && (mapSt==='__IN'||mapStOf(p)===mapSt)).length; }
 function mapLeafVisible(id){ const n=mapCatScopeCount(id); return n>0 || !mapPlacesAll().some(p=>p.catId===id); }
 function mapCatLabel(c){ const par = c.parentId ? mapCatsOf().find(x=>x.id===c.parentId) : null; const k = !c.parentId && mapKids(c.id).length;
-  return (par ? `${par.icon||'📌'} ${par.name} › ` : '') + `${c.icon||'📌'} ${c.name}` + (k ? ' (અન્ય)' : ''); }
+  return (par ? `${par.name} › ` : '') + c.name + (k ? ' (અન્ય)' : ''); }
 /* મુખ્ય વિભાગની પેટા યાદી — ફક્ત હાલના રાજ્યમાં માહિતી હોય તે (કે સાવ ખાલી નવા) */
-function mapSubItems(mainId){
-  const m = mapCatsOf().find(c=>c.id===mainId); if(!m) return [];
-  const out = mapKids(mainId).filter(k=>mapLeafVisible(k.id)).map(k=>({id:k.id, name:k.name, icon:k.icon||'📌', n:mapCatScopeCount(k.id)}));
-  if(mapKids(mainId).length && mapCatScopeCount(mainId)>0) out.push({id:'__own', name:'અન્ય', icon:'📌', n:mapCatScopeCount(mainId)});
+function mapSubRaw(mainId){
+  const out = mapKids(mainId).filter(k=>mapLeafVisible(k.id)).map(k=>({id:k.id, name:k.name, n:mapCatScopeCount(k.id)}));
+  if(mapKids(mainId).length && mapCatScopeCount(mainId)>0) out.push({id:'__own', name:'અન્ય', n:mapCatScopeCount(mainId)});
   return out;
 }
+function mapSubItems(mainId){ const r = mapSubRaw(mainId); if(r.length<2) return []; return [{id:'__all', name:'બધા', n:r.reduce((a,x)=>a+x.n,0)}].concat(r); }
 function mapSubSel(mainId){ const it = mapSubItems(mainId); return it.find(x=>x.id===mapSub) || it[0] || null; }
-function mapTopVisible(){ return mapCatsOf().filter(c=>!c.parentId).filter(c=> mapKids(c.id).length ? mapSubItems(c.id).length>0 : mapLeafVisible(c.id)); }
+function mapTopVisible(){ return mapCatsOf().filter(c=>!c.parentId).filter(c=> mapKids(c.id).length ? mapSubRaw(c.id).length>0 : mapLeafVisible(c.id)); }
 function mapTopCount(id){ const k = mapKids(id); return k.length ? k.concat([{id}]).reduce((a,c)=>a+mapCatScopeCount(c.id),0) : mapCatScopeCount(id); }
-function mapLeaf(){ if(!mapCat) return null; if(!mapKids(mapCat).length) return mapCat; const sel = mapSubSel(mapCat); return sel ? (sel.id==='__own' ? mapCat : sel.id) : null; }
+/* હાલમાં દેખાતા વિભાગ-id (મુખ્ય → બધા પેટા ભેગા, કે પસંદ કરેલ એક પેટા) */
+function mapSelIds(){
+  if(!mapCat) return []; if(!mapKids(mapCat).length) return [mapCat];
+  const r = mapSubRaw(mapCat); if(!r.length) return [];
+  const real = x=>x.id==='__own' ? mapCat : x.id;
+  if(r.length===1) return [real(r[0])];
+  const sel = mapSubSel(mapCat); if(!sel || sel.id==='__all') return r.map(real);
+  return [real(sel)];
+}
+function mapSelTitle(){ const ids = mapSelIds(); if(!ids.length) return ''; const m = mapCatsOf().find(c=>c.id===mapCat);
+  if(ids.length>1 || ids[0]===mapCat) return m ? m.name : ''; const c = mapCatsOf().find(x=>x.id===ids[0]); return c ? (m&&c.parentId?`${m.name} › ${c.name}`:c.name) : ''; }
+function mapDefaultLeaf(){ const ids = mapSelIds(); if(ids.length===1) return ids[0]; return ids.find(x=>x!==mapCat) || ids[0] || null; }
 function mapSelectLeaf(id){ const c=(DB.mapCats||[]).find(x=>x.id===id); if(!c) return; if(c.parentId){ mapCat=c.parentId; mapSub=id; } else { mapCat=id; mapSub=null; } }
 function mapByName(a,b){ return String(a).localeCompare(String(b),'gu'); }
 function mapGroupKey(p){ return mapTal ? '_' : (mapSt==='Gujarat' && !mapDist ? p.district : '_'); }
 function mapVisible(){
   const q = mapNorm(mapQuery||'');
-  let list = mapPlacesAll().filter(p=>p.catId===mapLeaf() && (mapSt==='__IN' || mapStOf(p)===mapSt) && (!mapDist || p.district===mapDist) && (!mapTal || (mapTal==='__none' ? !(p.taluka||'').trim() : (p.taluka||'').trim()===mapTal)));
+  let list = mapPlacesAll().filter(p=>mapSelIds().includes(p.catId) && (mapSt==='__IN' || mapStOf(p)===mapSt) && (!mapDist || p.district===mapDist) && (!mapTal || (mapTal==='__none' ? !(p.taluka||'').trim() : (p.taluka||'').trim()===mapTal)));
   if(q) list = list.filter(p=>mapNorm([p.name,p.taluka,p.note,mapDistName(p.district),p.district,mapStName(mapStOf(p))].join(' ')).includes(q));
   return list;
 }
@@ -4304,15 +4323,15 @@ function renderGujMap(){
   const exam = getActiveExam();
   if(!exam) return emptyState('🗺️','પહેલા પરીક્ષા ઉમેરો','નકશામાં સ્થળ પરીક્ષા મુજબ સાચવાય છે.','પરીક્ષા ઉમેરો',"showTab('exams'); setTimeout(()=>openExamForm(null),50);");
   const cats = mapCatsOf(); const all = mapPlacesAll();
-  const topBtns = `<button class="btn btn-sm btn-secondary" onclick="openMapCatManage()">⚙ વિભાગ</button><button class="btn btn-sm btn-secondary" onclick="openMapExport()">📄 PDF</button><button class="btn btn-sm btn-secondary" onclick="openMapBulk()">📥 ઘણા</button><button class="btn btn-sm btn-primary" onclick="openMapPlaceForm(null)">+ સ્થળ</button>`;
-  if(!cats.length) return pageTopHTML('', `<button class="btn btn-sm btn-secondary" onclick="openMapCatManage()">⚙ વિભાગ</button>`, '') + emptyState('🗺️','પહેલા વિભાગ બનાવો','નકશામાં સ્થળ વિભાગ મુજબ (જેમ કે તળાવ, મહેલ, કિલ્લો) સાચવાય છે અને એક સમયે એક જ વિભાગ દેખાય છે.','+ નવો વિભાગ',"openMapCatForm(null)");
+  const topBtns = `<button class="btn btn-sm btn-secondary" onclick="openMapCatManage()">વિભાગ</button><button class="btn btn-sm btn-secondary" onclick="openMapExport()">PDF</button><button class="btn btn-sm btn-secondary" onclick="openMapBulk()">ઘણા</button><button class="btn btn-sm btn-primary" onclick="openMapPlaceForm(null)">+ સ્થળ</button>`;
+  if(!cats.length) return pageTopHTML('', `<button class="btn btn-sm btn-secondary" onclick="openMapCatManage()">વિભાગ</button>`, '') + emptyState('🗺️','પહેલા વિભાગ બનાવો','નકશામાં સ્થળ વિભાગ મુજબ (જેમ કે તળાવ, મહેલ, કિલ્લો) સાચવાય છે અને એક સમયે એક જ વિભાગ દેખાય છે.','+ નવો વિભાગ',"openMapCatForm(null)");
   const tops = mapTopVisible(); if(!tops.find(c=>c.id===mapCat)){ mapCat = tops[0] ? tops[0].id : null; mapSub = null; }
-  const leaf = mapLeaf(); const inCat = all.filter(p=>p.catId===leaf);
+  const selIds = mapSelIds(); const leaf = selIds.length>0; const inCat = all.filter(p=>selIds.includes(p.catId));
   const cnt = {}; inCat.filter(p=>mapStOf(p)==='Gujarat').forEach(p=>{ cnt[p.district]=(cnt[p.district]||0)+1; });
   const scnt = {}; inCat.forEach(p=>{ const k=mapStOf(p); scnt[k]=(scnt[k]||0)+1; });
   const subs = mapCat ? mapSubItems(mapCat) : []; const subSel = mapCat ? mapSubSel(mapCat) : null;
-  const ring = (tops.length ? ringHTML('mapRing', tops.map(c=>[c.id, `${esc(c.icon||'📌')} ${esc(c.name)} (${mapTopCount(c.id)})`]), mapCat, "mapCat='%K'; mapSub=null; renderMain();") : '')
-    + (subs.length>1 ? ringHTML('mapRingSub', subs.map(x=>[x.id, `${esc(x.icon)} ${esc(x.name)} (${x.n})`]), subSel?subSel.id:'', "mapSub='%K'; renderMain();") : '');
+  const ring = (tops.length ? ringHTML('mapRing', tops.map(c=>[c.id, `${esc(c.name)} (${mapTopCount(c.id)})`]), mapCat, "mapCat='%K'; mapSub=null; renderMain();") : '')
+    + (subs.length>1 ? `<div class="mp-subring">${ringHTML('mapRingSub', subs.map(x=>[x.id, `${esc(x.name)} (${x.n})`]), subSel?subSel.id:'', "mapSub='%K'; renderMain();")}</div>` : '');
   let svgInner = '';
   if(mapSt==='Gujarat'){
     const paths = GJ_MAP.d.map(d=>{ const n=cnt[d.k]||0; const sel = mapDist===d.k; const hasTal = sel && mapTalList(d.k).length;
@@ -4338,7 +4357,7 @@ function renderGujMap(){
   if(mapSt==='__IN') selLine = `<div class="mp-crumb"><div class="mp-crumb-t"><b>🇮🇳 ભારત</b> <span class="ink-dim fs-12" style="cursor:default;">· રાજ્ય ટેપ કરો</span></div></div>`;
   else if(mapSt==='Gujarat') selLine = `<div class="mp-crumb">${back}<div class="mp-crumb-t"><span onclick="mapShowIndia()">ભારત</span> › ${mapDist?`<span onclick="mapHome()">ગુજરાત</span> › ${mapTal?`<span onclick="mapTalClear()">${esc(mapDistName(mapDist))}</span> › <b>${esc(talTitle)}</b>`:`<b>${esc(mapDistName(mapDist))}</b>`}`:`<b>ગુજરાત</b>`}</div></div>`;
   else selLine = `<div class="mp-crumb">${back}<div class="mp-crumb-t"><span onclick="mapShowIndia()">ભારત</span> › <b>${esc(mapStName(mapSt))}</b></div></div>`;
-  const hint = mapSt==='__IN' ? 'રાજ્ય ટેપ કરો · ગુજરાત માટે ગુજરાત ટેપ કરો' : (mapSt==='Gujarat' && !mapDist ? 'જિલ્લો ટેપ કરો · ઝૂમ આઉટ કરતાં ભારત' : 'ઝૂમ આઉટ કરતાં ભારત');
+  const hint = mapSt==='__IN' ? 'રાજ્ય ટેપ કરો' : (mapSt==='Gujarat' && !mapDist ? 'જિલ્લો ટેપ કરો' : '');
   /* યાદી */
   const list = mapVisible(); const q = (mapQuery||'').trim();
   const manual = mapSort==='manual' && !q;
@@ -4347,7 +4366,8 @@ function renderGujMap(){
   const reorder = manual && mapReorder && canOrder;
   const card = p=>{ const sb = reorder ? sibs(p) : []; const i = sb.indexOf(p);
     const p3 = (q || mapSt==='__IN') ? (mapStOf(p)==='Gujarat' ? ((mapSt==='__IN'?'ગુજરાત › ':'')+mapDistName(p.district)) : mapStName(mapStOf(p))) : (mapSt==='Gujarat' && !mapDist ? mapDistName(p.district) : '');
-    const pills = `${(!mapTal&&p.taluka&&q)?`<span class="mp-pill">${esc(p.taluka)}</span>`:''}${p3?`<span class="mp-pill mp-pill3">${esc(p3)}</span>`:''}`;
+    const subN = (selIds.length>1) ? (p.catId===mapCat ? 'અન્ય' : ((mapCatsOf().find(x=>x.id===p.catId)||{}).name||'')) : '';
+    const pills = `${subN?`<span class="mp-pill mp-pill2">${esc(subN)}</span>`:''}${(!mapTal&&p.taluka&&q)?`<span class="mp-pill">${esc(p.taluka)}</span>`:''}${p3?`<span class="mp-pill mp-pill3">${esc(p3)}</span>`:''}`;
     return `<div class="mp-it">
       <div class="mp-it-h"><div style="flex:1;min-width:0;"><div class="mp-it-n">${esc(p.name)}${(!mapTal&&p.taluka&&!q)?` <span class="mp-tb">(${esc(p.taluka)})</span>`:''}</div>${pills?`<div class="mp-it-s">${pills}</div>`:''}</div>
       ${reorder&&sb.length>1?`<div style="display:flex;gap:4px;flex-shrink:0;"><button class="btn btn-sm btn-secondary" style="padding:4px 10px;" ${i<=0?'disabled':''} onclick="mapMovePlace('${p.id}',-1)">▲</button><button class="btn btn-sm btn-secondary" style="padding:4px 10px;" ${i>=sb.length-1?'disabled':''} onclick="mapMovePlace('${p.id}',1)">▼</button></div>`:''}
@@ -4423,7 +4443,6 @@ function mapPickState(k){
 }
 function mapZoomAt(f, cx, cy){
   const v = {...mapCur()}; const b = mapBase();
-  if(f<1 && v.w >= b.w*0.999 && mapSt!=='__IN'){ mapShowIndia(); return; }
   const nw = Math.min(b.w, Math.max(b.w/12, v.w/f)); const r = nw / v.w;
   mapView = mapClamp({x:cx-(cx-v.x)*r, y:cy-(cy-v.y)*r, w:nw, h:v.h*r}); mapApplyView();
 }
@@ -4442,7 +4461,6 @@ function mapBind(){
     p.x=e.clientX; p.y=e.clientY;
     if(ptrs.size===2 && startView){ const [a,b]=[...ptrs.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y)||1; const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
       const bs = mapBase(); const want = startView.w*startDist/d;
-      if(mapSt!=='__IN' && want > bs.w*1.12){ ptrs.clear(); startView=null; window.__mapNoClick=Date.now()+500; mapShowIndia(); return; }
       const nw = Math.min(bs.w, Math.max(bs.w/12, want)); const r = nw/startView.w;
       const f = toUnits(mid.x, mid.y, startView); /* શરૂઆતના નકશા પર આંગળીઓનું કેન્દ્ર */
       const rect = svg.getBoundingClientRect(); const fx=(mid.x-rect.left)/rect.width, fy=(mid.y-rect.top)/rect.height;
@@ -4494,35 +4512,36 @@ function mapSheetRefresh(){
 function openMapCatManage(){
   const all = mapCatsOf(); const mains = all.filter(c=>!c.parentId);
   const cntOf = id=>(DB.mapPlaces||[]).filter(p=>p.catId===id).length;
-  const row = (c, sib, k, sub)=>{ const kids = sub ? [] : all.filter(x=>x.parentId===c.id); const n = cntOf(c.id) + kids.reduce((a,x)=>a+cntOf(x.id),0);
-    return `<div class="item cursor-default" style="gap:8px;${sub?'margin-left:22px;':''}"><span style="flex:1;min-width:0;" onclick="mapFromManage=true; openMapCatForm('${c.id}')"><b>${sub?'↳ ':''}${esc(c.icon||'📌')} ${esc(c.name)}</b><div class="ink-dim fs-12">${n} સ્થળ${kids.length?` · ${kids.length} પેટા વિભાગ`:''} · ✎ એડિટ</div></span>
-      <button class="btn btn-sm btn-secondary" ${k===0?'disabled':''} onclick="mapMoveCat('${c.id}',-1)">▲</button><button class="btn btn-sm btn-secondary" ${k===sib.length-1?'disabled':''} onclick="mapMoveCat('${c.id}',1)">▼</button></div>`; };
-  const html = mains.map((m,i)=>{ const kids = all.filter(x=>x.parentId===m.id); return row(m,mains,i,false) + kids.map((x,j)=>row(x,kids,j,true)).join(''); }).join('');
+  const mv = (c, sib, k)=>`<div class="mc-mv"><button class="btn btn-sm btn-secondary" ${k===0?'disabled':''} onclick="mapMoveCat('${c.id}',-1)" aria-label="ઉપર">▲</button><button class="btn btn-sm btn-secondary" ${k===sib.length-1?'disabled':''} onclick="mapMoveCat('${c.id}',1)" aria-label="નીચે">▼</button></div>`;
+  const html = mains.map((m,i)=>{ const kids = all.filter(x=>x.parentId===m.id); const n = cntOf(m.id)+kids.reduce((a,x)=>a+cntOf(x.id),0);
+    return `<div class="mc-main">
+      <div class="mc-h"><div class="mc-t" onclick="mapFromManage=true; openMapCatForm('${m.id}')"><div class="mc-n">${esc(m.name)}</div><div class="mc-s">${n} સ્થળ${kids.length?` · ${kids.length} પેટા વિભાગ`:''}</div></div>
+        <button class="btn btn-sm btn-secondary" onclick="mapFromManage=true; openMapCatForm('${m.id}')">એડિટ</button>${mv(m,mains,i)}</div>
+      ${kids.length?`<div class="mc-kids">${kids.map((k,j)=>`<div class="mc-k"><div class="mc-t" onclick="mapFromManage=true; openMapCatForm('${k.id}')"><div class="mc-kn">${esc(k.name)}</div><div class="mc-s">${cntOf(k.id)} સ્થળ</div></div><button class="btn btn-sm btn-secondary" onclick="mapFromManage=true; openMapCatForm('${k.id}')">એડિટ</button>${mv(k,kids,j)}</div>`).join('')}</div>`:''}
+      <button class="mc-add" onclick="mapFromManage=true; openMapCatForm(null,'${m.id}')">+ પેટા વિભાગ ઉમેરો</button></div>`; }).join('');
   openSheet(`<h3>વિભાગો</h3>
-    ${all.length ? html : '<div class="ink-dim" style="padding:10px 0;">હજી કોઈ વિભાગ નથી (જેમ કે જળાશયો, મહેલ, કિલ્લો...)</div>'}
-    <div class="ink-dim fs-12" style="margin-top:8px;">મુખ્ય વિભાગ (દા.ત. જળાશયો) માં પેટા વિભાગ (તળાવો, ઝરા, કુંડ, વાવ, ધોધ) બનાવવા: નવો વિભાગ બનાવતી વખતે "મુખ્ય વિભાગ" પસંદ કરો. જૂના વિભાગને એડિટ કરીને પણ કોઈ મુખ્ય વિભાગમાં મૂકી શકાય.</div>
-    <div class="sheet-actions" style="margin-top:12px;"><button class="btn btn-primary btn-block" onclick="mapFromManage=true; openMapCatForm(null)">+ નવો વિભાગ</button></div>`);
+    ${all.length ? html : '<div class="ink-dim" style="padding:10px 0;">હજી કોઈ વિભાગ નથી. નીચેથી મુખ્ય વિભાગ બનાવો (દા.ત. જળાશયો), પછી તેમાં પેટા વિભાગ ઉમેરો (તળાવ, સરોવર, કુંડ, વાવ…).</div>'}
+    <div class="sheet-actions" style="margin-top:12px;"><button class="btn btn-primary btn-block" onclick="mapFromManage=true; openMapCatForm(null)">+ નવો મુખ્ય વિભાગ</button></div>`);
 }
-function openMapCatForm(id){
+function openMapCatForm(id, par){
   const c = id ? (DB.mapCats||[]).find(x=>x.id===id) : null;
   const hasKids = c && mapKids(c.id).length;
   const mains = mapCatsOf().filter(x=>!x.parentId && x.id!==id);
-  const defPar = c ? (c.parentId||'') : (mapCat && !mapCatsOf().find(x=>x.id===mapCat&&x.parentId) ? mapCat : '');
-  openSheet(`<h3>${c?'વિભાગ એડિટ':'નવો વિભાગ'}</h3>
-    <div class="field"><label>વિભાગનું નામ</label><input type="text" id="f_mc_name" value="${c?esc(c.name):''}" placeholder="દા.ત. તળાવો, મહેલ, કિલ્લો"></div>
-    <div class="field"><label>આઈકન (ઇમોજી)</label><input type="text" id="f_mc_icon" value="${c?esc(c.icon||'📌'):'📌'}" maxlength="4" placeholder="🏰"></div>
-    <div class="field"><label>મુખ્ય વિભાગ (પેટા વિભાગ બનાવવા હોય તો)</label><select id="f_mc_par" ${hasKids?'disabled':''}><option value="">— આ પોતે મુખ્ય વિભાગ છે —</option>${mains.map(m=>`<option value="${m.id}" ${m.id===defPar?'selected':''}>${esc(m.icon||'📌')} ${esc(m.name)}</option>`).join('')}</select>${hasKids?'<div class="ink-dim fs-12" style="margin-top:4px;">આમાં પેટા વિભાગ છે, એટલે આ બીજાની અંદર ન મૂકી શકાય.</div>':''}</div>
+  const defPar = c ? (c.parentId||'') : (par||'');
+  openSheet(`<h3>${c?'વિભાગ એડિટ':(par?'નવો પેટા વિભાગ':'નવો મુખ્ય વિભાગ')}</h3>
+    <div class="field"><label>વિભાગનું નામ</label><input type="text" id="f_mc_name" value="${c?esc(c.name):''}" placeholder="દા.ત. તળાવ, સરોવર, કુંડ"></div>
+    <div class="field"><label>મુખ્ય વિભાગ</label><select id="f_mc_par" ${hasKids?'disabled':''}><option value="">આ પોતે મુખ્ય વિભાગ છે</option>${mains.map(m=>`<option value="${m.id}" ${m.id===defPar?'selected':''}>${esc(m.name)} ની અંદર (પેટા વિભાગ)</option>`).join('')}</select>${hasKids?'<div class="ink-dim fs-12" style="margin-top:4px;">આમાં પેટા વિભાગ છે, એટલે આ બીજાની અંદર ન મૂકી શકાય.</div>':''}</div>
     <div class="sheet-actions">${c?`<button class="btn btn-danger" onclick="deleteMapCat('${id}')">ડિલીટ</button>`:''}<button class="btn btn-primary btn-block" onclick="saveMapCat(${c?`'${id}'`:'null'})">સેવ કરો</button></div>`);
 }
 function saveMapCat(id){
-  const name = val('f_mc_name'), icon = val('f_mc_icon') || '📌'; const parentId = (document.getElementById('f_mc_par')||{}).value || '';
+  const name = val('f_mc_name'); const parentId = (document.getElementById('f_mc_par')||{}).value || '';
   if(!name){ toast('વિભાગનું નામ લખો','error'); return; }
   const ex = getActiveExam(); if(!ex) return;
   if(mapCatsOf().find(c=>c.id!==id && (c.parentId||'')===parentId && c.name.trim().toLowerCase()===name.toLowerCase())){ toast('આ નામનો વિભાગ પહેલેથી છે','error'); return; }
   let cid = id;
-  if(id){ const c=DB.mapCats.find(x=>x.id===id); if(c){ c.name=name; c.icon=icon; if(!mapKids(id).length) c.parentId=parentId; } }
-  else { const c={id:uid(),examId:ex.id,name,icon,parentId}; (DB.mapCats=DB.mapCats||[]).push(c); cid=c.id; }
-  mapSelectLeaf(cid);
+  if(id){ const c=DB.mapCats.find(x=>x.id===id); if(c){ c.name=name; if(!mapKids(id).length) c.parentId=parentId; } }
+  else { const c={id:uid(),examId:ex.id,name,parentId}; (DB.mapCats=DB.mapCats||[]).push(c); cid=c.id; }
+  mapSelectLeaf(cid); if(parentId) mapSub = cid;
   save(); closeSheet(); mapRefresh(); toast('સેવ થયું'); if(mapFromManage){ mapFromManage=false; openMapCatManage(); }
 }
 function deleteMapCat(id){
@@ -4546,7 +4565,7 @@ function openMapPlaceForm(id){
   const cats = mapCatsOf();
   if(!p && !cats.length){ toast('પહેલા એક વિભાગ બનાવો (જેમ કે મહેલ)','error'); openMapCatForm(null); return; }
   const dist = p ? p.district : (mapDist||'');
-  const cat = p ? p.catId : (mapLeaf() || (cats[0]||{}).id);
+  const cat = p ? p.catId : (mapDefaultLeaf() || (cats[0]||{}).id);
   const stSel = p ? mapStOf(p) : (mapSt==='__IN' ? 'Gujarat' : mapSt);
   const stOpts = IN_MAP.s.slice().sort((a,b)=>a.k==='Gujarat'?-1:b.k==='Gujarat'?1:mapByName(a.n,b.n));
   const tal = p ? (p.taluka||'') : (mapTal||'');
@@ -4581,7 +4600,7 @@ function deleteMapPlace(id){
 /* ---- PDF ---- */
 function mapPrintListLegacy(){
   const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
-  const cn = mapCatName(mapLeaf()); const stT = mapSt==='__IN' ? 'ભારત' : mapStName(mapSt);
+  const cn = mapSelTitle(); const stT = mapSt==='__IN' ? 'ભારત' : mapStName(mapSt);
   const title = `${cn} — ${stT}${mapDist?' › '+mapDistName(mapDist):''}${mapTal?' › '+mapTal:''}`;
   const item = p=>`<div class="pq"><b>${esc(p.name)}</b> <span>— ${esc(mapPlaceLoc(p))}${p.taluka?' › '+esc(p.taluka):''}</span>${p.note?`<div class="pmp-note">${esc(p.note)}</div>`:''}</div>`;
   const g = {}; list.forEach(p=>{ const k = mapSt==='__IN' ? (mapStOf(p)==='Gujarat' ? 'ગુજરાત › '+mapDistName(p.district) : mapStName(mapStOf(p))) : ((mapDist||mapIsOther()) ? '' : mapDistName(p.district)); (g[k]=g[k]||[]).push(p); });
@@ -4660,11 +4679,11 @@ function mpPage(list, title, pid, regions, keyOf, dims, portrait){
   return `<div class="psec pmapPage ${portrait?'pmapPort':''}" id="${pid}"><div class="ph"><h1>${esc(title)}</h1><div>કુલ સ્થળ: ${list.length}${over.length?' · લાલ ↓ વાળા જિલ્લા પર ટેપ કરો → વિગત':''}</div></div>${svg}</div>${over.length?`<div class="psec pnew pdetwrap"><div class="ph"><h1>${esc(title)} — નકશામાં ન સમાયેલી વિગત</h1></div><div class="pqs">${det}</div></div>`:''}`;
 }
 function mapPrintMapLegacy(){
-  if(!mapLeaf()){ toast('પહેલા વિભાગ બનાવો','error'); return; }
+  if(!mapSelIds().length){ toast('પહેલા વિભાગ બનાવો','error'); return; }
   if(mapIsOther() || (mapQuery||'').trim() || (mapSt==='Gujarat' && (mapDist||mapTal))){ mapPrintListLegacy(); return; }
   const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
-  const c = mapCatsOf().find(x=>x.id===mapLeaf()); const ind = mapSt==='__IN';
-  const title = `${c.icon||'📌'} ${c.name} — ${ind?'ભારત':'ગુજરાત'}`;
+  const c = {name:mapSelTitle()}; const ind = mapSt==='__IN';
+  const title = `${c.name} — ${ind?'ભારત':'ગુજરાત'}`;
   const html = ind ? mpPage(list, title, 'mp0', IN_MAP.s.map(o=>({...o,bk:'S:'+o.k})), p=>mapStOf(p), {w:IN_MAP.w,h:IN_MAP.h}, true)
                    : mpPage(list, title, 'mp0', GJ_MAP.d.map(d=>({...d,bk:d.k})), p=>p.district, {w:GJ_MAP.w,h:GJ_MAP.h}, false);
   let pa = document.getElementById('printArea');
@@ -4799,19 +4818,19 @@ async function mapDownloadListPdf(title, groups){
   return mpBuildPdf(pages);
 }
 async function mapPrintPdf(){
-  if(!mapLeaf()){ toast('પહેલા વિભાગ બનાવો','error'); return; }
+  if(!mapSelIds().length){ toast('પહેલા વિભાગ બનાવો','error'); return; }
   const list = mapVisible(); if(!list.length){ toast('PDF માટે કોઈ સ્થળ નથી','error'); return; }
-  const c = mapCatsOf().find(x=>x.id===mapLeaf()); const q=(mapQuery||'').trim();
+  const c = {name:mapSelTitle()}; const q=(mapQuery||'').trim();
   const asList = mapIsOther() || q || (mapSt==='Gujarat' && (mapDist||mapTal));
   try{
     toast('PDF બની રહી છે…');
     let blob, name;
-    if(!asList){ const ind=mapSt==='__IN'; name=`${c.name} — ${ind?'ભારત':'ગુજરાત'}`; blob = await mapDownloadMapPdf(list, ind, `${c.icon||'📌'} ${name}`); }
+    if(!asList){ const ind=mapSt==='__IN'; name=`${c.name} — ${ind?'ભારત':'ગુજરાત'}`; blob = await mapDownloadMapPdf(list, ind, name); }
     else {
       const stT = mapSt==='__IN' ? 'ભારત' : mapStName(mapSt); name = `${c.name} — ${stT}${mapDist?' › '+mapDistName(mapDist):''}${mapTal?' › '+mapTal:''}`;
       const g={}; list.forEach(p=>{ const k = mapSt==='__IN' ? (mapStOf(p)==='Gujarat' ? 'ગુજરાત › '+mapDistName(p.district) : mapStName(mapStOf(p))) : ((mapDist||mapIsOther()) ? '' : mapDistName(p.district)); (g[k]=g[k]||[]).push(p); });
       const groups = Object.keys(g).sort(mapByName).map(k=>({head:k, items:(mapSort==='name'?g[k].slice().sort((a,b)=>mapByName(a.name,b.name)):g[k]).map(p=>({name:p.name, loc:[(mapSt==='__IN'||q)?mapPlaceLoc(p):'',p.taluka].filter(Boolean).join(' › '), note:p.note||''}))}));
-      blob = await mapDownloadListPdf(`${c.icon||'📌'} ${name}`, groups);
+      blob = await mapDownloadListPdf(name, groups);
     }
     const dt=new Date(), z=n=>String(n).padStart(2,'0'); mpDownload(blob, `ExamPath_${(mapSt==='__IN'?'India':String(mapSt).replace(/[^A-Za-z]+/g,''))}${mapDist?'_'+String(mapDist).replace(/[^A-Za-z]+/g,''):''}_${dt.getFullYear()}${z(dt.getMonth()+1)}${z(dt.getDate())}-${z(dt.getHours())}${z(dt.getMinutes())}.pdf`); toast('PDF ડાઉનલોડ થઈ ✅');
   }catch(e){ console.error(e); toast('સીધી PDF ન બની — છાપવાની રીત વાપરું છું','error'); if(asList) mapPrintListLegacy(); else mapPrintMapLegacy(); }
@@ -4822,7 +4841,7 @@ async function mapPrintPdf(){
 function openMapExport(){
   const map = !mapIsOther() && !(mapQuery||'').trim() && !(mapSt==='Gujarat' && (mapDist||mapTal));
   openSheet(`<h3>📄 નકશો ડાઉનલોડ કરો</h3>
-    <div class="ink-dim fs-12" style="margin-bottom:10px;">હાલનો વિભાગ: <b>${esc(mapCatName(mapLeaf()))}</b></div>
+    <div class="ink-dim fs-12" style="margin-bottom:10px;">હાલનો વિભાગ: <b>${esc(mapSelTitle())}</b></div>
     <button class="btn btn-primary btn-block" style="margin-bottom:6px;" ${map?'':'disabled'} onclick="closeSheet(); mapDownloadHtml();">🌐 ઇન્ટરેક્ટિવ નકશો (એક જ પેજ)</button>
     <div class="ink-dim fs-12" style="margin-bottom:14px;">જિલ્લો/રાજ્ય ટેપ કરો → તેની બાજુમાં જ બધી માહિતી ખૂલે. બીજો ટેપ કરો એટલે પહેલી બંધ. ક્રોમમાં ખોલો; ઇન્ટરનેટ વગર ચાલે.${map?'':' (આ સુવિધા ગુજરાત કે ભારતના આખા નકશા પર જ મળે.)'}</div>
     <button class="btn btn-secondary btn-block" style="margin-bottom:6px;" onclick="closeSheet(); mapPrintPdf();">📄 PDF ડાઉનલોડ (ચિત્ર + વિગત પેજ)</button>
@@ -4830,13 +4849,13 @@ function openMapExport(){
 }
 function mapDownloadHtml(){
   try{
-    if(!mapLeaf()){ toast('પહેલા વિભાગ બનાવો','error'); return; }
+    if(!mapSelIds().length){ toast('પહેલા વિભાગ બનાવો','error'); return; }
     const list = mapVisible(); if(!list.length){ toast('આ વિભાગમાં કોઈ સ્થળ નથી','error'); return; }
-    const c = mapCatsOf().find(x=>x.id===mapLeaf()); const ind = mapSt==='__IN';
+    const c = {name:mapSelTitle()}; const ind = mapSt==='__IN';
     const regions = ind ? IN_MAP.s.map(o=>({...o,bk:'S:'+o.k})) : GJ_MAP.d.map(d=>({...d,bk:d.k}));
     const dims = ind ? {w:IN_MAP.w,h:IN_MAP.h} : {w:GJ_MAP.w,h:GJ_MAP.h};
     const res = mpLayout(list, regions, ind ? (p=>mapStOf(p)) : (p=>p.district));
-    const title = `${c.icon||'📌'} ${c.name} — ${ind?'ભારત':'ગુજરાત'}`; const fam = 'system-ui,"Noto Sans Gujarati","Shruti",sans-serif';
+    const title = `${c.name} — ${ind?'ભારત':'ગુજરાત'}`; const fam = 'system-ui,"Noto Sans Gujarati","Shruti",sans-serif';
     let paths='', texts=''; const R = res.map(r=>r.has ? {n:r.d.n,x:r.d.x,y:r.d.y,it:r.items.map(p=>({n:p.name,t:p.taluka||'',o:p.note||''}))} : null);
     res.forEach(r=>{ paths += `<path data-i="${r.i}" class="${r.has?'has':''}" d="${r.d.d}"/>`;
       if(!r.has){ const bb=mapBBox(r.d.d,r.d.bk); if(r.d.n.length*5.2*0.62 < (bb.x1-bb.x0)*0.8) texts += `<text class="e" x="${r.d.x}" y="${r.d.y}" font-size="5.2">${esc(r.d.n)}</text>`; return; }
@@ -4921,7 +4940,7 @@ function openMapBulk(){
   const cats = mapCatsOf();
   if(!cats.length){ toast('પહેલા એક વિભાગ બનાવો (જેમ કે તળાવ)','error'); openMapCatForm(null); return; }
   mapBulkOv = {}; mapBulkSkip = {}; mapBulkEd = {};
-  const cat = mapLeaf() || cats[0].id;
+  const cat = mapDefaultLeaf() || cats[0].id;
   openSheet(`<h3>📥 ઘણાં સ્થળ એકસાથે${mapIsOther()?' — '+esc(mapStName(mapSt)):''}</h3>
     <div class="field"><label>વિભાગ (બધા સ્થળ આમાં જશે)</label><select id="f_mb_cat" onchange="mapBulkPreview()">${cats.map(c=>`<option value="${c.id}" ${c.id===cat?'selected':''}>${esc(mapCatLabel(c))}</option>`).join('')}</select></div>
     <div class="field"><label>યાદી પેસ્ટ કરો (એક લીટીમાં એક સ્થળ)</label>
@@ -4956,7 +4975,7 @@ function mapBulkSave(){
   const defCat = val('f_mb_cat'); const cats = mapCatsOf(); let newCats = 0;
   rows.forEach(r=>{
     let catId = defCat;
-    if(r.cat){ const c = cats.find(x=>mapNorm(x.name)===mapNorm(r.cat)); if(c) catId=c.id; else { const nc={id:uid(),examId:ex.id,name:r.cat,icon:'📌'}; (DB.mapCats=DB.mapCats||[]).push(nc); cats.push(nc); catId=nc.id; newCats++; } }
+    if(r.cat){ const c = cats.find(x=>mapNorm(x.name)===mapNorm(r.cat)); if(c) catId=c.id; else { const nc={id:uid(),examId:ex.id,name:r.cat,parentId:''}; (DB.mapCats=DB.mapCats||[]).push(nc); cats.push(nc); catId=nc.id; newCats++; } }
     (DB.mapPlaces=DB.mapPlaces||[]).push({id:uid(),examId:ex.id,catId,state:mapIsOther()?mapSt:'Gujarat',name:r.name,district:r.dist||'',taluka:r.loc||'',note:r.note||''});
   });
   mapSelectLeaf(defCat); save(); closeSheet(); renderMain(); toast(`${rows.length} સ્થળ ઉમેરાયા${newCats?` (નવા વિભાગ: ${newCats})`:''}`);
