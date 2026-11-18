@@ -199,8 +199,10 @@ a{color:inherit;}
 .mq-res{font-size:12px; color:var(--ink-dim); margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);}
 .mq-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
 .mq-actions .btn{flex:1; min-width:0; white-space:nowrap;}
-.pg-back{margin-bottom:8px;}
-.pg-btns{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:8px;}
+.pg-top{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
+.pg-back{flex-shrink:0;}
+.pg-btns{display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; flex:1;}
+.pg-top .btn-sm{padding:6px 8px; white-space:nowrap;}
 .mq-topbar{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;}
 .mq-topbar.mq-center{display:grid; grid-template-columns:1fr minmax(0,2fr) 1fr; gap:6px;}
 .mq-topbar.mq-center>:first-child{justify-self:start;} .mq-topbar.mq-center>:last-child{justify-self:end;}
@@ -490,8 +492,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.18-3';
-const APP_BUILT = '2026-11-18T15:19:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.18-4';
+const APP_BUILT = '2026-11-18T16:18:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -604,7 +606,7 @@ let revCalSelectedDate = null;
 function esc(str){ if(str===undefined||str===null) return ''; return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 /* બધા પેજનો ઉપરનો ભાગ સરખો: ઉપર "પાછા", નીચે બીજા બટન, પછી ક્રમ (breadcrumb) */
 function pageTopHTML(backCode, btnsHTML, crumbHTML){
-  return `${backCode?`<div class="pg-back">${backButtonHTML(backCode)}</div>`:''}${btnsHTML?`<div class="pg-btns">${btnsHTML}</div>`:''}${crumbHTML||''}`;
+  return `${(backCode||btnsHTML)?`<div class="pg-top">${backCode?`<div class="pg-back">${backButtonHTML(backCode)}</div>`:''}${btnsHTML?`<div class="pg-btns">${btnsHTML}</div>`:''}</div>`:''}${crumbHTML||''}`;
 }
 function backButtonHTML(onclickCode){
   return `<button class="btn btn-sm btn-secondary" onclick="${onclickCode}">← પાછા</button>`;
@@ -3450,7 +3452,7 @@ function renderMockQuiz(seg){
       ${MQ_SORTS.map(([v,l])=>`<option value="${v}" ${cur_sort===v?'selected':''}>${l}</option>`).join('')}
     </select></div>`;
   return mqSticky(seg + pageTopHTML(cur?`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`:'',
-     `<button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null)">+ ${cur?'ફોલ્ડર':'વિભાગ'}</button><button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરીને આપો</button><button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`,
+     `<button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null)">+ ${cur?'ફોલ્ડર':'વિભાગ'}</button><button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`,
      path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:'') + `
    ${toolbar}${mqTabSegHTML()}`) + `<div id="mqListWrap">${mqListHTML()}</div>`;
 }
@@ -3587,6 +3589,11 @@ function tlRenderSheet(title){
     <input type="text" id="tlSearch" value="${esc(tlQ)}" placeholder="🔍 ટોપિક કે વિષય શોધો..." oninput="tlSearchInput(this.value)" style="width:100%; padding:9px 10px; margin-bottom:8px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:14px;">
     <div id="tlList" style="max-height:46vh; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${tlPickerHTML()}</div>
     <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="tlSave()">સેવ કરો (${tlSel.size} ટોપિક)</button></div>`);
+  tlScrollToChecked('tlList');
+}
+function tlScrollToChecked(listId){
+  setTimeout(()=>{ const l = document.getElementById(listId); if(!l) return; const c = l.querySelector('input:checked'); if(!c) return;
+    const row = c.closest('label')||c; l.scrollTop = Math.max(0, row.offsetTop - l.offsetTop - 50); }, 60);
 }
 function tlPickerHTML(){
   const q = tlQ.trim().toLowerCase(); let h = '';
@@ -3624,6 +3631,7 @@ function openTopicTests(topicId){
 }
 function tlOpenTopicPicker(topicId){
   tlTopicId = topicId; tlTopicSel = new Set(tlTestsOfTopic(topicId).map(t=>t.id)); tlRenderTopicPicker();
+  tlScrollToChecked('tlTpList');
 }
 function tlTestTree(fid, depth){
   let h = '';
