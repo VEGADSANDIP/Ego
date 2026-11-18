@@ -490,8 +490,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.18-2';
-const APP_BUILT = '2026-11-18T15:08:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.18-3';
+const APP_BUILT = '2026-11-18T15:19:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3450,7 +3450,7 @@ function renderMockQuiz(seg){
       ${MQ_SORTS.map(([v,l])=>`<option value="${v}" ${cur_sort===v?'selected':''}>${l}</option>`).join('')}
     </select></div>`;
   return mqSticky(seg + pageTopHTML(cur?`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`:'',
-     `<button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null)">+ ફોલ્ડર</button><button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ ટેસ્ટ / ફોલ્ડર પસંદ કરીને આપો</button><button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`,
+     `<button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null)">+ ${cur?'ફોલ્ડર':'વિભાગ'}</button><button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરીને આપો</button><button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`,
      path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:'') + `
    ${toolbar}${mqTabSegHTML()}`) + `<div id="mqListWrap">${mqListHTML()}</div>`;
 }
@@ -3467,7 +3467,7 @@ function mqFolderOptions(selId, excludeId){
 function openQFolderForm(id){
   const f = id ? DB.qfolders.find(x=>x.id===id) : null;
   openSheet(`
-    <h3>${f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર'} 📁</h3>
+    <h3>${(f?!f.parentId:!mqFolderId)?(f?'વિભાગ એડિટ':'નવો વિભાગ'):(f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર')} 📁</h3>
     <div class="field"><label>નામ</label><input type="text" id="f_qfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: Daily Test Series"></div>
     <div class="field"><label>ક્યાં રાખવું?</label><select id="f_qfparent">${mqFolderOptions(f ? (f.parentId||'') : (mqFolderId||''), id)}</select></div>
     ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ફોલ્ડરની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>`:''}
@@ -4151,6 +4151,13 @@ function mqFolderBookHTML(f){
   const tests = mqFolderTestsDeep(f.id);
   const nT = tests.length, nF = mqFolders(f.id).length;
   const attempted = tests.filter(t=>(t.attempts||[]).length).length;
+  if(!f.parentId){ /* મુખ્ય વિભાગ — પરીક્ષાના વિભાગ કાર્ડ જેવું જ */
+    const pc = nT ? Math.round(attempted/nT*100) : 0;
+    return `<div class="card cursor-pointer" data-search="${esc(f.name.toLowerCase())}" onclick="mqOpenFolder('${f.id}')">
+      ${progressCardHeader(pc, `📂 ${esc(f.name)} <span class="badge badge-primary" style="font-weight:700;">${nT} ટેસ્ટ</span>`, `openQFolderForm('${f.id}')`)}
+      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${nF?nF+' ફોલ્ડર · ':''}${attempted}/${nT} આપેલી — વિગત જોવા ટેપ કરો →</div>
+    </div>`;
+  }
   const totalTimes = tests.reduce((a,t)=>a+mqTimes(t),0);
   const pct = nT ? Math.round(attempted/nT*100) : 0;
   const ids = new Set(tests.map(t=>t.id));
