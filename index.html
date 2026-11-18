@@ -191,7 +191,12 @@ a{color:inherit;}
 .seg button.on{background:var(--surface); color:var(--ink); box-shadow:var(--shadow);}
 .mq-crumb{font-size:12.5px; color:var(--ink-dim); margin:2px 0 10px; word-break:break-word;}
 .mq-row{display:flex; align-items:center; gap:12px;}
-.mq-ico{font-size:28px; flex-shrink:0;}
+.mq-ico{font-size:24px; flex-shrink:0; align-self:flex-start; margin-top:2px;}
+.mq-row{align-items:flex-start;}
+.mq-side{display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;}
+.mq-name{font-weight:800; font-size:15.5px; line-height:1.35; word-break:break-word;}
+.mq-meta{font-size:12.5px; color:var(--ink-dim); margin-top:3px;}
+.mq-res{font-size:12px; color:var(--ink-dim); margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);}
 .mq-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
 .mq-actions .btn{flex:1; min-width:0; white-space:nowrap;}
 .pg-back{margin-bottom:8px;}
@@ -247,7 +252,11 @@ a{color:inherit;}
 
 .topic-row{padding:10px 0; border-bottom:1px solid var(--border);}
 .topic-row:last-child{border-bottom:none;}
-.topic-row-top{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:14px;}
+.topic-row-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px; font-size:15px;}
+.topic-name{flex:1; min-width:0; font-weight:600; line-height:1.4; word-break:break-word; padding-top:4px;}
+.topic-meta{display:flex; flex-wrap:wrap; gap:6px; padding:2px 0 8px 0;}
+.topic-meta span{font-size:11.5px; color:var(--ink-dim); background:color-mix(in srgb, var(--ink) 7%, transparent); padding:3px 9px; border-radius:8px;}
+.topic-meta span.t-test{background:color-mix(in srgb, var(--primary) 16%, transparent); color:var(--ink);}
 .btn:disabled{opacity:.3; cursor:default;}
 .row-highlight{animation:topicFlash 1.6s ease-out; border-radius:10px;}
 @keyframes topicFlash{
@@ -329,7 +338,8 @@ a{color:inherit;}
 .mq-pick-row{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px;}
 .mq-pick-row input{width:20px; height:20px; flex-shrink:0;}
 .mq-pick-folder{font-weight:800;}
-.tl-chip{display:inline-block; font-size:11.5px; padding:2px 8px; margin:3px 4px 0 0; border-radius:999px; background:color-mix(in srgb, var(--primary) 16%, transparent); cursor:pointer;}
+.tl-chip{display:inline-block; max-width:100%; font-size:11.5px; line-height:1.35; padding:3px 9px; margin:4px 5px 0 0; border-radius:8px; background:color-mix(in srgb, var(--primary) 16%, transparent); cursor:pointer; word-break:break-word;}
+.tl-more{background:transparent; border:1px dashed var(--border); color:var(--ink-dim);}
 .dh-wrap{margin:14px 0 14px;}
 .dh-card{padding:11px 14px 10px; border-radius:18px; border:1px solid color-mix(in srgb, #FF8A3D 28%, var(--border)); background:linear-gradient(135deg, rgba(255,138,61,.16), rgba(255,61,107,.05)), var(--surface); box-shadow:var(--shadow);}
 .dh-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
@@ -480,8 +490,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.18-1';
-const APP_BUILT = '2026-11-18T15:03:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.18-2';
+const APP_BUILT = '2026-11-18T15:08:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1823,12 +1833,12 @@ function topicRow(t){
   let btn;
   if(topicTab==='sub'){ const n = subtopicsForTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicSubtopicManageForm('${t.id}')">📑${n?` ${n}`:''}</button>`; }
   else if(topicTab==='rev'){ btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicRevisionForm('${t.id}')">🔁</button>`; }
-  else if(topicTab==='tests'){ const n = tlTestsOfTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicTests('${t.id}')">🧠${n?` ${n}`:''}</button>`; }
+  else if(topicTab==='tests'){ const n = tlTestsOfTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicTests('${t.id}')">🧠${n?` ${n}`:' ＋'}</button>`; }
   else if(topicTab==='status'){ btn = `<span onclick="openTopicStatusSheet('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px; padding:8px 10px;">${statusDot}</span>`; }
   else btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>`;
   return `<div class="topic-row${highlight}" data-search="${esc(t.name.toLowerCase())}" id="topic-${t.id}">
     <div class="topic-row-top">
-      <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
+      <span class="topic-name">${esc(t.name)}</span>
       ${btn}
     </div>
     ${topicMetaHTML(t)}
@@ -1837,10 +1847,12 @@ function topicRow(t){
 function topicMetaHTML(t){
   const st = topicStudyInfo(t), rv = topicRevInfo(t);
   const parts = [];
-  if(st.n) parts.push(`📖 ${st.n} વાર${st.last?' · '+formatDateShort(st.last):''}`);
-  if(rv.n) parts.push(`🔁 ${rv.n} વાર${rv.last?' · '+formatDateShort(rv.last):''}`);
-  let tl = ''; { const ts = tlTestsOfTopic(t.id); if(ts.length){ const l = ts.filter(x=>(x.attempts||[]).length).map(x=>x.attempts[x.attempts.length-1].pct); tl = `<div class="ink-dim fs-12" style="padding:0 0 8px 4px;">🧠 ${ts.length} ટેસ્ટ${l.length?' · છેલ્લી સરેરાશ '+Math.round(l.reduce((a,b)=>a+b,0)/l.length)+'%':''}</div>`; } }
-  return (parts.length ? `<div class="ink-dim fs-12" style="padding:0 0 8px 4px;">${parts.join(' &nbsp;·&nbsp; ')} <span style="opacity:.7;">(છેલ્લી તારીખ)</span></div>` : '') + tl;
+  if(st.n) parts.push(`<span>📖 ${st.n} વાર${st.last?' · '+formatDateShort(st.last):''}</span>`);
+  if(rv.n) parts.push(`<span>🔁 ${rv.n} વાર${rv.last?' · '+formatDateShort(rv.last):''}</span>`);
+  const ts = tlTestsOfTopic(t.id);
+  if(ts.length){ const l = ts.filter(x=>(x.attempts||[]).length).map(x=>x.attempts[x.attempts.length-1].pct);
+    parts.push(`<span class="t-test" onclick="openTopicTests('${t.id}')">🧠 ${ts.length} ટેસ્ટ${l.length?' · સરેરાશ '+Math.round(l.reduce((a,b)=>a+b,0)/l.length)+'%':''}</span>`); }
+  return parts.length ? `<div class="topic-meta">${parts.join('')}</div>` : '';
 }
 function moveTopic(id, dir){
   const list = DB.topics;
@@ -3344,12 +3356,12 @@ function mqTestCardHTML(t, showPath){
   }[mqTab] || '';
   return `<div class="card${hl}" id="qtest-${t.id}" data-search="${esc(t.name.toLowerCase())}">
     <div class="mq-row"><span class="mq-ico">📄</span>
-      <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">${esc(t.name)}</div>
-      ${path?`<div class="ink-dim" style="font-size:12px;">📁 ${esc(path)}</div>`:''}
-      <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${mqTimes(t)?` · ${mqTimes(t)} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div>${tlTopicChips(t)}</div>
-      ${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}
-      ${side}</div>
-    ${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">છેલ્લી: ${last.correct}/${last.total} સાચા${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</div>`:''}
+      <div style="flex:1;min-width:0;"><div class="mq-name">${esc(t.name)}</div>
+      ${path?`<div class="mq-meta">📁 ${esc(path)}</div>`:''}
+      <div class="mq-meta">${t.questions.length} પ્રશ્નો${mqTimes(t)?` · ${mqTimes(t)} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div>
+      ${tlTopicChips(t)}</div>
+      <div class="mq-side">${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}${side}</div></div>
+    ${last?`<div class="mq-res">છેલ્લી: ${last.correct}/${last.total} સાચા${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</div>`:''}
     ${mqTab==='rev'?mqRevLineHTML(t):''}</div>`;
 }
 function mqPickTestsUnder(fid){
@@ -3545,7 +3557,9 @@ function tlTestsOfTopic(topicId){ return DB.qtests.filter(t=>(t.topicIds||[]).in
 function tlTopicChips(t){
   const ids = (t.topicIds||[]).filter(id=>DB.topics.some(x=>x.id===id));
   if(!ids.length) return '';
-  return `<div style="margin-top:4px;">${ids.map(id=>{ const tp = DB.topics.find(x=>x.id===id); return `<span class="tl-chip" onclick="tlGoTopic('${id}')">🔗 ${esc(tp.name)}</span>`; }).join('')}</div>`;
+  if(mqTab!=='link') return `<div><span class="tl-chip" onclick="tlOpenTest('${t.id}')">🔗 ${ids.length} ટોપિક જોડેલા</span></div>`;
+  const show = ids, more = 0;
+  return `<div>${show.map(id=>{ const tp = DB.topics.find(x=>x.id===id); return `<span class="tl-chip" onclick="tlGoTopic('${id}')">🔗 ${esc(tp.name)}</span>`; }).join('')}${more>0?`<span class="tl-chip tl-more" onclick="tlOpenTest('${t.id}')">+${more} વધુ</span>`:''}</div>`;
 }
 function tlGoTopic(topicId){
   const tp = DB.topics.find(x=>x.id===topicId); if(!tp) return;
