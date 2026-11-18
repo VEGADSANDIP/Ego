@@ -329,6 +329,7 @@ a{color:inherit;}
 .mq-pick-row{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px;}
 .mq-pick-row input{width:20px; height:20px; flex-shrink:0;}
 .mq-pick-folder{font-weight:800;}
+.tl-chip{display:inline-block; font-size:11.5px; padding:2px 8px; margin:3px 4px 0 0; border-radius:999px; background:color-mix(in srgb, var(--primary) 16%, transparent); cursor:pointer;}
 .dh-wrap{margin:14px 0 14px;}
 .dh-card{padding:11px 14px 10px; border-radius:18px; border:1px solid color-mix(in srgb, #FF8A3D 28%, var(--border)); background:linear-gradient(135deg, rgba(255,138,61,.16), rgba(255,61,107,.05)), var(--surface); box-shadow:var(--shadow);}
 .dh-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
@@ -479,8 +480,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.11-4';
-const APP_BUILT = '2026-11-11T16:13:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.18-1';
+const APP_BUILT = '2026-11-18T15:03:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1815,13 +1816,14 @@ function dashboardTodayStudyRow(l){
   </div>`;
 }
 let topicTab = 'edit'; /* ચેપ્ટરની બાજુનું બટન કયું કામ કરે: edit / sub / rev / status */
-function topicTabSegHTML(){ return ringHTML('topicRing', [['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન'],['status','🚦 સ્ટેટસ']], topicTab, "topicTab='%K'; renderMain();"); }
+function topicTabSegHTML(){ return ringHTML('topicRing', [['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન'],['tests','🧠 ટેસ્ટ'],['status','🚦 સ્ટેટસ']], topicTab, "topicTab='%K'; renderMain();"); }
 function topicRow(t){
   const statusDot = t.status==='completed' ? '🟢' : (t.status==='studying' ? '🟡' : '🔴');
   const highlight = (highlightTopicId===t.id) ? ' row-highlight' : '';
   let btn;
   if(topicTab==='sub'){ const n = subtopicsForTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicSubtopicManageForm('${t.id}')">📑${n?` ${n}`:''}</button>`; }
   else if(topicTab==='rev'){ btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicRevisionForm('${t.id}')">🔁</button>`; }
+  else if(topicTab==='tests'){ const n = tlTestsOfTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicTests('${t.id}')">🧠${n?` ${n}`:''}</button>`; }
   else if(topicTab==='status'){ btn = `<span onclick="openTopicStatusSheet('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px; padding:8px 10px;">${statusDot}</span>`; }
   else btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>`;
   return `<div class="topic-row${highlight}" data-search="${esc(t.name.toLowerCase())}" id="topic-${t.id}">
@@ -1837,7 +1839,8 @@ function topicMetaHTML(t){
   const parts = [];
   if(st.n) parts.push(`📖 ${st.n} વાર${st.last?' · '+formatDateShort(st.last):''}`);
   if(rv.n) parts.push(`🔁 ${rv.n} વાર${rv.last?' · '+formatDateShort(rv.last):''}`);
-  return parts.length ? `<div class="ink-dim fs-12" style="padding:0 0 8px 4px;">${parts.join(' &nbsp;·&nbsp; ')} <span style="opacity:.7;">(છેલ્લી તારીખ)</span></div>` : '';
+  let tl = ''; { const ts = tlTestsOfTopic(t.id); if(ts.length){ const l = ts.filter(x=>(x.attempts||[]).length).map(x=>x.attempts[x.attempts.length-1].pct); tl = `<div class="ink-dim fs-12" style="padding:0 0 8px 4px;">🧠 ${ts.length} ટેસ્ટ${l.length?' · છેલ્લી સરેરાશ '+Math.round(l.reduce((a,b)=>a+b,0)/l.length)+'%':''}</div>`; } }
+  return (parts.length ? `<div class="ink-dim fs-12" style="padding:0 0 8px 4px;">${parts.join(' &nbsp;·&nbsp; ')} <span style="opacity:.7;">(છેલ્લી તારીખ)</span></div>` : '') + tl;
 }
 function moveTopic(id, dir){
   const list = DB.topics;
@@ -2148,6 +2151,7 @@ function saveExam(id){
 }
 function cascadeDeleteSubjectData(subjectId){
   const topicIds = DB.topics.filter(t=>t.subjectId===subjectId).map(t=>t.id);
+  (DB.qtests||[]).forEach(q=>{ if(q.topicIds) q.topicIds = q.topicIds.filter(x=>!topicIds.includes(x)); });
   DB.subtopics = DB.subtopics.filter(st=>!topicIds.includes(st.topicId));
   DB.revisions = DB.revisions.filter(r=>r.subjectId!==subjectId);
   DB.topics = DB.topics.filter(t=>t.subjectId!==subjectId);
@@ -2282,6 +2286,7 @@ function deleteTopic(id){
   DB.topics = DB.topics.filter(x=>x.id!==id);
   DB.subtopics = DB.subtopics.filter(x=>x.topicId!==id);
   DB.revisions = DB.revisions.filter(r=>r.topicId!==id);
+  DB.qtests.forEach(q=>{ if(q.topicIds) q.topicIds = q.topicIds.filter(x=>x!==id); });
   DB.studyLogs.forEach(l=>{
     if(l.topicId===id) l.topicId='';
     if(l.topicIds) l.topicIds = l.topicIds.filter(tid=>tid!==id);
@@ -3290,7 +3295,7 @@ function mqCmp(mode, a, b){
   return r || byName();
 }
 let mqTab = 'test'; /* ટેસ્ટની બાજુનું બટન કયું કામ કરે */
-const MQ_TABS = [['test','⏱ ટેસ્ટ'],['practice','✍ પ્રેક્ટિસ'],['read','📖 વાંચન'],['pdf','📄 PDF'],['rev','🔁 રિવિઝન'],['edit','✎ એડિટ']];
+const MQ_TABS = [['test','⏱ ટેસ્ટ'],['practice','✍ પ્રેક્ટિસ'],['read','📖 વાંચન'],['pdf','📄 PDF'],['rev','🔁 રિવિઝન'],['link','🔗 ટોપિક'],['edit','✎ એડિટ']];
 
 /* ===== રિંગ ટેબ ===== */
 function ringHTML(id, items, active, setCode){
@@ -3334,13 +3339,14 @@ function mqTestCardHTML(t, showPath){
     read: B('📖', `mqStart('${t.id}','read')`, true),
     pdf: B('📄', `openMqPdf('${t.id}')`, true),
     rev: B('🔁', `openQTestRevisionSheet('${t.id}')`, true),
+    link: B('🔗'+((t.topicIds||[]).length?' '+(t.topicIds||[]).length:''), `tlOpenTest('${t.id}')`, true),
     edit: B('✎', `openQTestForm('${t.id}')`, false)
   }[mqTab] || '';
   return `<div class="card${hl}" id="qtest-${t.id}" data-search="${esc(t.name.toLowerCase())}">
     <div class="mq-row"><span class="mq-ico">📄</span>
       <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:16px;">${esc(t.name)}</div>
       ${path?`<div class="ink-dim" style="font-size:12px;">📁 ${esc(path)}</div>`:''}
-      <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${mqTimes(t)?` · ${mqTimes(t)} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div></div>
+      <div class="ink-dim" style="font-size:12.5px;margin-top:2px;">${t.questions.length} પ્રશ્નો${mqTimes(t)?` · ${mqTimes(t)} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div>${tlTopicChips(t)}</div>
       ${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}
       ${side}</div>
     ${last?`<div class="ink-dim" style="font-size:12px;margin-top:6px;">છેલ્લી: ${last.correct}/${last.total} સાચા${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</div>`:''}
@@ -3452,6 +3458,7 @@ function openQFolderForm(id){
     <h3>${f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર'} 📁</h3>
     <div class="field"><label>નામ</label><input type="text" id="f_qfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: Daily Test Series"></div>
     <div class="field"><label>ક્યાં રાખવું?</label><select id="f_qfparent">${mqFolderOptions(f ? (f.parentId||'') : (mqFolderId||''), id)}</select></div>
+    ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ફોલ્ડરની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>`:''}
     <div class="sheet-actions">
       ${f?`<button class="btn btn-danger" onclick="deleteQFolder('${f.id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveQFolder(${f?`'${f.id}'`:'null'})">સેવ કરો</button>
@@ -3488,6 +3495,7 @@ function openQTestForm(id){
     <div class="field"><label>જવાબ ચાવી (દા.ત. DACBBC… અથવા 1-D 2-A 3-A…)</label>
       <input type="text" id="f_qtkey" oninput="mqPreview()" value="${t?esc(mqKeyString(t.questions)):''}" placeholder="DACBBCADBC…" style="letter-spacing:1px;"></div>
     <div id="mqPreview" class="ink-dim" style="font-size:13px;margin:8px 0 4px;"></div>
+    ${t?`<button class="btn btn-secondary btn-block" style="margin-top:6px;" onclick="tlOpenTest('${t.id}')">🔗 ટોપિક જોડો${(t.topicIds||[]).length?' ('+(t.topicIds||[]).length+')':''}</button>`:''}
     <div class="sheet-actions">
       ${t?`<button class="btn btn-danger" onclick="deleteQTest('${t.id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveQTest(${t?`'${t.id}'`:'null'})">સેવ કરો</button>
@@ -3529,6 +3537,111 @@ function saveQTest(id){
 function deleteQTest(id){
   if(!confirm('આ ટેસ્ટ ડિલીટ કરવી છે?')) return;
   DB.qtests = DB.qtests.filter(t=>t.id!==id); DB.qrevs = (DB.qrevs||[]).filter(r=>r.testId!==id); save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+
+/* ===== ટેસ્ટ ↔ ટોપિક લિંક (એક ટેસ્ટ સાથે ઘણા ટોપિક, એક ટોપિક સાથે ઘણી ટેસ્ટ) ===== */
+let tlSel = new Set(), tlTests = [], tlBase = new Set(), tlQ = '', tlTopicSel = new Set(), tlTopicId = null;
+function tlTestsOfTopic(topicId){ return DB.qtests.filter(t=>(t.topicIds||[]).includes(topicId)); }
+function tlTopicChips(t){
+  const ids = (t.topicIds||[]).filter(id=>DB.topics.some(x=>x.id===id));
+  if(!ids.length) return '';
+  return `<div style="margin-top:4px;">${ids.map(id=>{ const tp = DB.topics.find(x=>x.id===id); return `<span class="tl-chip" onclick="tlGoTopic('${id}')">🔗 ${esc(tp.name)}</span>`; }).join('')}</div>`;
+}
+function tlGoTopic(topicId){
+  const tp = DB.topics.find(x=>x.id===topicId); if(!tp) return;
+  if(!mqNavReset()) return;
+  navigateToSubjectTopics(tp.subjectId, topicId);
+}
+function tlGoTest(testId){ closeSheet(); mqGoToTest(testId); }
+/* --- ટેસ્ટ/ફોલ્ડર બાજુથી ટોપિક પસંદ કરવા --- */
+function tlOpenForTests(tests, title){
+  tlTests = tests.filter(Boolean); if(!tlTests.length){ toast('આમાં કોઈ ટેસ્ટ નથી','error'); return; }
+  const common = (tlTests[0].topicIds||[]).filter(id=>tlTests.every(t=>(t.topicIds||[]).includes(id)));
+  tlBase = new Set(common); tlSel = new Set(common); tlQ = '';
+  tlRenderSheet(title);
+}
+function tlOpenTest(testId){ const t = DB.qtests.find(x=>x.id===testId); if(t) tlOpenForTests([t], t.name); }
+function tlOpenFolder(fid){ const f = DB.qfolders.find(x=>x.id===fid); tlOpenForTests(mqFolderTestsDeep(fid), '📁 '+(f?f.name:'')); }
+let tlTitle = '';
+function tlRenderSheet(title){
+  if(title!==undefined) tlTitle = title;
+  const multi = tlTests.length>1;
+  openSheet(`
+    <div class="sheet-title">🔗 ટોપિક જોડો</div>
+    <div style="font-weight:800; margin-bottom:4px;">${esc(tlTitle)}</div>
+    ${multi?`<div class="ink-dim fs-12 mb-6">${tlTests.length} ટેસ્ટ — પસંદ કરેલા ટોપિક બધી ટેસ્ટ સાથે જોડાશે (ટિક કાઢશો તો બધીમાંથી હટશે).</div>`:''}
+    <input type="text" id="tlSearch" value="${esc(tlQ)}" placeholder="🔍 ટોપિક કે વિષય શોધો..." oninput="tlSearchInput(this.value)" style="width:100%; padding:9px 10px; margin-bottom:8px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:14px;">
+    <div id="tlList" style="max-height:46vh; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${tlPickerHTML()}</div>
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="tlSave()">સેવ કરો (${tlSel.size} ટોપિક)</button></div>`);
+}
+function tlPickerHTML(){
+  const q = tlQ.trim().toLowerCase(); let h = '';
+  examSubjects(mqExamId()).forEach(s=>{
+    const ts = subjectTopics(s.id).filter(t=>!q || t.name.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
+    if(!ts.length) return;
+    h += `<div class="mq-pick-row mq-pick-folder"><span style="flex:1;min-width:0;">📚 ${esc(s.name)}</span></div>`;
+    ts.forEach(t=>{ h += `<label class="mq-pick-row" style="padding-left:16px;"><input type="checkbox" ${tlSel.has(t.id)?'checked':''} onchange="tlToggle('${t.id}')"><span style="flex:1;min-width:0;">${esc(t.name)}</span></label>`; });
+  });
+  return h || emptyRow('કોઈ ટોપિક મળ્યો નથી');
+}
+function tlSearchInput(v){ tlQ = v; const l = document.getElementById('tlList'); if(l) l.innerHTML = tlPickerHTML(); }
+function tlToggle(id){ if(tlSel.has(id)) tlSel.delete(id); else tlSel.add(id);
+  const b = document.querySelector('.sheet-actions .btn-primary'); if(b) b.textContent = `સેવ કરો (${tlSel.size} ટોપિક)`; }
+function tlSave(){
+  tlTests.forEach(t=>{
+    const cur = new Set(t.topicIds||[]);
+    tlSel.forEach(id=>cur.add(id));
+    tlBase.forEach(id=>{ if(!tlSel.has(id)) cur.delete(id); });
+    t.topicIds = [...cur];
+  });
+  save(); closeSheet(); renderMain(); toast('લિંક સેવ થઈ ✅');
+}
+/* --- ટોપિક બાજુથી ટેસ્ટ જોવા/જોડવા --- */
+function openTopicTests(topicId){
+  const tp = DB.topics.find(x=>x.id===topicId); if(!tp) return;
+  const tests = tlTestsOfTopic(topicId).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true}));
+  const row = t=>{ const last = (t.attempts||[]).slice(-1)[0];
+    return `<div class="item" onclick="tlGoTest('${t.id}')"><span style="flex:1;min-width:0;"><b>${esc(t.name)}</b><br><span class="ink-dim fs-12">${esc(mqFolderPath(t.folderId).join(' › '))}${last?` · છેલ્લી ${last.pct}% · શ્રેષ્ઠ ${mqBest(t)}%`:' · હજી આપી નથી'}</span></span><span>›</span></div>`; };
+  openSheet(`
+    <div class="sheet-title">🧠 જોડેલી ટેસ્ટ</div>
+    <div style="font-weight:800; margin-bottom:8px;">${esc(tp.name)}</div>
+    ${tests.length ? tests.map(row).join('') : emptyRow('હજી કોઈ ટેસ્ટ જોડાયેલી નથી')}
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="tlOpenTopicPicker('${topicId}')">＋ ટેસ્ટ જોડો / બદલો</button></div>`);
+}
+function tlOpenTopicPicker(topicId){
+  tlTopicId = topicId; tlTopicSel = new Set(tlTestsOfTopic(topicId).map(t=>t.id)); tlRenderTopicPicker();
+}
+function tlTestTree(fid, depth){
+  let h = '';
+  mqTests(fid).forEach(t=>{ h += `<label class="mq-pick-row" style="padding-left:${depth*16}px;"><input type="checkbox" ${tlTopicSel.has(t.id)?'checked':''} onchange="tlTpToggle('${t.id}')"><span style="flex:1;min-width:0;">${esc(t.name)}</span></label>`; });
+  mqFolders(fid).forEach(f=>{
+    const all = mqPickTestsUnder(f.id); if(!all.length) return;
+    const on = all.filter(t=>tlTopicSel.has(t.id)).length;
+    h += `<label class="mq-pick-row mq-pick-folder" style="padding-left:${depth*16}px;"><input type="checkbox" ${on===all.length?'checked':''} ${(on>0&&on<all.length)?'data-part="1"':''} onchange="tlTpFolder('${f.id}', this.checked)"><span style="flex:1;min-width:0;">📁 ${esc(f.name)}</span><span class="ink-dim fs-12">${on}/${all.length}</span></label>`;
+    h += tlTestTree(f.id, depth+1);
+  });
+  return h;
+}
+function tlRenderTopicPicker(){
+  const tp = DB.topics.find(x=>x.id===tlTopicId); if(!tp) return;
+  const l0 = document.getElementById('tlTpList'); const sc = l0 ? l0.scrollTop : 0;
+  openSheet(`
+    <div class="sheet-title">🔗 ટેસ્ટ જોડો</div>
+    <div style="font-weight:800; margin-bottom:8px;">${esc(tp.name)}</div>
+    <div id="tlTpList" style="max-height:50vh; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${tlTestTree(null,0) || emptyRow('કોઈ ટેસ્ટ નથી')}</div>
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="tlTpSave()">સેવ કરો (${tlTopicSel.size} ટેસ્ટ)</button></div>`);
+  const l = document.getElementById('tlTpList'); if(l) l.scrollTop = sc;
+  document.querySelectorAll('#tlTpList input[data-part]').forEach(i=>{ i.indeterminate = true; });
+}
+function tlTpToggle(id){ if(tlTopicSel.has(id)) tlTopicSel.delete(id); else tlTopicSel.add(id); tlRenderTopicPicker(); }
+function tlTpFolder(fid, on){ mqPickTestsUnder(fid).forEach(t=>{ if(on) tlTopicSel.add(t.id); else tlTopicSel.delete(t.id); }); tlRenderTopicPicker(); }
+function tlTpSave(){
+  DB.qtests.filter(t=>t.examId===mqExamId()).forEach(t=>{
+    const cur = new Set(t.topicIds||[]);
+    if(tlTopicSel.has(t.id)) cur.add(tlTopicId); else cur.delete(tlTopicId);
+    t.topicIds = [...cur];
+  });
+  save(); closeSheet(); renderMain(); toast('લિંક સેવ થઈ ✅');
 }
 
 /* ---- ક્વિઝ સેશન ---- */
