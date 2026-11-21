@@ -492,8 +492,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.21-3';
-const APP_BUILT = '2026-11-21T10:31:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-4';
+const APP_BUILT = '2026-11-21T10:45:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -2182,7 +2182,7 @@ function deleteExam(id){
   if(DB.activity) delete DB.activity[id];
   { const gone = new Set((DB.qtests||[]).filter(t=>t.examId===id).map(t=>t.id)); DB.qrevs = (DB.qrevs||[]).filter(r=>!gone.has(r.testId)); }
   DB.qtests = (DB.qtests||[]).filter(t=>t.examId!==id);
-  DB.mapCats = (DB.mapCats||[]).filter(c=>c.examId!==id); DB.mapPlaces = (DB.mapPlaces||[]).filter(p=>p.examId!==id);
+  /* નકશો કોમન છે — પરીક્ષા ડિલીટ કરવાથી નકશાનો ડેટા ભૂંસાતો નથી */
   DB.exams = DB.exams.filter(x=>x.id!==id);
   if(DB.exams.length && !DB.exams.find(x=>x.active)) DB.exams[0].active=true;
   examDetailId=null;
@@ -4497,8 +4497,25 @@ function mapFit(bb, pad){
 function mapDistObj(k){ return GJ_MAP.d.find(x=>x.k===k); }
 function mapDistName(k){ const d = mapDistObj(k); return d ? d.n : (k||''); }
 function mapTalList(k){ return GJ_TAL[k] || []; }
-function mapCatsOf(){ const e=getActiveExam(); return e ? (DB.mapCats||[]).filter(c=>c.examId===e.id) : []; }
-function mapPlacesAll(){ const e=getActiveExam(); return e ? (DB.mapPlaces||[]).filter(p=>p.examId===e.id) : []; }
+/* નકશો બધી પરીક્ષા માટે કોમન: વિભાગો અને સ્થળો પરીક્ષા પ્રમાણે અલગ નથી */
+function mapEnsureCommon(){
+  if(DB.mapCommon) return; DB.mapCommon = true;
+  const cats = DB.mapCats||[], places = DB.mapPlaces||[];
+  const byId = {}; cats.forEach(c=>{ byId[c.id]=c; });
+  const key = c=>{ const out=[]; let x=c, g=0; while(x && g++<10){ out.unshift(mapNorm(x.name)); x = x.parentId ? byId[x.parentId] : null; } return out.join('>'); };
+  const depth = c=>{ let d=0, x=c, g=0; while(x && x.parentId && g++<10){ d++; x=byId[x.parentId]; } return d; };
+  const canon = {}, remap = {};
+  [...cats].sort((a,b)=>depth(a)-depth(b)).forEach(c=>{ const k=key(c); if(canon[k]) remap[c.id]=canon[k].id; else canon[k]=c; });
+  DB.mapCats = cats.filter(c=>!remap[c.id]);
+  DB.mapCats.forEach(c=>{ if(c.parentId && remap[c.parentId]) c.parentId = remap[c.parentId]; });
+  const seen = new Set(); const keep = [];
+  places.forEach(pl=>{ if(remap[pl.catId]) pl.catId = remap[pl.catId];
+    const k = [pl.catId, pl.state||'Gujarat', mapNorm(pl.name), mapNorm(pl.district||''), mapNorm(pl.taluka||'')].join('|');
+    if(seen.has(k)) return; seen.add(k); keep.push(pl); });
+  DB.mapPlaces = keep; save();
+}
+function mapCatsOf(){ mapEnsureCommon(); return (DB.mapCats||[]).slice(); }
+function mapPlacesAll(){ mapEnsureCommon(); return (DB.mapPlaces||[]).slice(); }
 function mapCatName(id){ const c=(DB.mapCats||[]).find(x=>x.id===id); return c ? mapCatLabel(c) : ''; }
 function mapKids(id){ return mapCatsOf().filter(c=>c.parentId===id); }
 function mapCatScopeCount(id){ return mapPlacesAll().filter(p=>p.catId===id && (mapSt==='__IN'||mapStOf(p)===mapSt)).length; }
