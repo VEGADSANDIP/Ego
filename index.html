@@ -492,8 +492,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.21-6';
-const APP_BUILT = '2026-11-21T11:34:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-9';
+const APP_BUILT = '2026-11-21T16:51:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -2625,7 +2625,7 @@ function calKindCount(dateStr, kind){
 function calendarDayDetailHTML(dateStr){
   if(calKind==='mcq'){
     if(calMode==='study'){
-      const items = mqAttemptsOn(dateStr).map(({t,a})=>({t, extra:` <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':(a.mode==='survive'?'ચેલેન્જ':'ટેસ્ટ')}${a.set&&a.set!=='A'?' · સેટ '+a.set:''}</span>`, right:`<span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span>`}));
+      const items = mqAttemptsOn(dateStr).map(({t,a})=>({t, extra:` <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':(a.mode==='survive'?'ચેલેન્જ':'ટેસ્ટ')}${a.set&&a.set!=='A'?' · સેટ '+a.set:''}${a.first===true?' · 📖 પહેલી વાર':(a.first===false?' · 🔁 રિવિઝન':'')}</span>`, right:`<span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span>`}));
       return items.length ? mqFolderGroupedHTML(items) : emptyRow('આ દિવસે કોઈ MCQ ટેસ્ટ આપી નથી');
     }
     const rv = qrevsForActiveExam().filter(r=>r.dueDate===dateStr);
@@ -3467,11 +3467,11 @@ function mqTestCardHTML(t, showPath){
       <div style="flex:1;min-width:0;"><div class="mq-name">${esc(t.name)}</div>
       ${path?`<div class="mq-meta">📁 ${esc(path)}</div>`:''}
       <div class="mq-meta">${t.questions.length} પ્રશ્નો${mqTimes(t)?` · ${mqTimes(t)} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div>
-      ${mqTab==='survive'&&t.chal?`<div class="mq-meta">🔥 છેલ્લી ચેલેન્જ: ${t.chal.runs} પ્રયત્ન · છેલ્લામાં ${t.chal.correct}/${t.chal.total} સાચા (${t.chal.pct}%)</div>`:''}
+      ${t.chal?`<div class="mq-meta">🔥 છેલ્લી ચેલેન્જ: ${t.chal.runs} પ્રયત્ન · છેલ્લામાં ${t.chal.correct}/${t.chal.total} સાચા (${t.chal.pct}%)</div>`:''}
       ${tlTopicChips(t)}</div>
       <div class="mq-side">${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}${side}</div></div>
     ${last?`<div class="mq-res">છેલ્લી: ${last.correct}/${last.total} સાચા${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</div>`:''}
-    ${mqTab==='rev'?mqRevLineHTML(t):''}</div>`;
+    ${mqRevLineHTML(t)}</div>`;
 }
 function mqPickTestsUnder(fid){
   let out = mqTests(fid).slice();
@@ -3674,7 +3674,6 @@ function tlTestsOfTopic(topicId){ return DB.qtests.filter(t=>(t.topicIds||[]).in
 function tlTopicChips(t){
   const ids = (t.topicIds||[]).filter(id=>DB.topics.some(x=>x.id===id));
   if(!ids.length) return '';
-  if(mqTab!=='link') return `<div><span class="tl-chip" onclick="tlOpenTest('${t.id}')">🔗 ${ids.length} ટોપિક જોડેલા</span></div>`;
   const show = ids, more = 0;
   return `<div>${show.map(id=>{ const tp = DB.topics.find(x=>x.id===id); return `<span class="tl-chip" onclick="tlGoTopic('${id}')">🔗 ${esc(tp.name)}</span>`; }).join('')}${more>0?`<span class="tl-chip tl-more" onclick="tlOpenTest('${t.id}')">+${more} વધુ</span>`:''}</div>`;
 }
@@ -3688,7 +3687,7 @@ function tlGoTest(testId){ closeSheet(); mqGoToTest(testId); }
 function tlOpenForTests(tests, title){
   tlTests = tests.filter(Boolean); if(!tlTests.length){ toast('આમાં કોઈ ટેસ્ટ નથી','error'); return; }
   const common = (tlTests[0].topicIds||[]).filter(id=>tlTests.every(t=>(t.topicIds||[]).includes(id)));
-  tlBase = new Set(common); tlSel = new Set(common); tlQ = '';
+  tlBase = new Set(common); tlSel = new Set(common); tlQ = ''; tlOpenSubj = new Set();
   tlRenderSheet(title);
 }
 function tlOpenTest(testId){ const t = DB.qtests.find(x=>x.id===testId); if(t) tlOpenForTests([t], t.name); }
@@ -3710,13 +3709,17 @@ function tlScrollToChecked(listId){
   setTimeout(()=>{ const l = document.getElementById(listId); if(!l) return; const c = l.querySelector('input:checked'); if(!c) return;
     const row = c.closest('label')||c; l.scrollTop = Math.max(0, row.offsetTop - l.offsetTop - 50); }, 60);
 }
+var tlOpenSubj = new Set(), tlOpenFold = new Set();
+function tlToggleSubj(id){ if(tlOpenSubj.has(id)) tlOpenSubj.delete(id); else tlOpenSubj.add(id); const l=document.getElementById('tlList'); if(l) l.innerHTML = tlPickerHTML(); }
+function tlToggleFold(id){ if(tlOpenFold.has(id)) tlOpenFold.delete(id); else tlOpenFold.add(id); tlRenderTopicPicker(); }
 function tlPickerHTML(){
   const q = tlQ.trim().toLowerCase(); let h = '';
   examSubjects(mqExamId()).forEach(s=>{
     const ts = subjectTopics(s.id).filter(t=>!q || t.name.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
     if(!ts.length) return;
-    h += `<div class="mq-pick-row mq-pick-folder"><span style="flex:1;min-width:0;">📚 ${esc(s.name)}</span></div>`;
-    ts.forEach(t=>{ h += `<label class="mq-pick-row" style="padding-left:16px;"><input type="checkbox" ${tlSel.has(t.id)?'checked':''} onchange="tlToggle('${t.id}')"><span style="flex:1;min-width:0;">${esc(t.name)}</span></label>`; });
+    const open = !!q || tlOpenSubj.has(s.id), nsel = ts.filter(t=>tlSel.has(t.id)).length;
+    h += `<div class="mq-pick-row mq-pick-folder" style="cursor:pointer;" onclick="tlToggleSubj('${s.id}')"><span>${open?'▾':'▸'}</span><span style="flex:1;min-width:0;">📚 ${esc(s.name)}</span><span class="ink-dim fs-12">${nsel?'✓ '+nsel+'/':''}${ts.length}</span></div>`;
+    if(open) ts.forEach(t=>{ h += `<label class="mq-pick-row" style="padding-left:16px;"><input type="checkbox" ${tlSel.has(t.id)?'checked':''} onchange="tlToggle('${t.id}')"><span style="flex:1;min-width:0;">${esc(t.name)}</span></label>`; });
   });
   return h || emptyRow('કોઈ ટોપિક મળ્યો નથી');
 }
@@ -3745,7 +3748,7 @@ function openTopicTests(topicId){
     <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="tlOpenTopicPicker('${topicId}')">＋ ટેસ્ટ જોડો / બદલો</button></div>`);
 }
 function tlOpenTopicPicker(topicId){
-  tlTopicId = topicId; tlTopicSel = new Set(tlTestsOfTopic(topicId).map(t=>t.id)); tlRenderTopicPicker();
+  tlTopicId = topicId; tlTopicSel = new Set(tlTestsOfTopic(topicId).map(t=>t.id)); tlOpenFold = new Set(); tlRenderTopicPicker();
   tlScrollToChecked('tlTpList');
 }
 function tlTestTree(fid, depth){
@@ -3754,8 +3757,9 @@ function tlTestTree(fid, depth){
   mqFolders(fid).forEach(f=>{
     const all = mqPickTestsUnder(f.id); if(!all.length) return;
     const on = all.filter(t=>tlTopicSel.has(t.id)).length;
-    h += `<label class="mq-pick-row mq-pick-folder" style="padding-left:${depth*16}px;"><input type="checkbox" ${on===all.length?'checked':''} ${(on>0&&on<all.length)?'data-part="1"':''} onchange="tlTpFolder('${f.id}', this.checked)"><span style="flex:1;min-width:0;">📁 ${esc(f.name)}</span><span class="ink-dim fs-12">${on}/${all.length}</span></label>`;
-    h += tlTestTree(f.id, depth+1);
+    const open = tlOpenFold.has(f.id);
+    h += `<div class="mq-pick-row mq-pick-folder" style="padding-left:${depth*16}px;"><input type="checkbox" ${on===all.length?'checked':''} ${(on>0&&on<all.length)?'data-part="1"':''} onchange="tlTpFolder('${f.id}', this.checked)"><span style="flex:1;min-width:0;cursor:pointer;" onclick="tlToggleFold('${f.id}')">${open?'▾':'▸'} 📁 ${esc(f.name)}</span><span class="ink-dim fs-12" style="cursor:pointer;" onclick="tlToggleFold('${f.id}')">${on}/${all.length}</span></div>`;
+    if(open) h += tlTestTree(f.id, depth+1);
   });
   return h;
 }
@@ -4015,21 +4019,28 @@ function mqPick(k){
 }
 /* ટેસ્ટ સાથે જોડેલા ટોપિક આપોઆપ રિવિઝનમાં: ટેસ્ટ/પ્રેક્ટિસ/ચેલેન્જ કોઈ પણ આપો ત્યારે */
 function mqAutoReviseTopics(tests){
-  const today = todayStr(), names = []; const seen = new Set();
+  /* પહેલી વાર: ટોપિક "અભ્યાસ" (એક જ વાર) · પછી દરેક વખતે: "રિવિઝન" (આજે એક ટોપિકનું એક) */
+  const today = todayStr(); const seen = new Set(); const nStudy = [], nRev = [];
   tests.forEach(t=>{ (t.topicIds||[]).forEach(id=>{
     if(seen.has(id)) return; seen.add(id);
     const tp = DB.topics.find(x=>x.id===id); if(!tp) return;
+    const st = topicStudyInfo(tp), rv = topicRevInfo(tp);
     const mine = DB.revisions.filter(r=>r.topicId===id && !r.subtopicId);
+    const everStudied = st.n>0 || rv.n>0 || mine.some(r=>r.status==='completed');
+    if(!everStudied){ addAutoStudyLog(tp.subjectId, id, null); nStudy.push(tp.name); return; }
     if(mine.some(r=>r.status==='completed' && (r.completedDate||r.dueDate)===today)) return; /* આજે રિવિઝન થઈ ગયું છે */
     const due = mine.filter(r=>r.status==='pending' && r.dueDate<=today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
     if(due){ due.status='completed'; due.completedDate=today; }
     else { const stage = Math.max(0, ...mine.map(r=>r.stage||0)) + 1;
       DB.revisions.push({id:uid(), topicId:id, subjectId:tp.subjectId, dueDate:today, status:'completed', completedDate:today, stage, auto:true}); }
-    names.push(tp.name);
+    nRev.push(tp.name);
   }); });
-  if(names.length){ save(); const sh = names.slice(0,2).map(n=>n.length>28?n.slice(0,28)+'…':n).join(', ');
-    setTimeout(()=>toast(`🔁 ${names.length} ટોપિક રિવિઝનમાં ઉમેર્યા: ${sh}${names.length>2?' +'+(names.length-2):''}`),700); }
-  return names.length;
+  const n = nStudy.length + nRev.length;
+  if(n){ save(); const parts = [];
+    if(nStudy.length) parts.push(`📖 ${nStudy.length} ટોપિક અભ્યાસમાં`);
+    if(nRev.length) parts.push(`🔁 ${nRev.length} ટોપિક રિવિઝનમાં`);
+    setTimeout(()=>toast(parts.join(' · ')+' ઉમેર્યા'),700); }
+  return n;
 }
 function mqAutoReviseSession(S){
   if(!S || S.revDone) return; S.revDone = true;
@@ -4265,14 +4276,14 @@ function qrevsForActiveExam(){
 }
 function mqAttemptsOn(dateStr){
   const out = [];
-  mqExamTests(mqExamId()).forEach(t=>{ (t.attempts||[]).forEach(a=>{ if(a.date===dateStr) out.push({t,a}); });
+  mqExamTests(mqExamId()).forEach(t=>{ (t.attempts||[]).forEach(a=>{ if(a.date===dateStr) out.push({t, a:Object.assign({}, a, {first: mqTimes(t)<=1})}); });
     if(t.chal && t.chal.date===dateStr) out.push({t, a:{mode:'survive', correct:t.chal.correct, total:t.chal.total, pct:t.chal.pct}}); });
   return out;
 }
 function mqAttemptsCardHTML(dateStr){
   const list = mqAttemptsOn(dateStr);
   if(!list.length) return '';
-  return `<div class="card mt-14"><div class="item item-static"><b>🧠 MCQ ટેસ્ટ આપી</b></div>${list.map(({t,a})=>`<div class="item" onclick="mqGoToTest('${t.id}')"><span style="flex:1;">${esc(t.name)} <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':(a.mode==='survive'?'ચેલેન્જ':'ટેસ્ટ')}</span></span><span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span></div>`).join('')}</div>`;
+  return `<div class="card mt-14"><div class="item item-static"><b>🧠 MCQ ટેસ્ટ આપી</b></div>${list.map(({t,a})=>`<div class="item" onclick="mqGoToTest('${t.id}')"><span style="flex:1;">${esc(t.name)} <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':(a.mode==='survive'?'ચેલેન્જ':'ટેસ્ટ')}${a.first===true?' · 📖 પહેલી વાર':(a.first===false?' · 🔁 રિવિઝન':'')}</span></span><span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span></div>`).join('')}</div>`;
 }
 
 /* ચાલુ ટેસ્ટ/પ્રેક્ટિસ હોય તો બીજે ક્યાંકથી ક્લિક કરતાં તે બંધ ન થાય */
