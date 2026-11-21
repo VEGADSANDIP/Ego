@@ -492,8 +492,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.21-1';
-const APP_BUILT = '2026-11-21T09:37:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-2';
+const APP_BUILT = '2026-11-21T09:59:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3362,6 +3362,7 @@ function mqTestCardHTML(t, showPath){
       <div style="flex:1;min-width:0;"><div class="mq-name">${esc(t.name)}</div>
       ${path?`<div class="mq-meta">📁 ${esc(path)}</div>`:''}
       <div class="mq-meta">${t.questions.length} પ્રશ્નો${mqTimes(t)?` · ${mqTimes(t)} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div>
+      ${mqTab==='survive'&&t.chal?`<div class="mq-meta">🔥 છેલ્લી ચેલેન્જ: ${t.chal.runs} પ્રયત્ન · છેલ્લામાં ${t.chal.correct}/${t.chal.total} સાચા (${t.chal.pct}%)</div>`:''}
       ${tlTopicChips(t)}</div>
       <div class="mq-side">${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}${side}</div></div>
     ${last?`<div class="mq-res">છેલ્લી: ${last.correct}/${last.total} સાચા${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</div>`:''}
@@ -3752,15 +3753,15 @@ function openMqSet(testId, mode){
   const lastLine = (ls.test||ls.practice) ? `છેલ્લે આપેલ સેટ: ${ls.test?'⏱ ટેસ્ટ → સેટ '+ls.test:''}${ls.test&&ls.practice?' · ':''}${ls.practice?'✍ પ્રેક્ટિસ → સેટ '+ls.practice:''}` : 'આ ટેસ્ટ હજી સેટ સાથે આપી નથી.';
   openSheet(`
     <div class="sheet-title">${mqModeLabel(mode)} — પેપર સેટ પસંદ કરો</div>
-    ${mode==='survive'?'<div class="card" style="margin:0 0 10px; padding:10px 12px; font-size:13px; line-height:1.5;">🔥 <b>ચેલેન્જ:</b> દરેક જવાબ તરત ચેક થશે. એક પણ MCQ ખોટો પડે તો ટેસ્ટ <b>પહેલા પ્રશ્ન</b> થી ફરી શરૂ. બધા સળંગ સાચા પાડો ત્યારે જ પૂરી થશે. ફક્ત છેલ્લું પરિણામ (ટકા) સેવ થશે — ખોટા જવાબોની કોઈ વિગત સેવ નહીં થાય.</div>':''}
+    ${mode==='survive'?'<div class="card" style="margin:0 0 10px; padding:10px 12px; font-size:13px; line-height:1.5;">🔥 <b>ચેલેન્જ</b> (યાદ રાખવાની ટ્રીક): જવાબ તરત ચેક થશે. એક MCQ ખોટો પડે તો <b>પહેલા પ્રશ્ન</b> થી ફરી શરૂ. ગમે ત્યારે સમાપ્ત કરી શકો, અને ગમે તેટલી વાર આપી શકો. આ ટેસ્ટના સ્કોર/ટકા/આંકડામાં ગણાતું નથી.</div>':''}
     <div style="font-weight:800; margin-bottom:4px;">${esc(t.name)}</div>
     <div class="ink-dim fs-12 mb-6">સેટ A = મૂળ પેપર. B થી G માં પ્રશ્નો અને વિકલ્પોનો ક્રમ બદલાયેલો હશે, જેથી દર વખતે પેપર નવું લાગે.</div>
     <div class="ink-dim fs-12" style="margin-top:6px;">${lastLine}</div>
     <div id="mqSetChips" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0;">
       ${MQ_SETS.map(c=>`<button class="btn ${c==='A'?'btn-primary':'btn-secondary'}" data-set="${c}" onclick="mqPickSet('${c}')" style="flex-direction:column; gap:1px; line-height:1.2;">${c==='A'?'A · મૂળ':'સેટ '+c}${lastNow===c?'<span style="display:block; white-space:nowrap; font-size:10.5px; font-weight:700; color:var(--success);">✓ છેલ્લે</span>':''}</button>`).join('')}
     </div>
-    ${mqMarkBoxHTML()}
-    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="if(!mqSaveMarksFromSheet()) return; closeSheet(); mqStart('${t.id}','${mode}',null,mqSetChoice)">શરૂ કરો ▶</button></div>`);
+    ${mode==='survive'?'':mqMarkBoxHTML()}
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="${mode==='survive'?'':'if(!mqSaveMarksFromSheet()) return; '}closeSheet(); mqStart('${t.id}','${mode}',null,mqSetChoice)">શરૂ કરો ▶</button></div>`);
 }
 function mqPickSet(c){
   mqSetChoice = c;
@@ -3814,7 +3815,7 @@ function mqStartTimer(){
   },1000);
 }
 function mqExit(force){
-  if(mqSession && !mqSession.finished && mqSession.mode!=='read' && !force && Object.keys(mqSession.answers).length){
+  if(mqSession && !mqSession.finished && mqSession.mode!=='read' && mqSession.mode!=='survive' && !force && Object.keys(mqSession.answers).length){
     if(!confirm('બહાર નીકળશો તો આ પ્રયત્ન સેવ નહીં થાય. બહાર નીકળવું છે?')) return;
   }
   mqSession = null; clearInterval(mqTimerHandle); renderMain(); mqScrollTop();
@@ -3841,7 +3842,7 @@ function mqTest(){ return mqGetTest(mqSession.testId); }
 function renderMqSession(){
   const S = mqSession;
   if(S.mode==='read') return mqRenderRead();
-  if(S.finished) return mqRenderResult();
+  if(S.finished) return S.mode==='survive' ? mqRenderSurviveEnd() : mqRenderResult();
   return mqRenderQuestion();
 }
 function mqRenderQuestion(){
@@ -3878,7 +3879,8 @@ function mqRenderQuestion(){
    </div>
    ${survive?`<div class="ink-dim" style="text-align:center; font-size:12.5px; margin-top:8px;">🔥 પ્રયત્ન ${S.runs} · ભૂલો ${S.fails}</div>
    ${S.dead?`<div class="mq-nav"><button class="btn btn-danger btn-block" onclick="mqSurviveRestart()">🔄 પહેલેથી ફરી શરૂ કરો</button></div>`
-     :`<div class="mq-nav"><button class="btn btn-secondary" disabled>${S.pos+1}/${total}</button>${locked?(S.pos<total-1?`<button class="btn btn-primary" onclick="mqMove(1)">આગળ ▶</button>`:`<button class="btn btn-primary" onclick="mqFinish()">સમાપ્ત ✔</button>`):`<button class="btn btn-primary" disabled>આગળ ▶</button>`}</div>`}`
+     :`<div class="mq-nav"><button class="btn btn-secondary" disabled>${S.pos+1}/${total}</button>${locked?(S.pos<total-1?`<button class="btn btn-primary" onclick="mqMove(1)">આગળ ▶</button>`:`<button class="btn btn-primary" onclick="mqFinish()">સમાપ્ત ✔</button>`):`<button class="btn btn-primary" disabled>આગળ ▶</button>`}</div>`}
+   <div style="text-align:center; margin-top:10px;"><button class="btn btn-sm btn-secondary" onclick="mqSurviveEnd()">🏁 ચેલેન્જ સમાપ્ત કરો</button></div>`
    :`<div class="mq-nav">
      <button class="btn btn-secondary" ${S.pos===0?'disabled':''} onclick="mqMove(-1)">◀ પાછળ</button>
      <button class="btn btn-secondary" onclick="mqOpenPalette()">▦ ${S.pos+1}/${total}</button>
@@ -3891,11 +3893,36 @@ function mqPick(k){
     if(S.answers[qi]!==undefined) return; S.answers[qi]=k;
     const q = mqTest().questions[qi];
     if(q.ans!=null && k!==q.ans){ S.fails++; S.failMap[qi]=(S.failMap[qi]||0)+1; S.dead=true; }
+    mqSurviveSave(false);
   }
   else if(S.mode==='practice'){ if(S.answers[qi]!==undefined) return; S.answers[qi]=k; }
   else { if(S.answers[qi]===k) delete S.answers[qi]; else S.answers[qi]=k; }
   renderMain();
   if(S.mode==='test'){ mqStartTimer(); }
+}
+/* ચેલેન્જ: ફક્ત છેલ્લા પ્રયત્નનો આંકડો ટેસ્ટમાં સેવ થાય (કોઈ સ્કોર/ટકાવારી/કેલેન્ડરમાં ગણતરી નહીં) */
+function mqSurviveSave(done){
+  const S = mqSession; if(!S || S.mode!=='survive') return;
+  const t = mqTest(); if(!t || t.virtual) return;
+  const correct = Object.keys(S.answers).filter(qi=>{ const q=t.questions[qi]; return q && (q.ans==null || S.answers[qi]===q.ans); }).length;
+  const total = S.idx.length;
+  t.chal = {runs:S.runs, correct, total, pct: total?Math.round(correct/total*100):0, date:todayStr(), done: !!done};
+  save();
+}
+function mqSurviveEnd(){ const S=mqSession; if(!S) return; mqSurviveSave(false); S.finished = true; renderMain(); mqScrollTop(); }
+function mqRenderSurviveEnd(){
+  const S = mqSession, t = mqTest(); const c = (t && t.chal) || null;
+  return `${mqSticky(`<div class="mq-topbar mq-center"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span class="mq-title">${esc(t.name)}</span><span></span></div>`)}
+   <div class="card" style="text-align:center;">
+     <div style="font-size:34px;">🔥</div>
+     <div style="font-weight:800; font-size:18px; margin:4px 0;">${c&&c.done?'ચેલેન્જ પૂરી! 🎉':'ચેલેન્જ સમાપ્ત'}</div>
+     ${c?`<div style="margin-top:8px; font-size:15px;">કુલ <b>${c.runs}</b> પ્રયત્ન</div>
+     <div style="margin-top:4px; font-size:15px;">છેલ્લા પ્રયત્નમાં <b>${c.correct}/${c.total}</b> સાચા · <b>${c.pct}%</b></div>`:''}
+     <div class="mq-actions" style="margin-top:14px;">
+       <button class="btn btn-primary btn-sm" onclick="openMqSet('${t.id}','survive')">🔥 ફરી ચેલેન્જ</button>
+       <button class="btn btn-secondary btn-sm" onclick="mqExit(true)">← પાછા</button>
+     </div>
+   </div>`;
 }
 function mqSurviveRestart(){
   const S = mqSession; if(!S || S.mode!=='survive') return;
@@ -3920,6 +3947,7 @@ function mqOpenPalette(){
 function mqGoto(p){ mqSession.pos = p; closeSheet(); renderMain(); mqScrollTop(); }
 function mqFinish(){
   const S = mqSession;
+  if(S.mode==='survive'){ mqSurviveSave(true); S.finished = true; renderMain(); mqScrollTop(); return; }
   const un = S.idx.length - Object.keys(S.answers).length;
   if(un>0 && !confirm(`${un} પ્રશ્નો બાકી છે. છતાં સમાપ્ત કરવું છે?`)) return;
   const t = mqTest();
