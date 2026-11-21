@@ -492,8 +492,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.21-2';
-const APP_BUILT = '2026-11-21T09:59:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-3';
+const APP_BUILT = '2026-11-21T10:31:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3818,6 +3818,7 @@ function mqExit(force){
   if(mqSession && !mqSession.finished && mqSession.mode!=='read' && mqSession.mode!=='survive' && !force && Object.keys(mqSession.answers).length){
     if(!confirm('બહાર નીકળશો તો આ પ્રયત્ન સેવ નહીં થાય. બહાર નીકળવું છે?')) return;
   }
+  if(mqSession && mqSession.mode==='survive' && !mqSession.finished && (Object.keys(mqSession.answers).length||mqSession.runs>1)) mqAutoReviseSession(mqSession);
   mqSession = null; clearInterval(mqTimerHandle); renderMain(); mqScrollTop();
 }
 let _mqSelHolder = {};
@@ -3900,6 +3901,30 @@ function mqPick(k){
   renderMain();
   if(S.mode==='test'){ mqStartTimer(); }
 }
+/* ટેસ્ટ સાથે જોડેલા ટોપિક આપોઆપ રિવિઝનમાં: ટેસ્ટ/પ્રેક્ટિસ/ચેલેન્જ કોઈ પણ આપો ત્યારે */
+function mqAutoReviseTopics(tests){
+  const today = todayStr(), names = []; const seen = new Set();
+  tests.forEach(t=>{ (t.topicIds||[]).forEach(id=>{
+    if(seen.has(id)) return; seen.add(id);
+    const tp = DB.topics.find(x=>x.id===id); if(!tp) return;
+    const mine = DB.revisions.filter(r=>r.topicId===id && !r.subtopicId);
+    if(mine.some(r=>r.status==='completed' && (r.completedDate||r.dueDate)===today)) return; /* આજે રિવિઝન થઈ ગયું છે */
+    const due = mine.filter(r=>r.status==='pending' && r.dueDate<=today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
+    if(due){ due.status='completed'; due.completedDate=today; }
+    else { const stage = Math.max(0, ...mine.map(r=>r.stage||0)) + 1;
+      DB.revisions.push({id:uid(), topicId:id, subjectId:tp.subjectId, dueDate:today, status:'completed', completedDate:today, stage, auto:true}); }
+    names.push(tp.name);
+  }); });
+  if(names.length){ save(); const sh = names.slice(0,2).map(n=>n.length>28?n.slice(0,28)+'…':n).join(', ');
+    setTimeout(()=>toast(`🔁 ${names.length} ટોપિક રિવિઝનમાં ઉમેર્યા: ${sh}${names.length>2?' +'+(names.length-2):''}`),700); }
+  return names.length;
+}
+function mqAutoReviseSession(S){
+  if(!S || S.revDone) return; S.revDone = true;
+  const t = mqTest(); if(!t) return;
+  const list = (t.virtual && t.srcs) ? [...new Set(Object.values(t.srcs).map(x=>x&&x.t))].map(id=>DB.qtests.find(q=>q.id===id)).filter(Boolean) : [t];
+  mqAutoReviseTopics(list);
+}
 /* ચેલેન્જ: ફક્ત છેલ્લા પ્રયત્નનો આંકડો ટેસ્ટમાં સેવ થાય (કોઈ સ્કોર/ટકાવારી/કેલેન્ડરમાં ગણતરી નહીં) */
 function mqSurviveSave(done){
   const S = mqSession; if(!S || S.mode!=='survive') return;
@@ -3909,7 +3934,7 @@ function mqSurviveSave(done){
   t.chal = {runs:S.runs, correct, total, pct: total?Math.round(correct/total*100):0, date:todayStr(), done: !!done};
   save();
 }
-function mqSurviveEnd(){ const S=mqSession; if(!S) return; mqSurviveSave(false); S.finished = true; renderMain(); mqScrollTop(); }
+function mqSurviveEnd(){ const S=mqSession; if(!S) return; mqSurviveSave(false); if(Object.keys(S.answers).length||S.runs>1) mqAutoReviseSession(S); S.finished = true; renderMain(); mqScrollTop(); }
 function mqRenderSurviveEnd(){
   const S = mqSession, t = mqTest(); const c = (t && t.chal) || null;
   return `${mqSticky(`<div class="mq-topbar mq-center"><button class="btn btn-sm btn-secondary" onclick="mqExit(true)">← પાછા</button><span class="mq-title">${esc(t.name)}</span><span></span></div>`)}
@@ -3947,7 +3972,7 @@ function mqOpenPalette(){
 function mqGoto(p){ mqSession.pos = p; closeSheet(); renderMain(); mqScrollTop(); }
 function mqFinish(){
   const S = mqSession;
-  if(S.mode==='survive'){ mqSurviveSave(true); S.finished = true; renderMain(); mqScrollTop(); return; }
+  if(S.mode==='survive'){ mqSurviveSave(true); mqAutoReviseSession(S); S.finished = true; renderMain(); mqScrollTop(); return; }
   const un = S.idx.length - Object.keys(S.answers).length;
   if(un>0 && !confirm(`${un} પ્રશ્નો બાકી છે. છતાં સમાપ્ત કરવું છે?`)) return;
   const t = mqTest();
@@ -3997,6 +4022,7 @@ function mqFinish(){
     if(due){ due.status='completed'; due.completedDate=todayStr(); setTimeout(()=>toast('આ ટેસ્ટનું રિવિઝન પૂર્ણ ગણાયું ✅'),400); }
     save();
   }
+  mqAutoReviseSession(S);
   renderMain(); mqScrollTop();
 }
 function mqRenderResult(){
@@ -4127,7 +4153,8 @@ function qrevsForActiveExam(){
 }
 function mqAttemptsOn(dateStr){
   const out = [];
-  DB.qtests.filter(t=>t.examId===mqExamId()).forEach(t=>(t.attempts||[]).forEach(a=>{ if(a.date===dateStr) out.push({t,a}); }));
+  DB.qtests.filter(t=>t.examId===mqExamId()).forEach(t=>{ (t.attempts||[]).forEach(a=>{ if(a.date===dateStr) out.push({t,a}); });
+    if(t.chal && t.chal.date===dateStr) out.push({t, a:{mode:'survive', correct:t.chal.correct, total:t.chal.total, pct:t.chal.pct}}); });
   return out;
 }
 function mqAttemptsCardHTML(dateStr){
