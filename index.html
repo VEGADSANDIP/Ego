@@ -492,8 +492,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.18-4';
-const APP_BUILT = '2026-11-18T16:18:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-1';
+const APP_BUILT = '2026-11-21T09:37:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -2622,7 +2622,7 @@ function calKindCount(dateStr, kind){
 function calendarDayDetailHTML(dateStr){
   if(calKind==='mcq'){
     if(calMode==='study'){
-      const items = mqAttemptsOn(dateStr).map(({t,a})=>({t, extra:` <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':'ટેસ્ટ'}${a.set&&a.set!=='A'?' · સેટ '+a.set:''}</span>`, right:`<span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span>`}));
+      const items = mqAttemptsOn(dateStr).map(({t,a})=>({t, extra:` <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':(a.mode==='survive'?'ચેલેન્જ':'ટેસ્ટ')}${a.set&&a.set!=='A'?' · સેટ '+a.set:''}</span>`, right:`<span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span>`}));
       return items.length ? mqFolderGroupedHTML(items) : emptyRow('આ દિવસે કોઈ MCQ ટેસ્ટ આપી નથી');
     }
     const rv = qrevsForActiveExam().filter(r=>r.dueDate===dateStr);
@@ -3309,7 +3309,7 @@ function mqCmp(mode, a, b){
   return r || byName();
 }
 let mqTab = 'test'; /* ટેસ્ટની બાજુનું બટન કયું કામ કરે */
-const MQ_TABS = [['test','⏱ ટેસ્ટ'],['practice','✍ પ્રેક્ટિસ'],['read','📖 વાંચન'],['pdf','📄 PDF'],['rev','🔁 રિવિઝન'],['link','🔗 ટોપિક'],['edit','✎ એડિટ']];
+const MQ_TABS = [['test','⏱ ટેસ્ટ'],['practice','✍ પ્રેક્ટિસ'],['survive','🔥 ચેલેન્જ'],['read','📖 વાંચન'],['pdf','📄 PDF'],['rev','🔁 રિવિઝન'],['link','🔗 ટોપિક'],['edit','✎ એડિટ']];
 
 /* ===== રિંગ ટેબ ===== */
 function ringHTML(id, items, active, setCode){
@@ -3350,6 +3350,7 @@ function mqTestCardHTML(t, showPath){
   const side = {
     test: B('⏱', `openMqSet('${t.id}','test')`, true),
     practice: B('✍', `openMqSet('${t.id}','practice')`, true),
+    survive: B('🔥', `openMqSet('${t.id}','survive')`, true),
     read: B('📖', `mqStart('${t.id}','read')`, true),
     pdf: B('📄', `openMqPdf('${t.id}')`, true),
     rev: B('🔁', `openQTestRevisionSheet('${t.id}')`, true),
@@ -3406,6 +3407,7 @@ function mqPickRender(){
     <div class="mq-actions" style="margin-top:12px;">
       <button class="btn btn-primary btn-sm" ${dis} onclick="mqPickGo('${ids}','test')">⏱ ટેસ્ટ</button>
       <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','practice')">✍ પ્રેક્ટિસ</button>
+      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','survive')">🔥 ચેલેન્જ</button>
       <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','read')">📖 વાંચન</button>
       <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','pdf')">PDF</button>
     </div>`);
@@ -3742,14 +3744,15 @@ function mqSaveMarksFromSheet(){
 }
 function openMqSet(testId, mode){
   const t = mqGetTest(testId); if(!t) return;
-  if(mode==='practice' && !t.questions.some(q=>q.ans!=null)){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
+  if((mode==='practice'||mode==='survive') && !t.questions.some(q=>q.ans!=null)){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
   mqSetChoice = 'A';
   const hold = mqSetHolder(testId);
   const ls = (hold && hold.lastSet) || {};
   const lastNow = ls[mode] || null;
   const lastLine = (ls.test||ls.practice) ? `છેલ્લે આપેલ સેટ: ${ls.test?'⏱ ટેસ્ટ → સેટ '+ls.test:''}${ls.test&&ls.practice?' · ':''}${ls.practice?'✍ પ્રેક્ટિસ → સેટ '+ls.practice:''}` : 'આ ટેસ્ટ હજી સેટ સાથે આપી નથી.';
   openSheet(`
-    <div class="sheet-title">${mode==='test'?'⏱ ટેસ્ટ':'✍ પ્રેક્ટિસ'} — પેપર સેટ પસંદ કરો</div>
+    <div class="sheet-title">${mqModeLabel(mode)} — પેપર સેટ પસંદ કરો</div>
+    ${mode==='survive'?'<div class="card" style="margin:0 0 10px; padding:10px 12px; font-size:13px; line-height:1.5;">🔥 <b>ચેલેન્જ:</b> દરેક જવાબ તરત ચેક થશે. એક પણ MCQ ખોટો પડે તો ટેસ્ટ <b>પહેલા પ્રશ્ન</b> થી ફરી શરૂ. બધા સળંગ સાચા પાડો ત્યારે જ પૂરી થશે. ફક્ત છેલ્લું પરિણામ (ટકા) સેવ થશે — ખોટા જવાબોની કોઈ વિગત સેવ નહીં થાય.</div>':''}
     <div style="font-weight:800; margin-bottom:4px;">${esc(t.name)}</div>
     <div class="ink-dim fs-12 mb-6">સેટ A = મૂળ પેપર. B થી G માં પ્રશ્નો અને વિકલ્પોનો ક્રમ બદલાયેલો હશે, જેથી દર વખતે પેપર નવું લાગે.</div>
     <div class="ink-dim fs-12" style="margin-top:6px;">${lastLine}</div>
@@ -3766,9 +3769,10 @@ function mqPickSet(c){
     b.className = 'btn ' + (on?'btn-primary':'btn-secondary');
   });
 }
+function mqModeLabel(m){ return m==='test'?'⏱ ટેસ્ટ':(m==='survive'?'🔥 ચેલેન્જ':'✍ પ્રેક્ટિસ'); }
 function mqStart(testId, mode, onlyIdx, setCode){
   const t = mqGetTest(testId); if(!t) return;
-  if(mode!=='read' && !t.questions.some(q=>q.ans!=null) && mode==='practice'){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
+  if(mode!=='read' && !t.questions.some(q=>q.ans!=null) && (mode==='practice'||mode==='survive')){ toast('જવાબ ચાવી ઉમેરો (✎ એડિટ)','error'); return; }
   const base = onlyIdx || t.questions.map((_,i)=>i);
   const sc = (mode==='read') ? 'A' : (setCode||'A');
   if(mode!=='read'){ const h = mqSetHolder(testId); if(h){ h.lastSet = Object.assign({}, h.lastSet, {[mode]: sc}); save(); } }
@@ -3781,7 +3785,7 @@ function mqStart(testId, mode, onlyIdx, setCode){
       built.idx = built.idx.concat(b.idx); Object.assign(built.perm, b.perm);
     });
   } else built = mqBuildSet(t, base, sc);
-  mqSession = {testId, mode, marks:mqMarks(), idx:built.idx, perm:built.perm, setCode:sc, pos:0, answers:{}, start:Date.now(), finished:false, showAns:true, onlyStar:false};
+  mqSession = {testId, mode, marks:mqMarks(), idx:built.idx, perm:built.perm, setCode:sc, pos:0, answers:{}, start:Date.now(), finished:false, showAns:true, onlyStar:false, fails:0, failMap:{}, runs:1, dead:false};
   mqSession.groups = mqGroups(t, built.idx);
   renderMain(); mqScrollTop(); mqStartTimer();
 }
@@ -3843,7 +3847,8 @@ function renderMqSession(){
 function mqRenderQuestion(){
   const S = mqSession, t = mqTest(), qi = S.idx[S.pos], q = t.questions[qi];
   const picked = S.answers[qi];
-  const practice = S.mode==='practice';
+  const survive = S.mode==='survive';
+  const practice = S.mode==='practice' || survive;
   const locked = practice && picked!==undefined;
   const perm = (S.perm && S.perm[qi]) || [0,1,2,3];
   const opts = perm.map((k,d)=>{
@@ -3864,25 +3869,38 @@ function mqRenderQuestion(){
    </div>
    <div class="mq-bar"><i style="width:${Math.round((S.pos+1)/total*100)}%"></i></div>
    <div class="ink-dim" style="font-size:12.5px;display:flex;justify-content:space-between;">
-     <span>${S.mode==='test'?'⏱ ટેસ્ટ':'✍ પ્રેક્ટિસ'}${S.setCode&&S.setCode!=='A'?' · સેટ '+S.setCode:''} · ${multi?`ટેસ્ટ ${loc.ti}/${loc.nT} · પ્રશ્ન ${loc.j}/${loc.m}`:`પ્રશ્ન ${S.pos+1}/${total}`} · +${fmtMark((S.marks||{pos:1}).pos)}/−${fmtMark((S.marks||{neg:0}).neg)}</span><span>જવાબ આપ્યા: ${answeredN}</span></div>`) + `
+     <span>${mqModeLabel(S.mode)}${S.setCode&&S.setCode!=='A'?' · સેટ '+S.setCode:''} · ${multi?`ટેસ્ટ ${loc.ti}/${loc.nT} · પ્રશ્ન ${loc.j}/${loc.m}`:`પ્રશ્ન ${S.pos+1}/${total}`} · +${fmtMark((S.marks||{pos:1}).pos)}/−${fmtMark((S.marks||{neg:0}).neg)}</span><span>જવાબ આપ્યા: ${answeredN}</span></div>`) + `
    <div class="card" style="margin-top:8px;">
      <div class="mq-q">${multi?loc.j:S.pos+1}. ${esc(q.q)}</div>
      ${opts}
      ${locked && q.ans==null?'<div class="ink-dim" style="font-size:12.5px;">આ પ્રશ્ન માટે જવાબ ચાવી નથી</div>':''}
      ${locked && q.ans!=null?`<div style="font-weight:700;margin-top:4px;color:${picked===q.ans?'var(--success)':'var(--danger)'};">${picked===q.ans?'✅ સાચો જવાબ!':'❌ ખોટો — સાચો: ('+MQ_LET[perm.indexOf(q.ans)]+')'}</div>`:''}
    </div>
-   <div class="mq-nav">
+   ${survive?`<div class="ink-dim" style="text-align:center; font-size:12.5px; margin-top:8px;">🔥 પ્રયત્ન ${S.runs} · ભૂલો ${S.fails}</div>
+   ${S.dead?`<div class="mq-nav"><button class="btn btn-danger btn-block" onclick="mqSurviveRestart()">🔄 પહેલેથી ફરી શરૂ કરો</button></div>`
+     :`<div class="mq-nav"><button class="btn btn-secondary" disabled>${S.pos+1}/${total}</button>${locked?(S.pos<total-1?`<button class="btn btn-primary" onclick="mqMove(1)">આગળ ▶</button>`:`<button class="btn btn-primary" onclick="mqFinish()">સમાપ્ત ✔</button>`):`<button class="btn btn-primary" disabled>આગળ ▶</button>`}</div>`}`
+   :`<div class="mq-nav">
      <button class="btn btn-secondary" ${S.pos===0?'disabled':''} onclick="mqMove(-1)">◀ પાછળ</button>
      <button class="btn btn-secondary" onclick="mqOpenPalette()">▦ ${S.pos+1}/${total}</button>
      ${S.pos<total-1?`<button class="btn btn-primary" onclick="mqMove(1)">આગળ ▶</button>`:`<button class="btn btn-primary" onclick="mqFinish()">સમાપ્ત ✔</button>`}
-   </div>`;
+   </div>`}`;
 }
 function mqPick(k){
   const S = mqSession, qi = S.idx[S.pos];
-  if(S.mode==='practice'){ if(S.answers[qi]!==undefined) return; S.answers[qi]=k; }
+  if(S.mode==='survive'){
+    if(S.answers[qi]!==undefined) return; S.answers[qi]=k;
+    const q = mqTest().questions[qi];
+    if(q.ans!=null && k!==q.ans){ S.fails++; S.failMap[qi]=(S.failMap[qi]||0)+1; S.dead=true; }
+  }
+  else if(S.mode==='practice'){ if(S.answers[qi]!==undefined) return; S.answers[qi]=k; }
   else { if(S.answers[qi]===k) delete S.answers[qi]; else S.answers[qi]=k; }
   renderMain();
   if(S.mode==='test'){ mqStartTimer(); }
+}
+function mqSurviveRestart(){
+  const S = mqSession; if(!S || S.mode!=='survive') return;
+  S.answers = {}; S.pos = 0; S.dead = false; S.runs++;
+  renderMain(); mqScrollTop();
 }
 function mqMove(d){
   const S = mqSession; S.pos = Math.max(0, Math.min(S.idx.length-1, S.pos+d)); renderMain(); mqScrollTop();
@@ -3910,6 +3928,7 @@ function mqFinish(){
     const a = S.answers[qi], q = t.questions[qi];
     if(a===undefined) skipped++; else if(q.ans!=null && a===q.ans) correct++; else if(q.ans!=null) wrong++; else skipped++;
   });
+  if(S.mode==='survive') wrong = S.fails; /* ચેલેન્જ: ભૂલો = કુલ ખોટા પ્રયત્નો */
   const total = S.idx.length;
   const timeSec = Math.floor((Date.now()-S.start)/1000);
   const mk = S.marks || {pos:1, neg:0};
@@ -3931,6 +3950,7 @@ function mqFinish(){
       items.forEach(({gi,li})=>{
         const a = S.answers[gi], q = rt.questions[li];
         if(a===undefined) sk++; else { ans[li] = a; if(q.ans!=null && a===q.ans) c++; else if(q.ans!=null) w++; else sk++; }
+        if(S.mode==='survive') w += (S.failMap[gi]||0);
       });
       const tot = items.length;
       const sc = Math.round((c*mk.pos - w*mk.neg)*100)/100, mx = Math.round(tot*mk.pos*100)/100;
@@ -3983,6 +4003,7 @@ function mqRenderResult(){
    <div class="card" style="text-align:center;">
      <div style="font-size:44px;font-weight:900;color:${color};">${r.pct}%</div>
      ${r.maxScore!=null?`<div style="font-weight:800; font-size:17px; margin-top:2px;">ગુણ: ${fmtMark(r.score)} / ${fmtMark(r.maxScore)}</div><div class="ink-dim fs-12">(✓ +${fmtMark(r.pos)} · ✗ −${fmtMark(r.neg)})</div>`:''}
+     ${S.mode==='survive'?`<div style="font-weight:800; margin:4px 0;">🔥 ચેલેન્જ પૂર્ણ! · ${S.runs} પ્રયત્ન · ${S.fails} ભૂલો</div>`:''}
      <div class="ink-dim">${r.correct} સાચા / ${r.total} પ્રશ્નો · ⏱ ${String(Math.floor(r.timeSec/60)).padStart(2,'0')}:${String(r.timeSec%60).padStart(2,'0')}</div>
      <div class="mq-stat">
        <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--success) 14%, transparent);"><b style="color:var(--success);">${r.correct}</b><span>સાચા</span></div>
@@ -3990,7 +4011,7 @@ function mqRenderResult(){
        <div class="subject-mini-stat"><b>${r.skipped}</b><span>બાકી</span></div>
      </div>
      <div class="mq-actions">
-       <button class="btn btn-primary btn-sm" onclick="openMqSet('${t.id}','test')">⏱ ફરી ટેસ્ટ</button>
+       <button class="btn btn-primary btn-sm" onclick="openMqSet('${t.id}','${S.mode==='survive'?'survive':'test'}')">${S.mode==='survive'?'🔥 ફરી ચેલેન્જ':'⏱ ફરી ટેસ્ટ'}</button>
        ${(wrongIdx.length+skipIdx.length)?`<button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','practice',[${wrongIdx.concat(skipIdx).join(',')}],'${S.setCode||'A'}')">🔁 ખોટા પ્રશ્નો ફરી</button>`:''}
        <button class="btn btn-secondary btn-sm" onclick="mqStart('${t.id}','read')">📖 વાંચન</button>
      </div>
@@ -4084,7 +4105,7 @@ function mqAttemptsOn(dateStr){
 function mqAttemptsCardHTML(dateStr){
   const list = mqAttemptsOn(dateStr);
   if(!list.length) return '';
-  return `<div class="card mt-14"><div class="item item-static"><b>🧠 MCQ ટેસ્ટ આપી</b></div>${list.map(({t,a})=>`<div class="item" onclick="mqGoToTest('${t.id}')"><span style="flex:1;">${esc(t.name)} <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':'ટેસ્ટ'}</span></span><span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span></div>`).join('')}</div>`;
+  return `<div class="card mt-14"><div class="item item-static"><b>🧠 MCQ ટેસ્ટ આપી</b></div>${list.map(({t,a})=>`<div class="item" onclick="mqGoToTest('${t.id}')"><span style="flex:1;">${esc(t.name)} <span class="ink-dim fs-12">· ${a.mode==='practice'?'પ્રેક્ટિસ':(a.mode==='survive'?'ચેલેન્જ':'ટેસ્ટ')}</span></span><span class="badge ${a.pct>=70?'badge-success':(a.pct>=40?'badge-warning':'badge-danger')}">${a.correct}/${a.total} · ${a.pct}%</span></div>`).join('')}</div>`;
 }
 
 /* ચાલુ ટેસ્ટ/પ્રેક્ટિસ હોય તો બીજે ક્યાંકથી ક્લિક કરતાં તે બંધ ન થાય */
