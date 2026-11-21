@@ -252,8 +252,14 @@ a{color:inherit;}
 .ink-dim{color:var(--ink-dim); font-size:12.5px;}
 .empty-row{padding:14px 0; text-align:center; color:var(--ink-dim); font-size:13px;}
 
-.topic-row{padding:10px 0; border-bottom:1px solid var(--border);}
+.topic-row{padding:14px; margin-bottom:12px; border-bottom:none;}
 .topic-row:last-child{border-bottom:none;}
+.act-row{display:flex; gap:6px; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);}
+.act-row .btn{flex:1 1 0; min-width:0; padding:9px 0; font-size:17px; line-height:1; justify-content:center; border-radius:12px;}
+.act-row .btn small{font-size:11px; font-weight:800; margin-left:2px;}
+.mq-chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.mq-chips span{font-size:12px; color:var(--ink-dim); background:color-mix(in srgb, var(--ink) 7%, transparent); padding:4px 10px; border-radius:8px; line-height:1.35;}
+.mq-chips span.ch-fire{background:color-mix(in srgb, #ff7a1a 18%, transparent); color:var(--ink);}
 .topic-row-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px; font-size:15px;}
 .topic-name{flex:1; min-width:0; font-weight:600; line-height:1.4; word-break:break-word; padding-top:4px;}
 .topic-meta{display:flex; flex-wrap:wrap; gap:6px; padding:2px 0 8px 0;}
@@ -492,8 +498,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.21-9';
-const APP_BUILT = '2026-11-21T16:51:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-10';
+const APP_BUILT = '2026-11-21T17:00:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1828,22 +1834,24 @@ function dashboardTodayStudyRow(l){
   </div>`;
 }
 let topicTab = 'edit'; /* ચેપ્ટરની બાજુનું બટન કયું કામ કરે: edit / sub / rev / status */
-function topicTabSegHTML(){ return ringHTML('topicRing', [['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન'],['tests','🧠 ટેસ્ટ'],['status','🚦 સ્ટેટસ']], topicTab, "topicTab='%K'; renderMain();"); }
+function topicTabSegHTML(){ return ''; /* રિંગ કાઢી નાખી — બટનો કાર્ડની નીચે */ var _unused = ringHTML('topicRing', [['edit','✎ એડિટ'],['sub','📑 સબ-ટોપિક'],['rev','🔁 રિવિઝન'],['tests','🧠 ટેસ્ટ'],['status','🚦 સ્ટેટસ']], topicTab, "topicTab='%K'; renderMain();"); }
 function topicRow(t){
   const statusDot = t.status==='completed' ? '🟢' : (t.status==='studying' ? '🟡' : '🔴');
   const highlight = (highlightTopicId===t.id) ? ' row-highlight' : '';
-  let btn;
-  if(topicTab==='sub'){ const n = subtopicsForTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicSubtopicManageForm('${t.id}')">📑${n?` ${n}`:''}</button>`; }
-  else if(topicTab==='rev'){ btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicRevisionForm('${t.id}')">🔁</button>`; }
-  else if(topicTab==='tests'){ const n = tlTestsOfTopic(t.id).length; btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicTests('${t.id}')">🧠${n?` ${n}`:' ＋'}</button>`; }
-  else if(topicTab==='status'){ btn = `<span onclick="openTopicStatusSheet('${t.id}')" style="flex-shrink:0; cursor:pointer; font-size:13px; padding:8px 10px;">${statusDot}</span>`; }
-  else btn = `<button class="btn btn-sm btn-secondary" style="flex-shrink:0;" onclick="openTopicEditForm('${t.id}')">✎</button>`;
-  return `<div class="topic-row${highlight}" data-search="${esc(t.name.toLowerCase())}" id="topic-${t.id}">
+  const nSub = subtopicsForTopic(t.id).length, nTest = tlTestsOfTopic(t.id).length;
+  const A = (label, code, cls)=>`<button class="btn ${cls||'btn-secondary'}" onclick="${code}">${label}</button>`;
+  return `<div class="card topic-row${highlight}" data-search="${esc(t.name.toLowerCase())}" id="topic-${t.id}">
     <div class="topic-row-top">
-      <span class="topic-name">${esc(t.name)}</span>
-      ${btn}
+      <span class="topic-name" style="padding-top:0;">${esc(t.name)}</span>
     </div>
     ${topicMetaHTML(t)}
+    <div class="act-row">
+      ${A('✎', `openTopicEditForm('${t.id}')`)}
+      ${A('📑'+(nSub?`<small>${nSub}</small>`:''), `openTopicSubtopicManageForm('${t.id}')`)}
+      ${A('🔁', `openTopicRevisionForm('${t.id}')`)}
+      ${A('🧠'+(nTest?`<small>${nTest}</small>`:'<small>＋</small>'), `openTopicTests('${t.id}')`)}
+      ${A(statusDot, `openTopicStatusSheet('${t.id}')`)}
+    </div>
   </div>`;
 }
 function topicMetaHTML(t){
@@ -3444,34 +3452,38 @@ function ringInitAll(){
     btns.forEach(b=>b.addEventListener('click',()=>{ if(b.dataset.k!==el.dataset.active) center(b,true); }));
   });
 }
-function mqTabSegHTML(){ return ringHTML('mqRing', MQ_TABS, mqTab, "mqTab='%K'; renderMain();"); }
+function mqTabSegHTML(){ return ''; }
 function mqTestCardHTML(t, showPath){
   const last = (t.attempts||[]).slice(-1)[0];
   const best = mqBest(t);
   const hasKey = t.questions.some(q=>q.ans!=null);
   const path = showPath ? mqFolderPath(t.folderId).join(' › ') : '';
   const hl = (highlightQTestId===t.id) ? ' row-highlight' : '';
-  const B = (label, code, primary)=>`<button class="btn btn-sm ${primary?'btn-primary':'btn-secondary'}" style="flex-shrink:0;" onclick="${code}">${label}</button>`;
-  const side = {
-    test: B('⏱', `openMqSet('${t.id}','test')`, true),
-    practice: B('✍', `openMqSet('${t.id}','practice')`, true),
-    survive: B('🔥', `openMqSet('${t.id}','survive')`, true),
-    read: B('📖', `mqStart('${t.id}','read')`, true),
-    pdf: B('📄', `openMqPdf('${t.id}')`, true),
-    rev: B('🔁', `openQTestRevisionSheet('${t.id}')`, true),
-    link: B('🔗'+((t.topicIds||[]).length?' '+(t.topicIds||[]).length:''), `tlOpenTest('${t.id}')`, true),
-    edit: B('✎', `openQTestForm('${t.id}')`, false)
-  }[mqTab] || '';
+  const nl = (t.topicIds||[]).length;
+  const A = (label, code, cls)=>`<button class="btn ${cls||'btn-secondary'}" onclick="${code}">${label}</button>`;
+  const chips = [`<span>❓ ${t.questions.length} પ્રશ્નો</span>`];
+  if(mqTimes(t)) chips.push(`<span>🧠 ${mqTimes(t)} વાર આપી</span>`);
+  if(!hasKey) chips.push(`<span>⚠ જવાબ ચાવી નથી</span>`);
+  if(t.chal) chips.push(`<span class="ch-fire">🔥 ચેલેન્જ: ${t.chal.runs} પ્રયત્ન · છેલ્લામાં ${t.chal.correct}/${t.chal.total} (${t.chal.pct}%)</span>`);
+  if(last) chips.push(`<span>📊 છેલ્લી ${last.correct}/${last.total}${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</span>`);
   return `<div class="card${hl}" id="qtest-${t.id}" data-search="${esc(t.name.toLowerCase())}">
-    <div class="mq-row"><span class="mq-ico">📄</span>
+    <div class="mq-row">
       <div style="flex:1;min-width:0;"><div class="mq-name">${esc(t.name)}</div>
-      ${path?`<div class="mq-meta">📁 ${esc(path)}</div>`:''}
-      <div class="mq-meta">${t.questions.length} પ્રશ્નો${mqTimes(t)?` · ${mqTimes(t)} વાર આપી`:''}${hasKey?'':' · ⚠ જવાબ ચાવી નથી'}</div>
-      ${t.chal?`<div class="mq-meta">🔥 છેલ્લી ચેલેન્જ: ${t.chal.runs} પ્રયત્ન · છેલ્લામાં ${t.chal.correct}/${t.chal.total} સાચા (${t.chal.pct}%)</div>`:''}
-      ${tlTopicChips(t)}</div>
-      <div class="mq-side">${last?`<span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span>`:''}${side}</div></div>
-    ${last?`<div class="mq-res">છેલ્લી: ${last.correct}/${last.total} સાચા${last.maxScore!=null?` · ગુણ ${fmtMark(last.score)}/${fmtMark(last.maxScore)}`:''} · શ્રેષ્ઠ ${best}%</div>`:''}
-    ${mqRevLineHTML(t)}</div>`;
+      ${path?`<div class="mq-meta">📁 ${esc(path)}</div>`:''}</div>
+      ${last?`<div class="mq-side"><span class="badge ${last.pct>=70?'badge-success':(last.pct>=40?'badge-warning':'badge-danger')}">${last.pct}%</span></div>`:''}</div>
+    <div class="mq-chips">${chips.join('')}</div>
+    ${tlTopicChips(t)}
+    ${mqRevLineHTML(t)}
+    <div class="act-row">
+      ${A('⏱', `openMqSet('${t.id}','test')`, 'btn-primary')}
+      ${A('✍', `openMqSet('${t.id}','practice')`)}
+      ${A('🔥', `openMqSet('${t.id}','survive')`)}
+      ${A('📖', `mqStart('${t.id}','read')`)}
+      ${A('📄', `openMqPdf('${t.id}')`)}
+      ${A('🔁', `openQTestRevisionSheet('${t.id}')`)}
+      ${A('🔗'+(nl?`<small>${nl}</small>`:''), `tlOpenTest('${t.id}')`)}
+      ${A('✎', `openQTestForm('${t.id}')`)}
+    </div></div>`;
 }
 function mqPickTestsUnder(fid){
   let out = mqTests(fid).slice();
