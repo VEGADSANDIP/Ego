@@ -492,8 +492,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.21-4';
-const APP_BUILT = '2026-11-21T10:45:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-5';
+const APP_BUILT = '2026-11-21T11:22:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -561,6 +561,7 @@ function dataCorruptAlert(){
 
 let _saveTimer = null, _savePending = false, _lastSaveStr = '';
 function save(){
+  _mqSetsCache = null;
   if(_dataLocked) return;
   try{ if(DB.settings && DB.settings.compactOn) compactHistory(); }catch(e){ console.error('compact failed', e); }
   _savePending = true;
@@ -665,14 +666,14 @@ function streakRecordAll(){
   DB.exams.forEach(e=>{
     const set = new Set(); const ex = e;
     /* આ પરીક્ષાના દિવસો (activityDates હાલની active પરીક્ષા પર ચાલે છે, એટલે અહીં સીધું ગણીએ) */
-    const subIds = new Set(DB.subjects.filter(x=>x.examId===ex.id).map(x=>x.id));
+    const subIds = new Set(examSubjects(ex.id).map(x=>x.id));
     const rec = DB.activity[ex.id];
     if(Array.isArray(rec)) rec.forEach(d=>set.add(d));
     else if(rec && rec.last && rec.count>0){ const c = new Date(rec.last+'T00:00:00'); for(let i=0;i<rec.count;i++){ set.add(toLocalISODate(c)); c.setDate(c.getDate()-1); } }
     DB.studyLogs.forEach(l=>{ if(subIds.has(l.subjectId) && l.date) set.add(l.date); });
     DB.revisions.forEach(r=>{ if(subIds.has(r.subjectId) && r.status==='completed' && r.completedDate) set.add(r.completedDate); });
     const tIds = new Set();
-    DB.qtests.forEach(t=>{ if(t.examId===ex.id){ tIds.add(t.id); (t.attempts||[]).forEach(a=>{ if(a.date) set.add(a.date); }); } });
+    mqExamTests(ex.id).forEach(t=>{ { tIds.add(t.id); (t.attempts||[]).forEach(a=>{ if(a.date) set.add(a.date); }); } });
     (DB.qrevs||[]).forEach(r=>{ if(tIds.has(r.testId) && r.status==='completed' && r.completedDate) set.add(r.completedDate); });
     const today = todayStr();
     const days = [...set].filter(d=>d<=today).sort();
@@ -786,7 +787,7 @@ function activityDates(exam){
   DB.studyLogs.forEach(l=>{ if(activeIds.includes(l.subjectId) && l.date) out.add(l.date); });
   DB.revisions.forEach(r=>{ if(activeIds.includes(r.subjectId) && r.status==='completed' && r.completedDate) out.add(r.completedDate); });
   const tIds = new Set();
-  DB.qtests.forEach(t=>{ if(t.examId===exam.id){ tIds.add(t.id); (t.attempts||[]).forEach(a=>{ if(a.date) out.add(a.date); }); } });
+  mqExamTests(exam.id).forEach(t=>{ { tIds.add(t.id); (t.attempts||[]).forEach(a=>{ if(a.date) out.add(a.date); }); } });
   (DB.qrevs||[]).forEach(r=>{ if(tIds.has(r.testId) && r.status==='completed' && r.completedDate) out.add(r.completedDate); });
   return out;
 }
@@ -838,10 +839,10 @@ function dashHeadHTML(streakInfo, exam){
 function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
 function getActiveExam(){ return DB.exams.find(e=>e.active); }
-function examSubjects(examId){ return DB.subjects.filter(s=>s.examId===examId); }
+function examSubjects(examId){ const sec = new Set(examSections(examId).map(x=>x.id)); return DB.subjects.filter(s=>s.examId===examId || (s.sectionId && sec.has(s.sectionId))); }
 function subjectTopics(subjectId){ return DB.topics.filter(t=>t.subjectId===subjectId); }
 function subtopicsForTopic(topicId){ return DB.subtopics.filter(s=>s.topicId===topicId); }
-function examSections(examId){ return DB.sections.filter(x=>x.examId===examId); }
+function examSections(examId){ const own = DB.sections.filter(x=>x.examId===examId); const ids = new Set(shAll().filter(x=>x.kind==='section' && x.examId===examId).map(x=>x.srcId)); return own.concat(DB.sections.filter(x=>ids.has(x.id) && x.examId!==examId)); }
 function sectionSubjects(sectionId){ return DB.subjects.filter(s=>s.sectionId===sectionId); }
 function activeExamSubjectIds(){ const exam=getActiveExam(); if(!exam) return []; return examSubjects(exam.id).map(s=>s.id); }
 function studyLogsForActiveExam(){ const ids=activeExamSubjectIds(); return DB.studyLogs.filter(l=>ids.includes(l.subjectId)); }
@@ -1528,7 +1529,7 @@ function sectionSlideCard(sec){
   let totalTopics=0, completedTopics=0;
   subs.forEach(s=>{ const topics=subjectTopics(s.id); totalTopics+=topics.length; completedTopics+=topics.filter(t=>t.status==='completed').length; });
   const pct = totalTopics ? Math.round(completedTopics/totalTopics*100) : 0;
-  const title = `📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}`;
+  const title = `📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}${shBadge('section', sec.id)}`;
   return `<div class="card cursor-pointer" data-search="${esc(sec.name.toLowerCase())}" onclick="sectionDetailId='${sec.id}'; subjFolderId=null; renderMain();">
       ${progressCardHeader(pct, title, `openSectionForm('${sec.id}','${sec.examId}')`)}
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${subs.length} વિષય — વિગત જોવા ટેપ કરો →</div>
@@ -1578,7 +1579,7 @@ function renderSectionDetail(sectionId){
   const folders = sfChildren(sec.id, subjFolderId);
   const crumb = `<div class="mq-crumb">📁 <a onclick="sfOpen(null)" style="cursor:pointer;${path.length?'text-decoration:underline;':''}">${esc(sec.name)}</a>${path.map((f,i)=>' › '+(i<path.length-1?`<a onclick="sfOpen('${f.id}')" style="cursor:pointer;text-decoration:underline;">${esc(f.name)}</a>`:esc(f.name))).join('')}</div>`;
   const hdr = pageTopHTML(cur ? `sfOpen(${cur.parentId?`'${cur.parentId}'`:'null'})` : "sectionDetailId=null; renderMain();",
-     `${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}<button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${sec.examId}','${sec.id}')">+ વિષય</button>`, crumb);
+     `${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}<button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${(getActiveExam()||{}).id||sec.examId}','${sec.id}')">+ વિષય</button>`, crumb);
   const mid = folders.length ? `<div style="margin-top:6px;">${folders.map(sfFolderCard).join('')}</div>` : '';
   if(subs.length) return subjectListHTML(subs, sec.id, hdr, mid);
   return `<div class="hs-sticky hs-mid">${hdr}</div>${mid}${folders.length?'':emptyRow(cur?'આ ફોલ્ડર ખાલી છે':'કોઈ વિષય ઉમેર્યો નથી')}`;
@@ -1638,7 +1639,7 @@ function subjectSlideCard(s){
   const revTot = revs.length + rb;
   const revPct = revTot ? Math.round(revDone/revTot*100) : 0;
   const nav = `if(bookClickOK()){ topicDetailId='${s.id}'; renderMain(); }`;
-  const edit = `openSubjectForm('${s.id}','${s.examId}')`;
+  const edit = `openSubjectForm('${s.id}','${(getActiveExam()||{}).id||s.examId}')`;
   const front = `<div class="card cursor-pointer" onclick="${nav}">
       ${progressCardHeader(pct, esc(s.name), edit)}
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
@@ -2173,6 +2174,7 @@ function cascadeDeleteSubjectData(subjectId){
 }
 function deleteExam(id){
   if(!confirm('આ પરીક્ષા અને તેના તમામ વિભાગ/વિષય/ટોપિક/સબ-ટોપિક/રિવિઝન/અભ્યાસ/ટાઈમટેબલ/MCQ ટેસ્ટ — બધું ડિલીટ થશે. ચાલુ રાખવું છે?'))return;
+  shOnExamDelete(id);
   const subIds = DB.subjects.filter(s=>s.examId===id).map(s=>s.id);
   subIds.forEach(sid=>cascadeDeleteSubjectData(sid));
   DB.subjects = DB.subjects.filter(s=>s.examId!==id);
@@ -2192,7 +2194,7 @@ function deleteExam(id){
 }
 function openSubjectForm(id, examId, sectionId){
   const s = id ? DB.subjects.find(x=>x.id===id) : null;
-  const exId = s ? s.examId : examId;
+  const exId = (getActiveExam()||{}).id || (s ? s.examId : examId);
   const sections = examSections(exId);
   const currentSectionId = s ? (s.sectionId||'') : (sectionId||'');
   if(!sections.length){
@@ -2217,11 +2219,12 @@ function saveSubject(id, examId){
   const sectionId = val('f_section');
   if(!name){ toast('નામ ભરો','error'); return; }
   if(!sectionId){ toast('વિભાગ પસંદ કરો','error'); return; }
-  const dup = DB.subjects.find(x=>x.examId===examId && x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
+  const _sec = DB.sections.find(x=>x.id===sectionId); const ownerEx = _sec ? _sec.examId : examId;
+  const dup = examSubjects(examId).find(x=>x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
   if(dup){ toast('આ નામનો વિષય પહેલેથી છે','error'); return; }
   const folderId = val('f_sfolder') || null;
-  if(id){ const s=DB.subjects.find(x=>x.id===id); Object.assign(s,{name,sectionId,folderId}); }
-  else DB.subjects.push({id:uid(),examId,name,sectionId,folderId});
+  if(id){ const s=DB.subjects.find(x=>x.id===id); Object.assign(s,{name,sectionId,folderId,examId:ownerEx}); }
+  else DB.subjects.push({id:uid(),examId:ownerEx,name,sectionId,folderId});
   save(); closeSheet(); renderMain(); toast('સેવ થયું');
 }
 function openSectionForm(id, examId){
@@ -2232,6 +2235,7 @@ function openSectionForm(id, examId){
     <div class="field"><label>વિભાગનું નામ</label><input type="text" id="f_name" value="${sec?esc(sec.name):''}" placeholder="દા.ત. સામાન્ય જ્ઞાન"></div>
     <div class="field"><label>કુલ ગુણ</label><input type="number" id="f_marks" value="${sec?sec.totalMarks:''}"></div>
     <div class="ink-dim" style="font-size:11.5px; margin:-8px 0 12px 0;">વિભાગમાં એકથી વધુ વિષય હોઈ શકે, દરેકના ગુણ તમે વિષયમાં જ અલગ-અલગ સેટ કરી શકો છો</div>
+    ${sec?`<button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="shOpen('section','${id}')">🔗 બીજી પરીક્ષામાં શેર કરો${shIsShared('section',id)?' ('+(shHolders('section',id).length-1)+')':''}</button>`:''}
     <div class="sheet-actions">
       ${sec?`<button class="btn btn-danger" onclick="deleteSection('${id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveSection(${sec?`'${id}'`:'null'},'${exId}')">સેવ કરો</button>
@@ -2247,7 +2251,8 @@ function saveSection(id, examId){
   else DB.sections.push({id:uid(),examId,name,totalMarks:marks});
   save(); closeSheet(); renderMain(); toast('સેવ થયું');
 }
-function deleteSection(id){
+function deleteSection(id){ shGuard('section', id, ()=>deleteSectionReal(id)); }
+function deleteSectionReal(id){
   if(!confirm('આ વિભાગ ડિલીટ થશે. તેમાંના વિષયો "કોઈ વિભાગ નહીં" હેઠળ યથાવત રહેશે (ડિલીટ નહીં થાય). ચાલુ રાખવું છે?'))return;
   DB.subjects.forEach(s=>{ if(s.sectionId===id){ s.sectionId=null; s.folderId=null; } });
   DB.sfolders = (DB.sfolders||[]).filter(f=>f.sectionId!==id);
@@ -3202,8 +3207,110 @@ const MQ_LET = ['A','B','C','D'];
 
 function mqSticky(h){ return `<div class="hs-sticky mq-sticky">${h}</div>`; }
 function mqExamId(){ const e=getActiveExam(); return e?e.id:null; }
-function mqFolders(parentId){ return DB.qfolders.filter(f=>f.examId===mqExamId() && (f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
-function mqTests(folderId){ return DB.qtests.filter(t=>t.examId===mqExamId() && (t.folderId||null)===(folderId||null)).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
+/* ===== પરીક્ષા વચ્ચે શેર (લિંક — નકલ નહીં): વિભાગ (અભ્યાસ) અને MCQ ફોલ્ડર ===== */
+var _mqSetsCache = null;
+function shAll(){ return DB.shares = DB.shares || []; }
+function shTargets(kind, id){ return shAll().filter(x=>x.kind===kind && x.srcId===id).map(x=>x.examId); }
+function shObj(kind, id){ return kind==='section' ? DB.sections.find(x=>x.id===id) : DB.qfolders.find(x=>x.id===id); }
+function shOwner(kind, id){ const o = shObj(kind,id); return o ? o.examId : null; }
+function shExamName(id){ const e = DB.exams.find(x=>x.id===id); return e ? e.name : '?'; }
+function shHolders(kind, id){ const o = shOwner(kind,id); const t = shTargets(kind,id).filter(x=>x!==o && DB.exams.some(e=>e.id===x)); return o ? [o].concat(t) : t; }
+function shIsShared(kind, id){ return shHolders(kind,id).length > 1; }
+function shBadge(kind, id){ return shIsShared(kind,id) ? ` <span class="badge" style="font-weight:700;" title="શેર">🔗</span>` : ''; }
+function shSet(kind, id, examIds){
+  const owner = shOwner(kind,id);
+  DB.shares = shAll().filter(x=>!(x.kind===kind && x.srcId===id));
+  examIds.filter(e=>e!==owner).forEach(e=>DB.shares.push({id:uid(), kind, srcId:id, examId:e}));
+  _mqSetsCache = null;
+}
+function shTransferOwner(kind, id, newExam){
+  if(kind==='section'){
+    const sec = DB.sections.find(x=>x.id===id); if(!sec) return; sec.examId = newExam;
+    DB.subjects.forEach(x=>{ if(x.sectionId===id) x.examId = newExam; });
+    (DB.sfolders||[]).forEach(f=>{ if(f.sectionId===id) f.examId = newExam; });
+  } else {
+    const ids = mqCollectFolderIds(id);
+    DB.qfolders.forEach(f=>{ if(ids.includes(f.id)) f.examId = newExam; });
+    DB.qtests.forEach(t=>{ if(ids.includes(t.folderId)) t.examId = newExam; });
+  }
+  DB.shares = shAll().filter(x=>!(x.kind===kind && x.srcId===id && x.examId===newExam));
+  _mqSetsCache = null;
+}
+function shLabel(kind){ return kind==='section' ? 'વિભાગ' : 'ફોલ્ડર'; }
+/* શેર કરવા માટેની શીટ */
+function shOpen(kind, id){
+  const o = shObj(kind,id); if(!o) return;
+  const owner = o.examId, cur = new Set(shTargets(kind,id));
+  const others = DB.exams.filter(e=>e.id!==owner);
+  if(!others.length){ toast('શેર કરવા માટે બીજી પરીક્ષા ઉમેરો','error'); return; }
+  openSheet(`
+    <div class="sheet-title">🔗 બીજી પરીક્ષામાં શેર કરો</div>
+    <div style="font-weight:800; margin-bottom:4px;">${kind==='section'?'📂':'📁'} ${esc(o.name)}</div>
+    <div class="ink-dim fs-12 mb-6">મૂળ: <b>${esc(shExamName(owner))}</b>. શેર કરેલું ${shLabel(kind)} અંદરના બધા ${kind==='section'?'વિષય/ટોપિક':'ફોલ્ડર/ટેસ્ટ'} સાથે ત્યાં દેખાશે. એક જ ડેટા રહેશે (નકલ નહીં), એટલે ફેરફાર/પ્રગતિ બંનેમાં સરખી.${kind==='qfolder'&&o.parentId?' ઉપરના ફોલ્ડર ફક્ત રસ્તા તરીકે દેખાશે.':''}</div>
+    <div style="border:1px solid var(--border); border-radius:12px; padding:4px 8px;">
+      ${others.map(e=>`<label class="mq-pick-row"><input type="checkbox" class="sh-ck" value="${e.id}" ${cur.has(e.id)?'checked':''}><span style="flex:1;">🎓 ${esc(e.name)}</span></label>`).join('')}
+    </div>
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="shSave('${kind}','${id}')">સેવ કરો</button></div>`);
+}
+function shSave(kind, id){
+  const ids = [...document.querySelectorAll('.sh-ck:checked')].map(x=>x.value);
+  shSet(kind, id, ids); save(); closeSheet(); renderMain(); toast(ids.length ? `🔗 ${ids.length} પરીક્ષામાં શેર થયું` : 'શેર બંધ કર્યું');
+}
+/* શેર થયેલું ડિલીટ કરતા: કઈ કઈ પરીક્ષામાંથી કાઢવું તે પૂછે */
+function shGuard(kind, id, realDelete){
+  const holders = shHolders(kind,id);
+  if(holders.length < 2){ realDelete(); return; }
+  const cur = (getActiveExam()||{}).id;
+  const o = shObj(kind,id);
+  window._shDel = {kind, id, realDelete};
+  openSheet(`
+    <div class="sheet-title">🔗 શેર થયેલું ${shLabel(kind)}</div>
+    <div style="font-weight:800; margin-bottom:6px;">${kind==='section'?'📂':'📁'} ${esc(o?o.name:'')}</div>
+    <div class="ink-dim fs-12 mb-6">આ ${shLabel(kind)} નીચેની પરીક્ષાઓમાં છે. જેમાંથી કાઢવું હોય તેમાં ટિક કરો. ટિક ન કરેલી પરીક્ષામાં તે જેમ છે તેમ રહેશે (ડેટા ત્યાં સચવાશે).</div>
+    <div style="border:1px solid var(--border); border-radius:12px; padding:4px 8px;">
+      ${holders.map(e=>`<label class="mq-pick-row"><input type="checkbox" class="sh-dk" value="${e}" ${e===cur?'checked disabled':''}><span style="flex:1;">🎓 ${esc(shExamName(e))}${e===cur?' (અહીંથી)':''}${e===shOwner(kind,id)?' · મૂળ':''}</span></label>`).join('')}
+    </div>
+    <div class="sheet-actions"><button class="btn btn-danger btn-block" onclick="shGuardGo()">કાઢી નાખો</button></div>`);
+}
+function shGuardGo(){
+  const g = window._shDel; if(!g) return; const {kind, id, realDelete} = g;
+  const cur = (getActiveExam()||{}).id;
+  const holders = shHolders(kind,id);
+  const R = new Set([cur]); document.querySelectorAll('.sh-dk:checked').forEach(x=>R.add(x.value));
+  const K = holders.filter(e=>!R.has(e));
+  if(!K.length){ closeSheet(); realDelete(); return; }
+  const owner = shOwner(kind,id);
+  let newOwner = owner;
+  if(R.has(owner)){ newOwner = K[0]; shTransferOwner(kind,id,newOwner); }
+  shSet(kind, id, K.filter(e=>e!==newOwner));
+  if(kind==='section' && sectionDetailId===id && R.has(cur)) sectionDetailId = null;
+  if(kind==='qfolder' && R.has(cur)){ const ids = mqCollectFolderIds(id); if(ids.includes(mqFolderId)) mqFolderId = null; }
+  save(); closeSheet(); renderMain(); toast(`અહીંથી કાઢ્યું · ${K.map(shExamName).join(', ')} માં રહેશે`);
+}
+/* પરીક્ષા ડિલીટ કરતા: તેમાંથી શેર થયેલું બીજી પરીક્ષામાં સચવાય */
+function shOnExamDelete(examId){
+  shAll().filter(x=>x.examId===examId).forEach(x=>{ x.dead = true; });
+  DB.shares = shAll().filter(x=>!x.dead);
+  [['section',DB.sections],['qfolder',DB.qfolders]].forEach(([kind,list])=>{
+    list.filter(o=>o.examId===examId).forEach(o=>{ const t = shTargets(kind,o.id).filter(e=>e!==examId && DB.exams.some(x=>x.id===e)); if(t.length){ shTransferOwner(kind, o.id, t[0]); } });
+  });
+  DB.shares = shAll().filter(x=>!(x.examId===examId));
+}
+/* MCQ: પરીક્ષામાં દેખાતા ફોલ્ડર (પૂરા) અને ફક્ત રસ્તા તરીકે દેખાતા ઉપરના ફોલ્ડર */
+function mqSets(examId){
+  if(_mqSetsCache && _mqSetsCache.ex===examId) return _mqSetsCache;
+  const roots = DB.qfolders.filter(f=>f.examId===examId).map(f=>f.id).concat(shAll().filter(x=>x.kind==='qfolder' && x.examId===examId).map(x=>x.srcId));
+  const full = new Set(roots); let ch = true;
+  while(ch){ ch = false; DB.qfolders.forEach(f=>{ if(f.parentId && full.has(f.parentId) && !full.has(f.id)){ full.add(f.id); ch = true; } }); }
+  const path = new Set();
+  shAll().filter(x=>x.kind==='qfolder' && x.examId===examId).forEach(x=>{ let f = DB.qfolders.find(y=>y.id===x.srcId), g = 0; while(f && f.parentId && g++<30){ if(!full.has(f.parentId)) path.add(f.parentId); f = DB.qfolders.find(y=>y.id===f.parentId); } });
+  return _mqSetsCache = {ex:examId, full, path};
+}
+function mqExamTests(examId){ const S = mqSets(examId); return DB.qtests.filter(t=>t.folderId ? S.full.has(t.folderId) : t.examId===examId); }
+function mqExamFolders(examId){ const S = mqSets(examId); return DB.qfolders.filter(f=>S.full.has(f.id)); }
+function mqIsPathOnly(fid){ const S = mqSets(mqExamId()); return S.path.has(fid) && !S.full.has(fid); }
+function mqFolders(parentId){ const S = mqSets(mqExamId()); return DB.qfolders.filter(f=>(f.parentId||null)===(parentId||null) && (S.full.has(f.id)||S.path.has(f.id))).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
+function mqTests(folderId){ const S = mqSets(mqExamId()); return DB.qtests.filter(t=> folderId ? (t.folderId===folderId && S.full.has(folderId)) : (!t.folderId && t.examId===mqExamId())).sort((a,b)=>a.name.localeCompare(b.name,'gu',{numeric:true})); }
 function mqFolderPath(id){ const out=[]; let f=DB.qfolders.find(x=>x.id===id); while(f){ out.unshift(f.name); f=DB.qfolders.find(x=>x.id===f.parentId); } return out; }
 function mqCountDeep(folderId){
   let tests = mqTests(folderId).length, subs = mqFolders(folderId);
@@ -3429,8 +3536,8 @@ function mqListHTML(){
   const mode = getQSort();
   let folders, tests;
   if(q){
-    folders = DB.qfolders.filter(f=>f.examId===mqExamId() && f.name.toLowerCase().includes(q));
-    tests = DB.qtests.filter(t=>t.examId===mqExamId() && (t.name.toLowerCase().includes(q) || mqFolderPath(t.folderId).join(' ').toLowerCase().includes(q)));
+    folders = mqExamFolders(mqExamId()).filter(f=>f.name.toLowerCase().includes(q));
+    tests = mqExamTests(mqExamId()).filter(t=>(t.name.toLowerCase().includes(q) || mqFolderPath(t.folderId).join(' ').toLowerCase().includes(q)));
   } else {
     folders = mqFolders(mqFolderId); tests = mqTests(mqFolderId);
   }
@@ -3465,7 +3572,7 @@ function mqFolderOptions(selId, excludeId){
   const ban = excludeId ? new Set(mqCollectFolderIds(excludeId)) : new Set();
   const out = [`<option value="">📂 (મુખ્ય — ફોલ્ડર વગર)</option>`];
   const walk = (pid, depth)=>{ mqFolders(pid).forEach(f=>{ if(ban.has(f.id)) return;
-    out.push(`<option value="${f.id}" ${selId===f.id?'selected':''}>${'\u00A0\u00A0'.repeat(depth)}📁 ${esc(f.name)}</option>`); walk(f.id, depth+1); }); };
+    out.push(`<option value="${f.id}" ${selId===f.id?'selected':''} ${mqIsPathOnly(f.id)?'disabled':''}>${'\u00A0\u00A0'.repeat(depth)}📁 ${esc(f.name)}${mqIsPathOnly(f.id)?' (ફક્ત રસ્તો)':''}</option>`); walk(f.id, depth+1); }); };
   walk(null,0);
   return out.join('');
 }
@@ -3475,7 +3582,8 @@ function openQFolderForm(id){
     <h3>${(f?!f.parentId:!mqFolderId)?(f?'વિભાગ એડિટ':'નવો વિભાગ'):(f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર')} 📁</h3>
     <div class="field"><label>નામ</label><input type="text" id="f_qfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: Daily Test Series"></div>
     <div class="field"><label>ક્યાં રાખવું?</label><select id="f_qfparent">${mqFolderOptions(f ? (f.parentId||'') : (mqFolderId||''), id)}</select></div>
-    ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ફોલ્ડરની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>`:''}
+    ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ફોલ્ડરની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>
+    <button class="btn btn-secondary btn-block" style="margin-top:6px;" onclick="shOpen('qfolder','${f.id}')">🔗 બીજી પરીક્ષામાં શેર કરો${shIsShared('qfolder',f.id)?' ('+(shHolders('qfolder',f.id).length-1)+')':''}</button>`:''}
     <div class="sheet-actions">
       ${f?`<button class="btn btn-danger" onclick="deleteQFolder('${f.id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveQFolder(${f?`'${f.id}'`:'null'})">સેવ કરો</button>
@@ -3484,12 +3592,16 @@ function openQFolderForm(id){
 function saveQFolder(id){
   const name = val('f_qfname'); if(!name){ toast('નામ લખો','error'); return; }
   const parentId = val('f_qfparent') || null;
-  if(id){ const f = DB.qfolders.find(x=>x.id===id); f.name = name; f.parentId = parentId; }
-  else DB.qfolders.push({id:uid(), examId:mqExamId(), parentId, name});
+  const par = parentId ? DB.qfolders.find(x=>x.id===parentId) : null;
+  const ownerEx = par ? par.examId : mqExamId();
+  if(id){ const f = DB.qfolders.find(x=>x.id===id); const moved = (f.parentId||null)!==parentId; f.name = name; f.parentId = parentId;
+    if(moved){ const ids = mqCollectFolderIds(id); DB.qfolders.forEach(x=>{ if(ids.includes(x.id)) x.examId = ownerEx; }); DB.qtests.forEach(t=>{ if(ids.includes(t.folderId)) t.examId = ownerEx; }); } }
+  else DB.qfolders.push({id:uid(), examId:ownerEx, parentId, name});
   save(); closeSheet(); renderMain();
 }
 function mqCollectFolderIds(id){ let ids=[id]; DB.qfolders.filter(f=>f.parentId===id).forEach(f=>{ ids = ids.concat(mqCollectFolderIds(f.id)); }); return ids; }
-function deleteQFolder(id){
+function deleteQFolder(id){ shGuard('qfolder', id, ()=>deleteQFolderReal(id)); }
+function deleteQFolderReal(id){
   const ids = mqCollectFolderIds(id);
   const nT = DB.qtests.filter(t=>ids.includes(t.folderId)).length;
   if(!confirm(`આ ફોલ્ડર, તેના સબફોલ્ડર અને ${nT} ટેસ્ટ ડિલીટ થશે. ચાલુ રાખવું છે?`)) return;
@@ -3546,8 +3658,10 @@ function saveQTest(id){
     const old = t.questions;
     r.questions.forEach((q,i)=>{ if(old[i] && old[i].star) q.star = true; });
     t.name = name; t.questions = r.questions; t.folderId = val('f_qtfolder') || null;
+    { const fo = t.folderId ? DB.qfolders.find(x=>x.id===t.folderId) : null; t.examId = fo ? fo.examId : mqExamId(); }
   } else {
-    DB.qtests.push({id:uid(), examId:mqExamId(), folderId:(val('f_qtfolder')||null), name, questions:r.questions, attempts:[], created:todayStr()});
+    const _fo = val('f_qtfolder') ? DB.qfolders.find(x=>x.id===val('f_qtfolder')) : null;
+    DB.qtests.push({id:uid(), examId:(_fo?_fo.examId:mqExamId()), folderId:(val('f_qtfolder')||null), name, questions:r.questions, attempts:[], created:todayStr()});
   }
   save(); closeSheet(); renderMain(); toast('સેવ થયું ✅');
 }
@@ -3661,7 +3775,7 @@ function tlRenderTopicPicker(){
 function tlTpToggle(id){ if(tlTopicSel.has(id)) tlTopicSel.delete(id); else tlTopicSel.add(id); tlRenderTopicPicker(); }
 function tlTpFolder(fid, on){ mqPickTestsUnder(fid).forEach(t=>{ if(on) tlTopicSel.add(t.id); else tlTopicSel.delete(t.id); }); tlRenderTopicPicker(); }
 function tlTpSave(){
-  DB.qtests.filter(t=>t.examId===mqExamId()).forEach(t=>{
+  mqExamTests(mqExamId()).forEach(t=>{
     const cur = new Set(t.topicIds||[]);
     if(tlTopicSel.has(t.id)) cur.add(tlTopicId); else cur.delete(tlTopicId);
     t.topicIds = [...cur];
@@ -4148,12 +4262,12 @@ function saveQQuestion(qi){
 
 /* ---- MCQ ટેસ્ટ: રિવિઝન, ફોલ્ડર બુક, ડેશબોર્ડ ---- */
 function qrevsForActiveExam(){
-  const ids = new Set(DB.qtests.filter(t=>t.examId===mqExamId()).map(t=>t.id));
+  const ids = new Set(mqExamTests(mqExamId()).map(t=>t.id));
   return (DB.qrevs||[]).filter(r=>ids.has(r.testId));
 }
 function mqAttemptsOn(dateStr){
   const out = [];
-  DB.qtests.filter(t=>t.examId===mqExamId()).forEach(t=>{ (t.attempts||[]).forEach(a=>{ if(a.date===dateStr) out.push({t,a}); });
+  mqExamTests(mqExamId()).forEach(t=>{ (t.attempts||[]).forEach(a=>{ if(a.date===dateStr) out.push({t,a}); });
     if(t.chal && t.chal.date===dateStr) out.push({t, a:{mode:'survive', correct:t.chal.correct, total:t.chal.total, pct:t.chal.pct}}); });
   return out;
 }
@@ -4235,10 +4349,12 @@ function mqFolderBookHTML(f){
   const tests = mqFolderTestsDeep(f.id);
   const nT = tests.length, nF = mqFolders(f.id).length;
   const attempted = tests.filter(t=>(t.attempts||[]).length).length;
+  const editCode = mqIsPathOnly(f.id) ? `toast('આ ફોલ્ડર ફક્ત રસ્તા તરીકે દેખાય છે — મૂળ પરીક્ષામાં એડિટ કરો','info')` : `openQFolderForm('${f.id}')`;
+  const shb = mqIsPathOnly(f.id) ? ' <span class="badge" style="font-weight:700;">🔗 શેર</span>' : shBadge('qfolder', f.id);
   if(!f.parentId){ /* મુખ્ય વિભાગ — પરીક્ષાના વિભાગ કાર્ડ જેવું જ */
     const pc = nT ? Math.round(attempted/nT*100) : 0;
     return `<div class="card cursor-pointer" data-search="${esc(f.name.toLowerCase())}" onclick="mqOpenFolder('${f.id}')">
-      ${progressCardHeader(pc, `📂 ${esc(f.name)} <span class="badge badge-primary" style="font-weight:700;">${nT} ટેસ્ટ</span>`, `openQFolderForm('${f.id}')`)}
+      ${progressCardHeader(pc, `📂 ${esc(f.name)} <span class="badge badge-primary" style="font-weight:700;">${nT} ટેસ્ટ</span>${shb}`, editCode)}
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${nF?nF+' ફોલ્ડર · ':''}${attempted}/${nT} આપેલી — વિગત જોવા ટેપ કરો →</div>
     </div>`;
   }
@@ -4258,10 +4374,10 @@ function mqFolderBookHTML(f){
       <div class="subject-mini-stat"><b>${rTot}</b><span>કુલ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rDone}</b><span>પૂર્ણ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rTot-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
-  return `<div style="margin-bottom:12px;">${folderCardHTML(pct, '📁 '+esc(f.name), `${nF?nF+' સબફોલ્ડર · ':''}${nT} ટેસ્ટ — ખોલવા ટેપ કરો →`, `openQFolderForm('${f.id}')`, `mqOpenFolder('${f.id}')`, det)}</div>`;
+  return `<div style="margin-bottom:12px;">${folderCardHTML(pct, '📁 '+esc(f.name)+shb, `${nF?nF+' સબફોલ્ડર · ':''}${nT} ટેસ્ટ — ખોલવા ટેપ કરો →`, editCode, `mqOpenFolder('${f.id}')`, det)}</div>`;
 }
 function dashboardQuizPages(exam){
-  const tests = DB.qtests.filter(t=>t.examId===mqExamId());
+  const tests = mqExamTests(mqExamId());
   if(!tests.length) return [];
   const attempted = tests.filter(t=>(t.attempts||[]).length);
   const lastPcts = attempted.map(t=>t.attempts[t.attempts.length-1].pct);
@@ -4297,7 +4413,7 @@ function dashboardQuizPages(exam){
 }
 function dashMcqStats(){
   const today = todayStr();
-  const tests = DB.qtests.filter(t=>t.examId===mqExamId());
+  const tests = mqExamTests(mqExamId());
   const revs = qrevsForActiveExam();
   const dueToday = revs.filter(r=>r.dueDate===today);
   const doneToday = dueToday.filter(r=>r.status==='completed').length;
