@@ -492,8 +492,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.21-5';
-const APP_BUILT = '2026-11-21T11:22:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-6';
+const APP_BUILT = '2026-11-21T11:34:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1154,7 +1154,7 @@ function renderDashboard(){
     const secTotal = secTopics.length;
     if(!secTotal) return;
     const secCompleted = secTopics.filter(t=>t.status==='completed').length;
-    const hasMarks = sec.totalMarks && sec.totalMarks>0;
+    const hasMarks = false; /* વિભાગનો ગુણભાર દૂર કર્યો — હવે ગણતરીમાં નથી */
     const unitWeight = hasMarks ? (sec.totalMarks/secTotal) : 1;
     weightedTotal += secTotal*unitWeight;
     weightedCompleted += secCompleted*unitWeight;
@@ -1410,7 +1410,6 @@ function renderExamDetail(examId){
   if(!e){ examDetailId=null; return renderExams(); }
   if(sectionDetailId){ return renderSectionDetail(sectionDetailId); }
   const sections = examSections(examId);
-  const totalSectionMarks = sections.reduce((a,sec)=>a+Number(sec.totalMarks||0),0);
   return `
    <div class="hs-sticky mq-sticky">
      <div class="section-header mb-6" style="justify-content:flex-end;">
@@ -1529,7 +1528,7 @@ function sectionSlideCard(sec){
   let totalTopics=0, completedTopics=0;
   subs.forEach(s=>{ const topics=subjectTopics(s.id); totalTopics+=topics.length; completedTopics+=topics.filter(t=>t.status==='completed').length; });
   const pct = totalTopics ? Math.round(completedTopics/totalTopics*100) : 0;
-  const title = `📂 ${esc(sec.name)}${(sec.totalMarks&&sec.totalMarks>0)?` <span class="badge badge-primary" style="font-weight:700;">${sec.totalMarks} ગુણ</span>`:''}${shBadge('section', sec.id)}`;
+  const title = `📂 ${esc(sec.name)}${shBadge('section', sec.id)}`;
   return `<div class="card cursor-pointer" data-search="${esc(sec.name.toLowerCase())}" onclick="sectionDetailId='${sec.id}'; subjFolderId=null; renderMain();">
       ${progressCardHeader(pct, title, `openSectionForm('${sec.id}','${sec.examId}')`)}
       <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${subs.length} વિષય — વિગત જોવા ટેપ કરો →</div>
@@ -2148,6 +2147,7 @@ function openExamForm(id){
     <h3>${e?'પરીક્ષા એડિટ':'નવી પરીક્ષા'}</h3>
     <div class="field"><label>પરીક્ષાનું નામ</label><input type="text" id="f_name" value="${e?esc(e.name):''}" placeholder="દા.ત. GPSC, Talati"></div>
     <div class="field"><label>પરીક્ષાની તારીખ</label><input type="date" id="f_date" value="${e?e.date:''}"></div>
+    <div class="field"><label>પેપરના કુલ ગુણ (ફક્ત માહિતી માટે)</label><input type="number" id="f_extotal" inputmode="numeric" value="${e&&e.totalMarks?e.totalMarks:''}" placeholder="દા.ત. 100"></div>
     <div class="field"><label>વર્ણન</label><textarea id="f_desc">${e?esc(e.description||''):''}</textarea></div>
     <div class="sheet-actions">
       ${e?`<button class="btn btn-danger" onclick="deleteExam('${id}')">ડિલીટ</button>`:''}
@@ -2156,12 +2156,12 @@ function openExamForm(id){
   `);
 }
 function saveExam(id){
-  const name=val('f_name'), date=val('f_date'), desc=val('f_desc');
+  const name=val('f_name'), date=val('f_date'), desc=val('f_desc'), totalMarks=parseFloat(val('f_extotal'))||0;
   if(!name||!date){ toast('નામ અને તારીખ ભરો','error'); return; }
   const dup = DB.exams.find(x=>x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
   if(dup){ toast('આ નામની પરીક્ષા પહેલેથી છે','error'); return; }
-  if(id){ const e=DB.exams.find(x=>x.id===id); Object.assign(e,{name,date,description:desc}); }
-  else { const makeActive = DB.exams.length===0; DB.exams.push({id:uid(),name,date,description:desc,active:makeActive}); }
+  if(id){ const e=DB.exams.find(x=>x.id===id); Object.assign(e,{name,date,description:desc,totalMarks}); }
+  else { const makeActive = DB.exams.length===0; DB.exams.push({id:uid(),name,date,description:desc,totalMarks,active:makeActive}); }
   save(); closeSheet(); renderMain(); populateExamSwitcher(); toast('સેવ થયું');
 }
 function cascadeDeleteSubjectData(subjectId){
@@ -2233,8 +2233,6 @@ function openSectionForm(id, examId){
   openSheet(`
     <h3>${sec?'વિભાગ એડિટ':'નવો વિભાગ'}</h3>
     <div class="field"><label>વિભાગનું નામ</label><input type="text" id="f_name" value="${sec?esc(sec.name):''}" placeholder="દા.ત. સામાન્ય જ્ઞાન"></div>
-    <div class="field"><label>કુલ ગુણ</label><input type="number" id="f_marks" value="${sec?sec.totalMarks:''}"></div>
-    <div class="ink-dim" style="font-size:11.5px; margin:-8px 0 12px 0;">વિભાગમાં એકથી વધુ વિષય હોઈ શકે, દરેકના ગુણ તમે વિષયમાં જ અલગ-અલગ સેટ કરી શકો છો</div>
     ${sec?`<button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="shOpen('section','${id}')">🔗 બીજી પરીક્ષામાં શેર કરો${shIsShared('section',id)?' ('+(shHolders('section',id).length-1)+')':''}</button>`:''}
     <div class="sheet-actions">
       ${sec?`<button class="btn btn-danger" onclick="deleteSection('${id}')">ડિલીટ</button>`:''}
@@ -2243,12 +2241,12 @@ function openSectionForm(id, examId){
   `);
 }
 function saveSection(id, examId){
-  const name=val('f_name'), marks=parseFloat(val('f_marks'))||0;
+  const name=val('f_name');
   if(!name){ toast('નામ ભરો','error'); return; }
   const dup = DB.sections.find(x=>x.examId===examId && x.name.trim().toLowerCase()===name.toLowerCase() && x.id!==id);
   if(dup){ toast('આ નામનો વિભાગ પહેલેથી છે','error'); return; }
-  if(id){ const sec=DB.sections.find(x=>x.id===id); Object.assign(sec,{name,totalMarks:marks}); }
-  else DB.sections.push({id:uid(),examId,name,totalMarks:marks});
+  if(id){ const sec=DB.sections.find(x=>x.id===id); Object.assign(sec,{name}); }
+  else DB.sections.push({id:uid(),examId,name});
   save(); closeSheet(); renderMain(); toast('સેવ થયું');
 }
 function deleteSection(id){ shGuard('section', id, ()=>deleteSectionReal(id)); }
