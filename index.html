@@ -254,6 +254,18 @@ a{color:inherit;}
 
 .topic-row{padding:14px; margin-bottom:12px; border-bottom:none;}
 .topic-row:last-child{border-bottom:none;}
+.set-row{display:flex; align-items:center; gap:14px; padding:14px 2px; border-bottom:1px solid var(--border); cursor:pointer;}
+.set-row:last-child{border-bottom:none;}
+.set-ico{font-size:22px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:color-mix(in srgb, var(--ink) 8%, transparent); flex-shrink:0;}
+.set-txt{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+.set-txt b{font-size:15.5px;}
+.set-txt small{font-size:12.5px; color:var(--ink-dim);}
+.set-arr{font-size:22px; color:var(--ink-dim);}
+.st-row{display:flex; align-items:center; gap:6px; padding-top:10px; padding-bottom:3px; cursor:pointer;}
+.st-arr{width:16px; color:var(--ink-dim); flex-shrink:0;}
+.st-name{flex:1; min-width:0; font-size:14px; word-break:break-word;}
+.st-bar{height:4px; border-radius:4px; background:color-mix(in srgb, var(--ink) 8%, transparent); margin-bottom:4px; overflow:hidden;}
+.st-bar i{display:block; height:100%; background:var(--primary); border-radius:4px;}
 .act-row{display:flex; gap:6px; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);}
 .act-row .btn{flex:1 1 0; min-width:0; padding:9px 0; font-size:17px; line-height:1; justify-content:center; border-radius:12px;}
 .act-row .btn small{font-size:11px; font-weight:800; margin-left:2px;}
@@ -498,8 +510,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.21-10';
-const APP_BUILT = '2026-11-21T17:00:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.21-11';
+const APP_BUILT = '2026-11-21T18:01:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1093,6 +1105,7 @@ function buildNav(){
   ).join('');
 }
 function showTab(id){
+  if(id==='settings') setPage = null;
   if(id==='exams' && currentTab!==id){ lastMainTab = currentTab; }
   currentTab = id;
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
@@ -2818,36 +2831,271 @@ function navigateToRevisionDate(dateStr, revisionId){
   renderMain();
 }
 /* ===================== SETTINGS ===================== */
+/* ===== ⚙️ સેટિંગ્સ — મોબાઈલ સેટિંગ્સ જેવું: યાદી → અંદરનું પેજ ===== */
+var setPage = null, stOpen = new Set();
+const SET_ROWS = [
+  ['theme','🎨','દેખાવ',()=>DB.settings.theme==='dark'?'ડાર્ક મોડ ચાલુ':'લાઇટ મોડ'],
+  ['notif','🔔','નોટિફિકેશન',()=>notificationStatusText()],
+  ['lock','🔒','પાસવર્ડ સુરક્ષા',()=>lockHasPw()?'ચાલુ':'સેટ નથી'],
+  ['data','💾','ડેટા અને સ્ટોરેજ',()=>{ const u=storageUsage(); return storageMB(u.chars)+' વપરાયું'; }],
+  ['xport','📤','એક્સપોર્ટ / ઇમ્પોર્ટ',()=>'બેકઅપ · પરીક્ષા · ટેસ્ટ · નકશો'],
+  ['maint','🧹','જાળવણી',()=>'ઇતિહાસ ટૂંકો, છૂટો ડેટા સાફ'],
+  ['about','ℹ️','એપ વિશે',()=>'વર્ઝન '+APP_VERSION]
+];
+function setOpen(p){ setPage = p; renderMain(); }
 function renderSettings(){
-  const theme = DB.settings.theme;
-  return `
-   <h2>સેટિંગ્સ ⚙️</h2>
-   ${card('થીમ', `<div class="item cursor-default"><span>ડાર્ક મોડ</span><label class="switch"><input type="checkbox" ${theme==='dark'?'checked':''} onchange="toggleTheme(this.checked)"><span class="slider"></span></label></div>`)}
-   ${card('નોટિફિકેશન 🔔', `
+  if(!setPage) return `<h2>સેટિંગ્સ ⚙️</h2>
+    <div class="card" style="padding:4px 14px;">${SET_ROWS.map(r=>`<div class="set-row" onclick="setOpen('${r[0]}')"><span class="set-ico">${r[1]}</span><span class="set-txt"><b>${r[2]}</b><small>${esc(String(r[3]()))}</small></span><span class="set-arr">›</span></div>`).join('')}
+      <div class="set-row" onclick="guard('બધો ડેટા રીસેટ કરવા માટે', resetAllData)"><span class="set-ico">⚠️</span><span class="set-txt"><b style="color:var(--danger);">બધો ડેટા રીસેટ</b><small>કાયમ માટે ભૂંસાય છે</small></span><span class="set-arr">›</span></div></div>`;
+  const row = SET_ROWS.find(r=>r[0]===setPage);
+  return pageTopHTML("setPage=null; renderMain();", '', '') + `<h2>${row?row[1]+' '+row[2]:''}</h2>` + setPageBody(setPage);
+}
+function setPageBody(p){
+  if(p==='theme') return card('થીમ', `<div class="item cursor-default"><span>ડાર્ક મોડ</span><label class="switch"><input type="checkbox" ${DB.settings.theme==='dark'?'checked':''} onchange="toggleTheme(this.checked)"><span class="slider"></span></label></div>`);
+  if(p==='notif') return card('નોટિફિકેશન 🔔', `
      <div class="item cursor-default"><span>સ્ટેટસ</span><b>${notificationStatusText()}</b></div>
      <div class="ink-dim fs-12 mt-8 mb-6">બાકી/ઓવરડ્યુ રિવિઝન, અને સ્ટ્રીક રિમાઇન્ડર — app ખુલ્લી હોય ત્યારે મળશે. (App સંપૂર્ણ બંધ હોય ત્યારે નહીં — એ free રીતે શક્ય નથી.)</div>
      ${(('Notification' in window) && Notification.permission==='default') ? `<button class="btn btn-primary btn-block" onclick="requestNotificationPermission()">🔔 નોટિફિકેશન ચાલુ કરો</button>` : ''}
-     ${(('Notification' in window) && Notification.permission==='granted') ? `<button class="btn btn-secondary btn-block" onclick="showAppNotification('ટેસ્ટ ✅','આ એક ટેસ્ટ નોટિફિકેશન છે','test')">ટેસ્ટ નોટિફિકેશન મોકલો</button>` : ''}
-   `)}
-   ${card('સ્ટોરેજ 💾', storageCardHTML())}
-   ${card('ડેટા', `
-     ${lockCardHTML()}
-     <div style="height:12px;"></div>
-     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('બેકઅપ એક્સપોર્ટ કરવા માટે', exportBackup)">⬇️ બેકઅપ એક્સપોર્ટ કરો</button>
-     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('બેકઅપ ઇમ્પોર્ટ કરવા માટે', importPick)">⬆️ બેકઅપ ઇમ્પોર્ટ કરો</button>
-     <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackup(event)">
+     ${(('Notification' in window) && Notification.permission==='granted') ? `<button class="btn btn-secondary btn-block" onclick="showAppNotification('ટેસ્ટ ✅','આ એક ટેસ્ટ નોટિફિકેશન છે','test')">ટેસ્ટ નોટિફિકેશન મોકલો</button>` : ''}`);
+  if(p==='lock') return card('પાસવર્ડ સુરક્ષા', lockCardHTML()) + `<div class="ink-dim fs-12">પાસવર્ડ એક્સપોર્ટ, ઇમ્પોર્ટ, સાફ-સફાઈ અને રીસેટ વખતે પૂછાય છે.</div>`;
+  if(p==='data') return card('સ્ટોરેજ 💾', storageCardHTML()) + card('📂 ડેટા કેટલી જગ્યા રોકે છે', `<div id="stTree">${stTreeHTML()}</div><div class="ink-dim fs-12 mt-8">ટેપ કરીને અંદર ખોલો. સાઇઝ આશરે (સેવ થતા લખાણ પ્રમાણે) છે.</div>`);
+  if(p==='xport') return xportPageHTML();
+  if(p==='maint') return card('જાળવણી 🧹', `
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('ઇતિહાસ ટૂંકો કરવા માટે', openCompactSheet)">🧹 જૂનો ઇતિહાસ ટૂંકો કરો ${(DB.settings&&DB.settings.compactOn)?'(✓ ચાલુ)':''}</button>
-     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="openStructExport()">📐 ફક્ત માળખું એક્સપોર્ટ (નવી પરીક્ષા માટે)</button>
-     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="structImportPick()">📥 માળખું ઇમ્પોર્ટ → નવી પરીક્ષા</button>
-     <input type="file" id="structFile" accept="application/json" style="display:none" onchange="structImportRead(event)">
-     <div class="ink-dim fs-12 mb-6">માળખું = વિભાગ, ફોલ્ડર, વિષય, ચેપ્ટર અને MCQ ફોલ્ડર/ટેસ્ટ. અભ્યાસ, રિવિઝન, ગુણ, પ્રયત્નો કે તારીખો સાથે નથી — એટલે નવી પરીક્ષા શૂન્યથી શરૂ થાય.</div>
+     <div class="ink-dim fs-12 mb-6">પૂર્ણ થયેલા જૂના રિવિઝન, અભ્યાસ-લોગ અને ટેસ્ટના જૂના પ્રયત્નો ટૂંકા કરે — ફક્ત "કેટલી વાર + છેલ્લી તારીખ" રહે.</div>
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('જૂનો ડેટા સાફ કરવા માટે', cleanOrphanedData)">🧹 જૂનો છૂટો ડેટા સાફ કરો</button>
-     <div class="ink-dim fs-12 mb-6">ડિલીટ થયેલા વિષય/ટોપિક સાથે જોડાયેલો, પણ પાછળ રહી ગયેલો ડેટા (અભ્યાસ-લોગ, રિવિઝન, ટાઈમટેબલ) સાફ કરે — સેફ, બાકી કંઈ અસર નહીં થાય</div>
-     <button class="btn btn-danger btn-block" onclick="guard('બધો ડેટા રીસેટ કરવા માટે', resetAllData)">🗑️ બધો ડેટા રીસેટ કરો</button>
-   `)}
-   ${card('વિશે', `<div class="ink-dim" style="font-size:13px;line-height:1.7;">ExamPath — સંપૂર્ણ ઓફલાઈન સ્ટડી ટ્રેકર.<br>તમામ ડેટા ફક્ત તમારા મોબાઈલમાં (બ્રાઉઝર સ્ટોરેજ) સેવ થાય છે — ક્યાંય ઈન્ટરનેટ પર મોકલવામાં આવતો નથી. નિયમિત બેકઅપ એક્સપોર્ટ કરવાની ભલામણ છે.</div><div class="item cursor-default mt-8"><span>વર્ઝન</span><b>${APP_VERSION}</b></div><div class="item cursor-default"><span>અપડેટ થયેલ</span><b>${esc(fmtBuilt())}</b></div><button class="btn btn-secondary btn-block mt-8" onclick="checkForUpdate(true)">🔄 નવું વર્ઝન તપાસો</button>`)}
-  `;
+     <div class="ink-dim fs-12">ડિલીટ થયેલા વિષય/ટોપિક સાથે જોડાયેલો, પણ પાછળ રહી ગયેલો ડેટા સાફ કરે — સેફ, બાકી કંઈ અસર નહીં થાય.</div>`);
+  if(p==='about') return card('વિશે', `<div class="ink-dim" style="font-size:13px;line-height:1.7;">ExamPath — સંપૂર્ણ ઓફલાઈન સ્ટડી ટ્રેકર.<br>તમામ ડેટા ફક્ત તમારા મોબાઈલમાં (બ્રાઉઝર સ્ટોરેજ) સેવ થાય છે — ક્યાંય ઈન્ટરનેટ પર મોકલવામાં આવતો નથી. નિયમિત બેકઅપ એક્સપોર્ટ કરવાની ભલામણ છે.</div><div class="item cursor-default mt-8"><span>વર્ઝન</span><b>${APP_VERSION}</b></div><div class="item cursor-default"><span>અપડેટ થયેલ</span><b>${esc(fmtBuilt())}</b></div><button class="btn btn-secondary btn-block mt-8" onclick="checkForUpdate(true)">🔄 નવું વર્ઝન તપાસો</button>`);
+  return '';
 }
+function xportPageHTML(){
+  const mod = (kind, ico, name, sub)=>`<div class="card"><div class="card-title">${ico} ${name}</div><div class="ink-dim fs-12 mb-6">${sub}</div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-secondary flex-1" onclick="guard('${name} એક્સપોર્ટ કરવા માટે', ()=>xmOpenExport('${kind}'))">⬇️ એક્સપોર્ટ</button><button class="btn btn-secondary flex-1" onclick="guard('${name} ઇમ્પોર્ટ કરવા માટે', ()=>xmImportPick('${kind}'))">⬆️ ઇમ્પોર્ટ</button></div></div>`;
+  return `
+    ${mod('exam','📚','પરીક્ષા','વિભાગ, ફોલ્ડર, વિષય, ચેપ્ટર, સબ-ટોપિક. ઇમ્પોર્ટ વખતે હાલની કે નવી પરીક્ષામાં ઉમેરાય.')}
+    ${mod('mcq','🧠','MCQ ટેસ્ટ','MCQ ફોલ્ડર અને ટેસ્ટ (પ્રશ્નો + જવાબ ચાવી). ઇમ્પોર્ટ વખતે હાલની કે નવી પરીક્ષામાં ઉમેરાય.')}
+    ${mod('map','🗺','નકશો','બધી કેટેગરી અને સ્થળો. ઇમ્પોર્ટમાં ઉમેરો અથવા બદલો પસંદ કરી શકાય.')}
+    ${card('💼 આખું બેકઅપ', `
+     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('બેકઅપ એક્સપોર્ટ કરવા માટે', exportBackup)">⬇️ બેકઅપ એક્સપોર્ટ કરો</button>
+     <button class="btn btn-secondary btn-block" onclick="guard('બેકઅપ ઇમ્પોર્ટ કરવા માટે', importPick)">⬆️ બેકઅપ ઇમ્પોર્ટ કરો</button>
+     <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackup(event)">
+     <div class="ink-dim fs-12 mt-8">આખો ડેટા (બધી પરીક્ષા, અભ્યાસ, ટેસ્ટ, નકશો, સેટિંગ્સ). ઇમ્પોર્ટથી હાલનો ડેટા બદલાઈ જાય છે.</div>`)}
+    ${card('📐 માળખું → નવી પરીક્ષા', `
+     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="openStructExport()">📐 ફક્ત માળખું એક્સપોર્ટ</button>
+     <button class="btn btn-secondary btn-block" onclick="structImportPick()">📥 માળખું ઇમ્પોર્ટ → નવી પરીક્ષા</button>
+     <input type="file" id="structFile" accept="application/json" style="display:none" onchange="structImportRead(event)">
+     <input type="file" id="xmFile" accept="application/json" style="display:none" onchange="xmImportRead(event)">
+     <div class="ink-dim fs-12 mt-8">માળખું = વિભાગ, ફોલ્ડર, વિષય, ચેપ્ટર અને MCQ ફોલ્ડર/ટેસ્ટ. અભ્યાસ, રિવિઝન, ગુણ, પ્રયત્નો કે તારીખો સાથે નથી.</div>`)}`;
+}
+
+/* ---- 📤 મોડ્યુલ-વાર એક્સપોર્ટ / ઇમ્પોર્ટ ---- */
+const XM_NAME = {exam:'📚 પરીક્ષા', mcq:'🧠 MCQ ટેસ્ટ', map:'🗺 નકશો'};
+function xmClone(o){ return JSON.parse(JSON.stringify(o)); }
+function xmOpenExport(kind){
+  if(kind!=='map' && !DB.exams.length){ toast('પહેલા પરીક્ષા ઉમેરો','error'); return; }
+  const act = (DB.exams.find(e=>e.active)||DB.exams[0]||{}).id;
+  openSheet(`<h3>${XM_NAME[kind]} એક્સપોર્ટ</h3>
+    ${kind!=='map'?`<div class="field"><label>કઈ પરીક્ષાનું?</label><select id="f_xmExam">${DB.exams.map(e=>`<option value="${e.id}" ${e.id===act?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>`:''}
+    ${kind==='exam'?`<label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="f_xmProg"> પ્રગતિ સાથે (ચેપ્ટર સ્ટેટસ, પૂર્ણ સબ-ટોપિક, રિવિઝન સંખ્યા)</label>`:''}
+    ${kind==='mcq'?`<label style="display:flex;gap:8px;align-items:center;margin:10px 0;"><input type="checkbox" id="f_xmProg"> પ્રગતિ સાથે (છેલ્લું પરિણામ, શ્રેષ્ઠ %, કેટલી વાર, ચેલેન્જ, રિવિઝન સંખ્યા)</label>`:''}
+    <div class="ink-dim fs-12">${kind==='map'?'બધી કેટેગરી અને સ્થળો એક ફાઈલમાં.':'પ્રગતિ વગર ફક્ત માળખું'+(kind==='mcq'?' (પ્રશ્નો અને જવાબ ચાવી સાથે)':'')+' જશે.'}</div>
+    <div class="sheet-actions" style="margin-top:12px;"><button class="btn btn-primary btn-block" onclick="xmExportDo('${kind}')">⬇️ ડાઉનલોડ કરો</button></div>`);
+}
+function xmBuild(kind, examId, prog){
+  if(kind==='map'){ mapEnsureCommon(); return {exampathModule:1, kind:'map', name:'નકશો', cats:xmClone(DB.mapCats||[]), places:xmClone(DB.mapPlaces||[])}; }
+  const e = DB.exams.find(x=>x.id===examId); if(!e) return null;
+  if(kind==='exam'){
+    const subs = DB.subjects.filter(x=>x.examId===examId), sids = new Set(subs.map(x=>x.id));
+    const tops = DB.topics.filter(t=>sids.has(t.subjectId)), tids = new Set(tops.map(t=>t.id));
+    const withP = (o, src, keys)=>{ if(prog) keys.forEach(k=>{ if(src[k]!=null) o[k]=src[k]; }); return o; };
+    return {exampathModule:1, kind:'exam', name:e.name, prog,
+      sections: DB.sections.filter(x=>x.examId===examId).map(x=>({id:x.id, name:x.name})),
+      sfolders: (DB.sfolders||[]).filter(f=>f.examId===examId).map(f=>({id:f.id, sectionId:f.sectionId, parentId:f.parentId||null, name:f.name})),
+      subjects: subs.map(x=>({id:x.id, name:x.name, sectionId:x.sectionId||null, folderId:x.folderId||null})),
+      topics: tops.map(t=>withP({id:t.id, subjectId:t.subjectId, name:t.name}, t, ['status','completedDate','revCount','lastRev'])),
+      subtopics: (DB.subtopics||[]).filter(s=>tids.has(s.topicId)).map(s=>withP({id:s.id, topicId:s.topicId, subjectId:s.subjectId, name:s.name}, s, ['completed','completedDate','revCount','lastRev']))};
+  }
+  return {exampathModule:1, kind:'mcq', name:e.name, prog,
+    qfolders: DB.qfolders.filter(f=>f.examId===examId).map(f=>({id:f.id, parentId:f.parentId||null, name:f.name})),
+    qtests: DB.qtests.filter(t=>t.examId===examId).map(t=>{
+      const o = {id:t.id, folderId:t.folderId||null, name:t.name, questions:(t.questions||[]).map(q=>Object.assign(xmClone(q),{star:false}))};
+      if(prog) ['attempts','timesBase','bestPct','revCount','lastRev','chal'].forEach(k=>{ if(t[k]!=null) o[k]=xmClone(t[k]); });
+      return o; })};
+}
+function xmExportDo(kind){
+  const prog = !!(document.getElementById('f_xmProg')||{}).checked;
+  const out = xmBuild(kind, val('f_xmExam'), prog);
+  if(!out){ toast('પરીક્ષા મળી નથી','error'); return; }
+  closeSheet();
+  const blob = new Blob([JSON.stringify(out)], {type:'application/json'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = `exampath-${kind}-${String(out.name).replace(/[^\p{L}\p{N}]+/gu,'-')}-${todayStr()}.json`; a.click(); URL.revokeObjectURL(url);
+  toast('ફાઈલ ડાઉનલોડ થઈ ✅');
+}
+let _xmKind = null, _xmPending = null;
+function xmImportPick(kind){ _xmKind = kind; const i = document.getElementById('xmFile'); if(i){ i.value=''; i.click(); } }
+function xmImportRead(evt){
+  const file = evt.target.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = ev=>{
+    try{
+      const p = JSON.parse(ev.target.result);
+      if(!p || p.exampathModule!==1 || !p.kind) throw new Error('bad');
+      if(p.kind!==_xmKind){ toast(`આ ફાઈલ ${XM_NAME[p.kind]||''} ની છે, ${XM_NAME[_xmKind]} ની નહીં`,'error'); return; }
+      if(p.kind==='map' && (!Array.isArray(p.cats)||!Array.isArray(p.places))) throw new Error('bad');
+      if(p.kind==='exam' && (!Array.isArray(p.sections)||!Array.isArray(p.subjects)||!Array.isArray(p.topics))) throw new Error('bad');
+      if(p.kind==='mcq' && (!Array.isArray(p.qtests)||!Array.isArray(p.qfolders))) throw new Error('bad');
+      _xmPending = p; xmImportSheet(p);
+    }catch(err){ toast('ફાઈલ યોગ્ય નથી','error'); }
+  };
+  r.readAsText(file);
+}
+function xmImportSheet(p){
+  if(p.kind==='map'){
+    openSheet(`<h3>🗺 નકશો ઇમ્પોર્ટ</h3><div class="ink-dim fs-12 mb-6">${p.cats.length} કેટેગરી · ${p.places.length} સ્થળ</div>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;"><input type="radio" name="f_xmMode" value="merge" checked> <span><b>ઉમેરો</b> — હાલનો નકશો રહે, નવું ઉમેરાય (સરખા નામનું ફરી નહીં)</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;"><input type="radio" name="f_xmMode" value="replace"> <span><b>બદલો</b> — હાલનો આખો નકશો ભૂંસાઈને આ ફાઈલનો આવે</span></label>
+      <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="xmImportApply()">ઇમ્પોર્ટ કરો</button></div>`);
+    return;
+  }
+  const cnt = p.kind==='exam' ? `${p.sections.length} વિભાગ · ${p.subjects.length} વિષય · ${p.topics.length} ચેપ્ટર` : `${p.qfolders.length} ફોલ્ડર · ${p.qtests.length} ટેસ્ટ`;
+  const act = (DB.exams.find(e=>e.active)||DB.exams[0]||{}).id;
+  openSheet(`<h3>${XM_NAME[p.kind]} ઇમ્પોર્ટ</h3>
+    <div class="ink-dim fs-12 mb-6">${esc(p.name||'')} · ${cnt}${p.prog?' · પ્રગતિ સાથે':''}</div>
+    <div class="field"><label>ક્યાં ઉમેરવું?</label><select id="f_xmTarget" onchange="document.getElementById('xmNew').style.display=this.value==='__new'?'block':'none'">
+      ${DB.exams.map(e=>`<option value="${e.id}" ${e.id===act?'selected':''}>${esc(e.name)}</option>`).join('')}<option value="__new" ${DB.exams.length?'':'selected'}>➕ નવી પરીક્ષા બનાવો</option></select></div>
+    <div id="xmNew" style="display:${DB.exams.length?'none':'block'};"><div class="field"><label>નવી પરીક્ષાનું નામ</label><input type="text" id="f_xmName" value="${esc(p.name||'')}"></div>
+      <div class="field"><label>પરીક્ષાની તારીખ</label><input type="date" id="f_xmDate"></div></div>
+    <div class="ink-dim fs-12">હાલનો ડેટા રહે છે. સરખા નામનું વિભાગ/વિષય/ચેપ્ટર/ટેસ્ટ ફરી બનતું નથી (પહેલાનું જ વપરાય).</div>
+    <div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="xmImportApply()">ઇમ્પોર્ટ કરો</button></div>`);
+}
+function xmImportApply(){
+  const p = _xmPending; if(!p) return;
+  const same = (a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();
+  if(p.kind==='map'){
+    const mode = (document.querySelector('input[name="f_xmMode"]:checked')||{}).value || 'merge';
+    mapEnsureCommon();
+    if(mode==='replace'){
+      if(!confirm('હાલનો આખો નકશો ભૂંસાઈને આ ફાઈલનો નકશો આવશે. ચાલુ રાખવું છે?')) return;
+      DB.mapCats = xmClone(p.cats); DB.mapPlaces = xmClone(p.places);
+      save(); closeSheet(); renderMain(); toast(`નકશો બદલાયો ✅ (${p.places.length} સ્થળ)`); _xmPending=null; return;
+    }
+    DB.mapCats = DB.mapCats||[]; DB.mapPlaces = DB.mapPlaces||[];
+    const cm = {}; let nc=0, np=0;
+    const done = new Set(); let guardN = 0;
+    const cats = p.cats.slice();
+    while(done.size<cats.length && guardN++<50){
+      cats.forEach(c=>{
+        if(done.has(c.id)) return;
+        if(c.parentId && !cm[c.parentId] && cats.some(x=>x.id===c.parentId)) return;
+        const par = c.parentId ? (cm[c.parentId]||null) : null;
+        let ex = DB.mapCats.find(x=>same(x.name,c.name) && (x.parentId||null)===par);
+        if(!ex){ ex = Object.assign(xmClone(c), {id:uid(), parentId:par}); DB.mapCats.push(ex); nc++; }
+        cm[c.id] = ex.id; done.add(c.id);
+      });
+    }
+    const key = x=>[x.name,x.catId,x.district,x.taluka].map(v=>String(v||'').trim().toLowerCase()).join('|');
+    const have = new Set(DB.mapPlaces.map(key));
+    p.places.forEach(pl=>{ const o = Object.assign(xmClone(pl), {id:uid(), catId:cm[pl.catId]||pl.catId}); if(have.has(key(o))) return; have.add(key(o)); DB.mapPlaces.push(o); np++; });
+    save(); closeSheet(); renderMain(); toast(`નકશામાં ઉમેરાયું ✅ (${nc} કેટેગરી, ${np} સ્થળ)`); _xmPending=null; return;
+  }
+  let examId = val('f_xmTarget'), isNew = false;
+  if(examId==='__new'){
+    const name = val('f_xmName'), date = val('f_xmDate');
+    if(!name || !date){ toast('નામ અને તારીખ ભરો','error'); return; }
+    if(DB.exams.find(x=>same(x.name,name))){ toast('આ નામની પરીક્ષા પહેલેથી છે','error'); return; }
+    examId = uid(); isNew = true; DB.exams.push({id:examId, name, date, description:'', active:DB.exams.length===0});
+  }
+  const map = {}; let added = 0;
+  if(p.kind==='exam'){
+    p.sections.forEach(x=>{ let ex = DB.sections.find(s=>s.examId===examId && same(s.name,x.name)); if(!ex){ ex = {id:uid(), examId, name:x.name, totalMarks:0}; DB.sections.push(ex); added++; } map[x.id]=ex.id; });
+    const sfs = (p.sfolders||[]).slice(); const doneF = new Set(); let g=0;
+    while(doneF.size<sfs.length && g++<50) sfs.forEach(f=>{
+      if(doneF.has(f.id)) return; if(f.parentId && !map[f.parentId] && sfs.some(y=>y.id===f.parentId)) return;
+      const sec = map[f.sectionId]||null, par = f.parentId?(map[f.parentId]||null):null;
+      let ex = sfAll().find(y=>y.examId===examId && (y.sectionId||null)===sec && (y.parentId||null)===par && same(y.name,f.name));
+      if(!ex){ ex = {id:uid(), examId, sectionId:sec, parentId:par, name:f.name}; sfAll().push(ex); added++; }
+      map[f.id]=ex.id; doneF.add(f.id); });
+    p.subjects.forEach(x=>{ const sec = x.sectionId?(map[x.sectionId]||null):null, fol = x.folderId?(map[x.folderId]||null):null;
+      let ex = DB.subjects.find(s=>s.examId===examId && same(s.name,x.name) && (s.sectionId||null)===sec);
+      if(!ex){ ex = {id:uid(), examId, name:x.name, sectionId:sec, folderId:fol}; DB.subjects.push(ex); added++; } map[x.id]=ex.id; });
+    const PT = ['status','completedDate','revCount','lastRev'];
+    p.topics.forEach(t=>{ const sj = map[t.subjectId]; if(!sj) return;
+      let ex = DB.topics.find(y=>y.subjectId===sj && same(y.name,t.name));
+      if(!ex){ ex = {id:uid(), subjectId:sj, name:t.name, status:'not_started'}; if(p.prog) PT.forEach(k=>{ if(t[k]!=null) ex[k]=t[k]; }); DB.topics.push(ex); added++; }
+      map[t.id]=ex.id; });
+    (p.subtopics||[]).forEach(s=>{ const tp = map[s.topicId]; if(!tp) return;
+      if(DB.subtopics.find(y=>y.topicId===tp && same(y.name,s.name))) return;
+      const o = {id:uid(), topicId:tp, subjectId:s.subjectId?(map[s.subjectId]||s.subjectId):(DB.topics.find(x=>x.id===tp)||{}).subjectId, name:s.name, completed:false};
+      if(p.prog) ['completed','completedDate','revCount','lastRev'].forEach(k=>{ if(s[k]!=null) o[k]=s[k]; });
+      DB.subtopics.push(o); added++; });
+  } else {
+    const fs = p.qfolders.slice(); const doneF = new Set(); let g=0;
+    while(doneF.size<fs.length && g++<50) fs.forEach(f=>{
+      if(doneF.has(f.id)) return; if(f.parentId && !map[f.parentId] && fs.some(y=>y.id===f.parentId)) return;
+      const par = f.parentId?(map[f.parentId]||null):null;
+      let ex = DB.qfolders.find(y=>y.examId===examId && (y.parentId||null)===par && same(y.name,f.name));
+      if(!ex){ ex = {id:uid(), examId, parentId:par, name:f.name}; DB.qfolders.push(ex); added++; }
+      map[f.id]=ex.id; doneF.add(f.id); });
+    p.qtests.forEach(t=>{ const fol = t.folderId?(map[t.folderId]||null):null;
+      if(DB.qtests.find(y=>y.examId===examId && (y.folderId||null)===fol && same(y.name,t.name))) return;
+      const o = {id:uid(), examId, folderId:fol, name:t.name, attempts:[], created:todayStr(), questions:xmClone(t.questions||[])};
+      if(p.prog) ['attempts','timesBase','bestPct','revCount','lastRev','chal'].forEach(k=>{ if(t[k]!=null) o[k]=xmClone(t[k]); });
+      DB.qtests.push(o); added++; });
+  }
+  _xmPending = null;
+  save(); closeSheet(); if(isNew) populateExamSwitcher(); renderMain();
+  toast(added?`ઇમ્પોર્ટ થયું ✅ (${added} નવું ઉમેરાયું)`:'કંઈ નવું નહોતું — બધું પહેલેથી હતું');
+}
+
+/* ---- 📂 ડેટા ફાઈલ-મેનેજર (કેટલી જગ્યા કોણ રોકે) ---- */
+function stSz(x){ try{ return JSON.stringify(x).length; }catch(e){ return 0; } }
+function stFmt(n){ return n>=1048576 ? (n/1048576).toFixed(2)+' MB' : (n>=1024 ? (n/1024).toFixed(1)+' KB' : n+' B'); }
+function stBuild(){
+  const nodes = []; const used = {};
+  const node = (id, ico, name, size, kids)=>({id, ico, name, size, kids:kids||[]});
+  const sum = a=>a.reduce((s,x)=>s+x.size,0);
+  /* પરીક્ષા */
+  const subjSize = s=>{ const tops = DB.topics.filter(t=>t.subjectId===s.id), tids = new Set(tops.map(t=>t.id));
+    return stSz(s)+stSz(tops)+stSz((DB.subtopics||[]).filter(x=>tids.has(x.topicId)))+stSz(DB.revisions.filter(r=>r.subjectId===s.id))+stSz(DB.studyLogs.filter(l=>l.subjectId===s.id)); };
+  const examKids = DB.exams.map(e=>{
+    const secs = DB.sections.filter(s=>s.examId===e.id), subs = DB.subjects.filter(s=>s.examId===e.id);
+    const kids = secs.map(sc=>{ const ss = subs.filter(s=>s.sectionId===sc.id).map(s=>node('sj'+s.id,'📘',s.name,subjSize(s)));
+      return node('sc'+sc.id,'📂',sc.name,stSz(sc)+sum(ss),ss.sort((a,b)=>b.size-a.size)); });
+    const loose = subs.filter(s=>!s.sectionId || !secs.some(sc=>sc.id===s.sectionId)).map(s=>node('sj'+s.id,'📘',s.name,subjSize(s)));
+    kids.push(...loose);
+    return node('ex'+e.id,'🎓',e.name,stSz(e)+sum(kids),kids.sort((a,b)=>b.size-a.size)); });
+  nodes.push(node('g_exam','📚','પરીક્ષા',sum(examKids),examKids.sort((a,b)=>b.size-a.size)));
+  /* MCQ */
+  const fTree = (examId, pid)=>{
+    const fo = DB.qfolders.filter(f=>f.examId===examId && (f.parentId||null)===pid).map(f=>{ const k = fTree(examId, f.id); return node('qf'+f.id,'📁',f.name,stSz(f)+sum(k),k); });
+    const ts = DB.qtests.filter(t=>t.examId===examId && (t.folderId||null)===pid).map(t=>node('qt'+t.id,'📄',t.name,stSz(t)));
+    return fo.concat(ts).sort((a,b)=>b.size-a.size); };
+  const mcqKids = DB.exams.map(e=>{ const k = fTree(e.id, null); return node('qe'+e.id,'🎓',e.name,sum(k),k); });
+  nodes.push(node('g_mcq','🧠','MCQ ટેસ્ટ',sum(mcqKids)+stSz(DB.qrevs||[]),mcqKids.sort((a,b)=>b.size-a.size)));
+  /* નકશો */
+  const cats = DB.mapCats||[], places = DB.mapPlaces||[];
+  const mk = cats.filter(c=>!c.parentId).map(c=>{ const subs = cats.filter(x=>x.parentId===c.id).map(x=>node('mc'+x.id,'📍',x.name,stSz(x)+stSz(places.filter(p=>p.catId===x.id))));
+    return node('mc'+c.id,'🗺',c.name,stSz(c)+stSz(places.filter(p=>p.catId===c.id))+sum(subs),subs.sort((a,b)=>b.size-a.size)); });
+  nodes.push(node('g_map','🗺','નકશો',stSz(cats)+stSz(places),mk.sort((a,b)=>b.size-a.size)));
+  /* બાકી */
+  const total = _lastSaveStr.length || stSz(DB);
+  const known = nodes.reduce((s,x)=>s+x.size,0);
+  const logs = node('g_log','📅','અભ્યાસ લોગ, રિવિઝન, કેલેન્ડર',stSz(DB.studyLogs)+stSz(DB.revisions)+stSz(DB.activity||{}));
+  const set = node('g_set','⚙️','સેટિંગ્સ / ફોટો',stSz(DB.settings));
+  nodes.push(logs, set);
+  const rest = Math.max(0, total - nodes.reduce((s,x)=>s+x.size,0));
+  if(rest>1024) nodes.push(node('g_rest','📦','અન્ય',rest));
+  return {nodes: nodes.sort((a,b)=>b.size-a.size), total: Math.max(total, nodes.reduce((s,x)=>s+x.size,0))};
+}
+function stNodeHTML(n, depth, parentSize){
+  const open = stOpen.has(n.id), has = n.kids.length>0, pct = parentSize>0 ? Math.max(2,Math.round(n.size/parentSize*100)) : 0;
+  let h = `<div class="st-row" style="padding-left:${depth*14}px;" ${has?`onclick="stToggle('${n.id}')"`:''}><span class="st-arr">${has?(open?'▾':'▸'):''}</span><span class="st-name">${n.ico} ${esc(n.name)}</span><span class="ink-dim fs-12">${stFmt(n.size)}</span></div><div class="st-bar" style="margin-left:${depth*14+22}px;"><i style="width:${Math.min(100,pct)}%;"></i></div>`;
+  if(open) h += n.kids.map(k=>stNodeHTML(k, depth+1, n.size)).join('');
+  return h;
+}
+function stTreeHTML(){ const t = stBuild(); return t.nodes.map(n=>stNodeHTML(n,0,t.total)).join('') || emptyRow('ડેટા નથી'); }
+function stToggle(id){ if(stOpen.has(id)) stOpen.delete(id); else stOpen.add(id); const e = document.getElementById('stTree'); if(e) e.innerHTML = stTreeHTML(); }
 function toggleTheme(isDark){ DB.settings.theme = isDark ? 'dark' : 'light'; save(); applyTheme(); }
 function applyTheme(){
   const theme = DB.settings.theme || 'light';
