@@ -143,8 +143,6 @@ a{color:inherit;}
 .mp-svg{width:100%; height:auto; display:block; touch-action:pan-y; user-select:none; -webkit-user-select:none; border-radius:10px; background:#fff;}
 .mp-svg path{fill:#fff; stroke:#555; stroke-opacity:1; stroke-width:.9; vector-effect:non-scaling-stroke; stroke-linejoin:round; cursor:pointer;}
 .mp-svg path.has{fill:#fde9a8;}
-.mp-svg path.part{fill:#e6efb4;}
-.mp-svg path.done{fill:#9fe0b0;}
 .mp-svg path.sel{fill:#f8cd5c; fill-opacity:1; stroke:#c2410c; stroke-opacity:1; stroke-width:2.6;}
 .mp-svg path.tal{fill:#e08a00; fill-opacity:0; stroke:#666; stroke-opacity:.9; stroke-width:1; stroke-dasharray:3 2;}
 .mp-svg path.tal.has{fill-opacity:.28;}
@@ -188,12 +186,10 @@ a{color:inherit;}
 .mp-pillrow{display:flex; gap:8px; margin-bottom:10px;}
 .mp-catpill{flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 16px; border:none; border-radius:14px; background:var(--surface); box-shadow:var(--shadow); color:var(--ink); font-family:inherit; font-size:16px; font-weight:800; cursor:pointer; text-align:left;}
 .mp-catpill small{font-weight:600; color:var(--ink-dim); font-size:12.5px;}
-.mp-homebtn{border:none; border-radius:14px; background:var(--surface); box-shadow:var(--shadow); font-size:20px; padding:0 16px; cursor:pointer;}
 .mp-wrap{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px;}
 .mp-today{margin-bottom:12px;}
 .mp-box:has(.mp-it-card){background:transparent; box-shadow:none; overflow:visible;}
 .mp-it-card{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:12px; border-bottom:none !important; padding:14px;}
-.mp-it-card.mp-known{border-left:4px solid var(--success);}
 .mp-it{padding:14px 16px;} .mp-nd .mp-note{border-left:3px solid var(--primary); border-radius:0 10px 10px 0;}
 .mp-nav{padding:16px 18px;} .mp-nav .mp-grp-c{font-size:13px; padding:3px 12px;}
 .mc-main{background:var(--surface2); border-radius:14px; padding:10px; margin-bottom:12px;} .mc-h,.mc-k{display:flex; align-items:center; gap:8px;} .mc-t{flex:1; min-width:0; cursor:pointer;}
@@ -526,8 +522,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.22-12';
-const APP_BUILT = '2026-11-22T09:05:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.22-14';
+const APP_BUILT = '2026-11-22T09:17:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1120,13 +1116,19 @@ function buildNav(){
     </button>`
   ).join('');
 }
+/* ટોચનું હેડર ગાયબ ન થાય: અંદરનું scroll ફક્ત #main નું જ રહે, આખું પેજ/એપ-શેલ ક્યારેય સરકે નહીં */
+function fixDocScroll(){ try{ [document.scrollingElement, document.documentElement, document.body, document.querySelector('.app-shell')].forEach(e=>{ if(e && e.scrollTop) e.scrollTop = 0; }); if(window.scrollX||window.scrollY) window.scrollTo(0,0); }catch(e){} }
+function mainTop(){ const m = document.getElementById('main'); if(m) m.scrollTop = 0; fixDocScroll(); }
+document.addEventListener('scroll', e=>{ const t = e.target; if(t===document || t===document.documentElement || t===document.body || (t && t.classList && t.classList.contains('app-shell'))) fixDocScroll(); }, true);
+['resize','pageshow','focus','orientationchange'].forEach(ev=>window.addEventListener(ev, fixDocScroll, {passive:true}));
+document.addEventListener('visibilitychange', fixDocScroll);
 function showTab(id){
   if(id==='settings') setPage = null;
   if(id==='exams' && currentTab!==id){ lastMainTab = currentTab; }
   currentTab = id;
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
   renderMain();
-  document.getElementById('main').scrollIntoView({behavior:'instant', block:'start'});
+  mainTop();
 }
 function renderMain(){
   const map = {dashboard:renderDashboard, exams:renderExams, mock:renderMock, map:renderGujMap, calendar:renderCalendar, settings:renderSettings};
@@ -3840,7 +3842,7 @@ function renderMockQuiz(seg){
      path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:'') + `
    ${toolbar}${mqTabSegHTML()}`) + `<div id="mqListWrap">${mqListHTML()}</div>`;
 }
-function mqOpenFolder(id){ mqFolderId = id||null; mqQuery = ''; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
+function mqOpenFolder(id){ mqFolderId = id||null; mqQuery = ''; renderMain(); mainTop(); }
 
 function mqFolderOptions(selId, excludeId){
   const ban = excludeId ? new Set(mqCollectFolderIds(excludeId)) : new Set();
@@ -4196,7 +4198,7 @@ function mqLoc(S, t, p){
   for(let i=0;i<gs.length;i++){ const n=gs[i].items.length; if(p < acc+n) return {name:gs[i].name, ti:i+1, nT:gs.length, j:p-acc+1, m:n}; acc+=n; }
   return {name:t.name, ti:1, nT:1, j:p+1, m:S.idx.length};
 }
-function mqScrollTop(){ document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
+function mqScrollTop(){ mainTop(); }
 function mqStartTimer(){
   clearInterval(mqTimerHandle);
   mqTimerHandle = setInterval(()=>{
@@ -4962,25 +4964,22 @@ const MAP_ICO = [['જળાશય','💧'],['ધોધ','🌊'],['તળાવ'
 function mapCatIco(c){ if(c.icon) return c.icon; const n = c.name||''; const hit = MAP_ICO.find(x=>n.includes(x[0])); return hit ? hit[1] : '📍'; }
 function mapIdsUnder(id){ return mapKids(id).map(k=>k.id).concat([id]); }
 function mapInScope(p){ return mapSt==='__IN' || mapStOf(p)===mapSt; }
-function mapTopKnown(id){ const ids = mapIdsUnder(id); return mapPlacesAll().filter(p=>ids.includes(p.catId) && mapInScope(p) && p.known).length; }
 function mapTilesHTML(){
-  return mapTopVisible().map(c=>{ const n = mapTopCount(c.id), k = mapTopKnown(c.id), pc = n ? Math.round(k/n*100) : 0;
-    return `<button class="mp-tile ${c.id===mapCat&&!mapHub?'on':''}" onclick="mapPickCat('${c.id}')"><span class="mp-tile-i">${mapCatIco(c)}</span><span class="mp-tile-n">${esc(c.name)}</span><span class="mp-tile-c">${k}/${n} યાદ</span><span class="mp-tile-b"><i style="width:${pc}%"></i></span></button>`; }).join('');
+  return mapTopVisible().map(c=>{ const n = mapTopCount(c.id);
+    return `<button class="mp-tile ${c.id===mapCat&&!mapHub?'on':''}" onclick="mapPickCat('${c.id}')"><span class="mp-tile-i">${mapCatIco(c)}</span><span class="mp-tile-n">${esc(c.name)}</span><span class="mp-tile-c">${n} સ્થળ</span></button>`; }).join('');
 }
-function mapPickCat(id){ closeSheet(); mapCat = id; mapSub = null; mapHub = false; mapDist = null; mapTal = null; mapQuery = ''; mapView = null; mapPending = null; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
+function mapPickCat(id){ closeSheet(); mapCat = id; mapSub = null; mapHub = false; mapDist = null; mapTal = null; mapQuery = ''; mapView = null; mapPending = null; renderMain(); mainTop(); }
 function mapOpenCats(){ openSheet(`<h3>🗂 કેટેગરી પસંદ કરો</h3><div class="mp-tiles">${mapTilesHTML()}</div>`); }
-function mapHubGo(){ mapHub = true; renderMain(); document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
+function mapHubGo(){ mapHub = true; renderMain(); mainTop(); }
 function mapMenu(){
   openSheet(`<h3>⋯ નકશાના વિકલ્પો</h3>
     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;justify-content:flex-start;" onclick="openMapCatManage()">🗂 વિભાગ સંચાલન</button>
     <button class="btn btn-secondary btn-block" style="margin-bottom:8px;justify-content:flex-start;" onclick="openMapBulk()">📥 ઘણા સ્થળ એકસાથે</button>
-    <button class="btn btn-secondary btn-block" style="margin-bottom:8px;justify-content:flex-start;" onclick="openMapExport()">📄 PDF</button>
-    <button class="btn btn-secondary btn-block" style="justify-content:flex-start;" onclick="mapQuizStart()">🎯 ક્વિઝ</button>`);
+    <button class="btn btn-secondary btn-block" style="justify-content:flex-start;" onclick="openMapExport()">📄 PDF</button>`);
 }
-function mapToggleKnown(id){ const p = (DB.mapPlaces||[]).find(x=>x.id===id); if(!p) return; if(p.known) delete p.known; else p.known = true; save(); mapRefresh(); }
 function mapShowPlace(id){ const p = (DB.mapPlaces||[]).find(x=>x.id===id); if(!p) return; closeSheet();
   if(mapStOf(p)==='Gujarat' && p.district){ mapSt='Gujarat'; mapGoDist(p.district); } else { mapSt = mapStOf(p); mapDist=null; mapTal=null; mapView=null; mapPending=null; renderMain(); }
-  document.getElementById('main').scrollIntoView({behavior:'instant',block:'start'}); }
+  mainTop(); }
 /* આજનું સ્થળ */
 function mapTodayPlace(){
   const all = mapPlacesAll(); if(!all.length) return null;
@@ -4993,40 +4992,10 @@ function mapTodayHTML(){
   const cat = mapCatName(p.catId);
   return `<div class="card mp-today"><div class="card-title">🎲 આજનું સ્થળ</div>
     <div class="mp-it-n">${esc(p.name)}</div>
-    <div class="mp-it-s"><span class="mp-pill mp-pill3">📍 ${esc(mapPlaceLoc(p))}</span>${cat?`<span class="mp-pill mp-pill2">${esc(cat)}</span>`:''}${p.known?'<span class="mp-pill">✔ યાદ છે</span>':''}</div>
+    <div class="mp-it-s"><span class="mp-pill mp-pill3">📍 ${esc(mapPlaceLoc(p))}</span>${cat?`<span class="mp-pill mp-pill2">${esc(cat)}</span>`:''}</div>
     ${p.note?`<details class="mp-nd"><summary>વિગત વાંચો</summary><div class="mp-note">${esc(p.note)}</div></details>`:''}
-    <div class="act-row"><button class="btn btn-secondary" onclick="mapTodayNext()">🔄</button><button class="btn ${p.known?'btn-primary':'btn-secondary'}" onclick="mapToggleKnown('${p.id}')">✔</button><button class="btn btn-secondary" onclick="mapShowPlace('${p.id}')">📍</button></div></div>`;
+    <div class="act-row"><button class="btn btn-secondary" onclick="mapTodayNext()">🔄</button><button class="btn btn-secondary" onclick="mapShowPlace('${p.id}')">📍</button></div></div>`;
 }
-/* 🎯 ક્વિઝ: સ્થળ → જિલ્લો ઓળખો. ફક્ત છેલ્લો સ્કોર સચવાય. */
-var mapQz = null;
-function mapQuizStart(){
-  let ids = null; if(!mapHub && mapCat) ids = mapSelIds();
-  const pool = mapPlacesAll().filter(p=>mapStOf(p)==='Gujarat' && p.district && mapDistObj(p.district) && (!ids || ids.includes(p.catId)));
-  if(pool.length<3){ toast('ક્વિઝ માટે ઓછામાં ઓછાં 3 ગુજરાતનાં સ્થળ (જિલ્લા સાથે) જોઈએ','error'); return; }
-  const shuf = a=>{ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
-  const qs = shuf(pool).slice(0,10).map(p=>{ const others = shuf(GJ_MAP.d.filter(d=>d.k!==p.district)).slice(0,3).map(d=>d.k);
-    return {name:p.name, ans:p.district, opts:shuf(others.concat([p.district]))}; });
-  mapQz = {qs, i:0, ok:0, picked:null, scope: ids ? mapSelTitle() : 'બધા'};
-  mapQuizRender();
-}
-function mapQuizRender(){
-  const Q = mapQz; if(!Q) return;
-  if(Q.i>=Q.qs.length){
-    const pct = Math.round(Q.ok/Q.qs.length*100), old = (DB.settings.mapQuiz||{});
-    DB.settings.mapQuiz = {runs:(old.runs||0)+1, correct:Q.ok, total:Q.qs.length, pct, date:todayStr(), best:Math.max(old.best||0,pct)}; save();
-    openSheet(`<h3>🎯 ક્વિઝ પૂરી</h3><div style="font-size:34px;font-weight:800;text-align:center;margin:14px 0;">${Q.ok}/${Q.qs.length} <span class="ink-dim" style="font-size:16px;">(${pct}%)</span></div>
-      <div class="ink-dim fs-12 mb-6" style="text-align:center;">શ્રેષ્ઠ ${DB.settings.mapQuiz.best}% · કુલ ${DB.settings.mapQuiz.runs} વાર</div>
-      <div class="sheet-actions"><button class="btn btn-secondary" onclick="closeSheet(); renderMain();">બંધ</button><button class="btn btn-primary btn-block" onclick="mapQuizStart()">🔁 ફરી રમો</button></div>`);
-    mapQz = null; return;
-  }
-  const q = Q.qs[Q.i];
-  openSheet(`<h3>🎯 ક્વિઝ · ${Q.i+1}/${Q.qs.length}</h3><div class="ink-dim fs-12 mb-6">${esc(Q.scope||'')}</div>
-    <div class="mp-it-n" style="margin-bottom:4px;">📍 ${esc(q.name)}</div><div class="ink-dim fs-12 mb-6">આ સ્થળ કયા જિલ્લામાં છે?</div>
-    ${q.opts.map(k=>{ let cls='btn-secondary'; if(Q.picked){ if(k===q.ans) cls='btn-primary'; else if(k===Q.picked) cls='btn-danger'; }
-      return `<button class="btn ${cls} btn-block" style="margin-bottom:8px;" ${Q.picked?'disabled':''} onclick="mapQuizPick('${k}')">${esc(mapDistName(k))}</button>`; }).join('')}
-    ${Q.picked?`<div class="sheet-actions"><button class="btn btn-primary btn-block" onclick="mapQz.i++; mapQz.picked=null; mapQuizRender();">${Q.i+1>=Q.qs.length?'પરિણામ જુઓ':'આગળ →'}</button></div>`:''}`);
-}
-function mapQuizPick(k){ const Q = mapQz; if(!Q||Q.picked) return; Q.picked = k; if(k===Q.qs[Q.i].ans) Q.ok++; mapQuizRender(); }
 function renderGujMap(){
   const exam = getActiveExam();
   if(!exam) return emptyState('🗺️','પહેલા પરીક્ષા ઉમેરો','નકશામાં સ્થળ પરીક્ષા મુજબ સાચવાય છે.','પરીક્ષા ઉમેરો',"showTab('exams'); setTimeout(()=>openExamForm(null),50);");
@@ -5035,17 +5004,17 @@ function renderGujMap(){
   if(!cats.length) return pageTopHTML('', `<button class="btn btn-sm btn-secondary" onclick="openMapCatManage()">વિભાગ</button>`, '') + emptyState('🗺️','પહેલા વિભાગ બનાવો','નકશામાં સ્થળ વિભાગ મુજબ (જેમ કે તળાવ, મહેલ, કિલ્લો) સાચવાય છે અને એક સમયે એક જ વિભાગ દેખાય છે.','+ નવો વિભાગ',"openMapCatForm(null)");
   const tops = mapTopVisible(); if(!tops.find(c=>c.id===mapCat)){ mapCat = tops[0] ? tops[0].id : null; mapSub = null; }
   const selIds = mapSelIds(); const leaf = selIds.length>0; const inCat = all.filter(p=>selIds.includes(p.catId));
-  const cnt = {}, kcnt = {}; inCat.filter(p=>mapStOf(p)==='Gujarat').forEach(p=>{ cnt[p.district]=(cnt[p.district]||0)+1; if(p.known) kcnt[p.district]=(kcnt[p.district]||0)+1; });
+  const cnt = {}; inCat.filter(p=>mapStOf(p)==='Gujarat').forEach(p=>{ cnt[p.district]=(cnt[p.district]||0)+1; });
   const scnt = {}; inCat.forEach(p=>{ const k=mapStOf(p); scnt[k]=(scnt[k]||0)+1; });
   const subs = mapCat ? mapSubItems(mapCat) : []; const subSel = mapCat ? mapSubSel(mapCat) : null;
   const curTop = tops.find(c=>c.id===mapCat);
-  const ring = (curTop ? `<div class="mp-pillrow"><button class="mp-catpill" onclick="mapOpenCats()"><span>${mapCatIco(curTop)} ${esc(curTop.name)} <small>(${mapTopCount(curTop.id)}) · ✔ ${mapTopKnown(curTop.id)}</small></span><span>▾</span></button><button class="mp-homebtn" onclick="mapHubGo()" aria-label="બધી કેટેગરી">🏠</button></div>` : '')
+  const ring = (curTop ? `<div class="mp-pillrow"><button class="mp-catpill" onclick="mapOpenCats()"><span>${mapCatIco(curTop)} ${esc(curTop.name)} <small>(${mapTopCount(curTop.id)})</small></span><span>▾</span></button></div>` : '')
     + (subs.length>1 ? `<div class="mp-wrap">${subs.map(x=>`<button class="mp-chip ${subSel&&subSel.id===x.id?'on':''}" onclick="mapSub='${x.id}'; renderMain();">${esc(x.name)} (${x.n})</button>`).join('')}</div>` : '');
-  if(mapHub && tops.length) return pageTopHTML('', topBtns, '') + mapTodayHTML() + `<div class="card" style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;" onclick="mapQuizStart()"><span style="font-size:24px;">🎯</span><span style="flex:1;min-width:0;"><b>ક્વિઝ રમો</b><br><span class="ink-dim fs-12">${DB.settings.mapQuiz?`છેલ્લો સ્કોર ${DB.settings.mapQuiz.correct}/${DB.settings.mapQuiz.total} · શ્રેષ્ઠ ${DB.settings.mapQuiz.best}%`:'સ્થળ → જિલ્લો ઓળખો'}</span></span><span class="set-arr">›</span></div><div class="mp-gh">🗂 કેટેગરી</div><div class="mp-tiles">${mapTilesHTML()}</div>`;
+  if(mapHub && tops.length) return pageTopHTML('', topBtns, '') + mapTodayHTML() + `<div class="mp-gh">🗂 કેટેગરી</div><div class="mp-tiles">${mapTilesHTML()}</div>`;
   let svgInner = '';
   if(mapSt==='Gujarat'){
     const paths = GJ_MAP.d.map(d=>{ const n=cnt[d.k]||0; const sel = mapDist===d.k; const hasTal = sel && mapTalList(d.k).length;
-      return {sel, html:`<path class="${n?'has':''} ${n&&kcnt[d.k]===n?'done':(kcnt[d.k]?'part':'')} ${sel?'sel':''}" ${hasTal?'style="pointer-events:none;"':''} d="${d.d}" onclick="mapPickDist('${d.k}')"/>`}; });
+      return {sel, html:`<path class="${n?'has':''} ${sel?'sel':''}" ${hasTal?'style="pointer-events:none;"':''} d="${d.d}" onclick="mapPickDist('${d.k}')"/>`}; });
     const dPaths = paths.filter(p=>!p.sel).map(p=>p.html).join('') + paths.filter(p=>p.sel).map(p=>p.html).join('');
     let talPaths='', talLbls='';
     if(mapDist){
@@ -5067,7 +5036,7 @@ function renderGujMap(){
   if(mapSt==='__IN') selLine = `<div class="mp-crumb"><div class="mp-crumb-t"><b>🇮🇳 ભારત</b> <span class="ink-dim fs-12" style="cursor:default;">· રાજ્ય ટેપ કરો</span></div></div>`;
   else if(mapSt==='Gujarat') selLine = `<div class="mp-crumb">${back}<div class="mp-crumb-t"><span onclick="mapShowIndia()">ભારત</span> › ${mapDist?`<span onclick="mapHome()">ગુજરાત</span> › ${mapTal?`<span onclick="mapTalClear()">${esc(mapDistName(mapDist))}</span> › <b>${esc(talTitle)}</b>`:`<b>${esc(mapDistName(mapDist))}</b>`}`:`<b>ગુજરાત</b>`}</div></div>`;
   else selLine = `<div class="mp-crumb">${back}<div class="mp-crumb-t"><span onclick="mapShowIndia()">ભારત</span> › <b>${esc(mapStName(mapSt))}</b></div></div>`;
-  const hint = mapSt==='__IN' ? 'રાજ્ય ટેપ કરો' : (mapSt==='Gujarat' && !mapDist ? 'જિલ્લો ટેપ કરો · 🟢 બધા યાદ' : '');
+  const hint = mapSt==='__IN' ? 'રાજ્ય ટેપ કરો' : (mapSt==='Gujarat' && !mapDist ? 'જિલ્લો ટેપ કરો' : '');
   /* યાદી */
   const list = mapVisible(); const q = (mapQuery||'').trim();
   const manual = mapSort==='manual' && !q;
@@ -5078,12 +5047,12 @@ function renderGujMap(){
     const p3 = (q || mapSt==='__IN') ? (mapStOf(p)==='Gujarat' ? ((mapSt==='__IN'?'ગુજરાત › ':'')+mapDistName(p.district)) : mapStName(mapStOf(p))) : (mapSt==='Gujarat' && !mapDist ? mapDistName(p.district) : '');
     const subN = (selIds.length>1) ? (p.catId===mapCat ? 'અન્ય' : ((mapCatsOf().find(x=>x.id===p.catId)||{}).name||'')) : '';
     const pills = `${subN?`<span class="mp-pill mp-pill2">${esc(subN)}</span>`:''}${(!mapTal&&p.taluka&&q)?`<span class="mp-pill">${esc(p.taluka)}</span>`:''}${p3?`<span class="mp-pill mp-pill3">${esc(p3)}</span>`:''}`;
-    return `<div class="mp-it mp-it-card${p.known?' mp-known':''}">
-      <div class="mp-it-h"><div style="flex:1;min-width:0;"><div class="mp-it-n">${p.known?'✔ ':''}${esc(p.name)}${(!mapTal&&p.taluka&&!q)?` <span class="mp-tb">(${esc(p.taluka)})</span>`:''}</div>${pills?`<div class="mp-it-s">${pills}</div>`:''}</div>
+    return `<div class="mp-it mp-it-card">
+      <div class="mp-it-h"><div style="flex:1;min-width:0;"><div class="mp-it-n">${esc(p.name)}${(!mapTal&&p.taluka&&!q)?` <span class="mp-tb">(${esc(p.taluka)})</span>`:''}</div>${pills?`<div class="mp-it-s">${pills}</div>`:''}</div>
       ${reorder&&sb.length>1?`<div style="display:flex;gap:4px;flex-shrink:0;"><button class="btn btn-sm btn-secondary" style="padding:4px 10px;" ${i<=0?'disabled':''} onclick="mapMovePlace('${p.id}',-1)">▲</button><button class="btn btn-sm btn-secondary" style="padding:4px 10px;" ${i>=sb.length-1?'disabled':''} onclick="mapMovePlace('${p.id}',1)">▼</button></div>`:''}
       </div>
       ${p.note?`<details class="mp-nd" ${(mapDist||mapIsOther())?'open':''}><summary>વિગત વાંચો</summary><div class="mp-note">${esc(p.note)}</div></details>`:''}
-      <div class="act-row"><button class="btn ${p.known?'btn-primary':'btn-secondary'}" onclick="mapToggleKnown('${p.id}')" aria-label="યાદ છે">✔</button><button class="btn btn-secondary" onclick="mapShowPlace('${p.id}')" aria-label="નકશા પર">📍</button><button class="btn btn-secondary" onclick="openMapPlaceForm('${p.id}')" aria-label="એડિટ">✎</button></div></div>`; };
+      <div class="act-row"><button class="btn btn-secondary" onclick="mapShowPlace('${p.id}')" aria-label="નકશા પર">📍</button><button class="btn btn-secondary" onclick="openMapPlaceForm('${p.id}')" aria-label="એડિટ">✎</button></div></div>`; };
   const ord = arr=> mapSort==='name' ? arr.slice().sort((a,b)=>mapByName(a.name,b.name)) : arr;
   const navRow = (js, title, n)=>`<div class="mp-nav" onclick="${js}"><span class="mp-grp-t">${title}</span><span class="mp-grp-c">${n}</span><span class="mp-grp-a">›</span></div>`;
   let body = '';
@@ -5105,7 +5074,7 @@ function renderGujMap(){
   } else { body = `<div class="mp-box">${ord(list).map(card).join('')}</div>`; }
   const ctl = (canOrder && !q && mapSort==='manual' && list.length>1) ? `<div style="display:flex;margin-bottom:8px;"><button class="btn btn-sm ${mapReorder?'btn-primary':'btn-secondary'}" style="margin-left:auto;" onclick="mapReorder=!mapReorder; renderMain();">↕ ક્રમ બદલો</button></div>` : '';
   const v = mapCur();
-  return pageTopHTML('', topBtns, '') + ring +
+  return pageTopHTML('mapHubGo()', topBtns, '') + ring +
     `<div class="card" style="padding:12px;">${selLine}
       <svg id="mpSvg" class="mp-svg" viewBox="${v.x} ${v.y} ${v.w} ${v.h}">${svgInner}</svg>
       <div class="mp-zrow"><span class="ink-dim fs-12">${hint}</span><div class="mp-zbs"><button class="mp-zb" onclick="mapZoomBtn(1.6)" aria-label="મોટું">＋</button><button class="mp-zb" onclick="mapZoomBtn(1/1.6)" aria-label="નાનું">－</button><button class="mp-zb" onclick="mapZoomReset()" aria-label="રીસેટ">⟲</button></div></div>
@@ -6173,6 +6142,7 @@ async function init(){
   populateBrand();
   populateExamSwitcher();
   showTab('dashboard');
+  [0,150,500,1200,2500].forEach(ms=>setTimeout(fixDocScroll, ms));
   checkNotifications();
   setInterval(checkNotifications, 60000);
   try{ storageCheck(JSON.stringify(DB).length); refreshStorageEstimate(); }catch(e){}
