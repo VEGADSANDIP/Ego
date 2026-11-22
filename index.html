@@ -522,8 +522,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.22-15';
-const APP_BUILT = '2026-11-22T09:27:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.22-16';
+const APP_BUILT = '2026-11-22T20:30:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4273,7 +4273,7 @@ function mqRenderQuestion(){
      ${locked && q.ans!=null?`<div style="font-weight:700;margin-top:4px;color:${picked===q.ans?'var(--success)':'var(--danger)'};">${picked===q.ans?'✅ સાચો જવાબ!':'❌ ખોટો — સાચો: ('+MQ_LET[perm.indexOf(q.ans)]+')'}</div>`:''}
    </div>
    ${survive?`<div class="ink-dim" style="text-align:center; font-size:12.5px; margin-top:8px;">🔥 પ્રયત્ન ${S.runs} · ભૂલો ${S.fails}</div>
-   ${S.dead?`<div class="mq-nav"><button class="btn btn-danger btn-block" onclick="mqSurviveRestart()">🔄 પહેલેથી ફરી શરૂ કરો</button></div>`
+   ${S.dead?`<div class="mq-nav"><button class="btn btn-danger btn-block" onclick="mqSurviveAsk()">🔄 ફરી શરૂ કરો</button></div>`
      :`<div class="mq-nav"><button class="btn btn-secondary" disabled>${S.pos+1}/${total}</button>${locked?(S.pos<total-1?`<button class="btn btn-primary" onclick="mqMove(1)">આગળ ▶</button>`:`<button class="btn btn-primary" onclick="mqFinish()">સમાપ્ત ✔</button>`):`<button class="btn btn-primary" disabled>આગળ ▶</button>`}</div>`}
    <div style="text-align:center; margin-top:10px;"><button class="btn btn-sm btn-secondary" onclick="mqSurviveEnd()">🏁 ચેલેન્જ સમાપ્ત કરો</button></div>`
    :`<div class="mq-nav">
@@ -4363,11 +4363,30 @@ function mqRenderSurviveEnd(){
      </div>
    </div>`;
 }
-function mqSurviveRestart(){
+/* ભૂલ પડ્યા પછી: કયા પ્રશ્નથી ફરી શરૂ કરવું તે પસંદ કરો (પાછળના પ્રશ્નો સાચા ગણાઈને જળવાય) */
+function mqSurviveAsk(){
   const S = mqSession; if(!S || S.mode!=='survive') return;
-  S.answers = {}; S.pos = 0; S.dead = false; S.runs++;
+  const f = S.pos + 1;
+  const opts = [[1,'🔁 પહેલા પ્રશ્નથી (1)']];
+  [15,10,5].forEach(n=>{ if(f-n>1) opts.push([f-n, `⏪ ${n} પ્રશ્ન પાછળથી (${f-n})`]); });
+  opts.push([f, `📍 આ જ પ્રશ્નથી (${f})`]);
+  openSheet(`<h3>🔄 ક્યાંથી ફરી શરૂ કરવું?</h3>
+    <div class="ink-dim fs-12 mb-6">પ્રશ્ન ${f} ખોટો પડ્યો. તે પહેલાંના બધા પ્રશ્નો સાચા હતા, જે પસંદ કરેલા નંબર સુધી જળવાશે.</div>
+    ${opts.map(o=>`<button class="btn btn-secondary btn-block" style="margin-bottom:8px;justify-content:flex-start;" onclick="mqSurviveRestartAt(${o[0]})">${o[1]}</button>`).join('')}
+    <div class="field" style="margin-top:6px;"><label>અથવા નંબર લખો (1 થી ${f})</label><div style="display:flex;gap:8px;"><input type="number" id="f_mqFrom" min="1" max="${f}" inputmode="numeric" placeholder="${f}" style="flex:1;"><button class="btn btn-primary" onclick="mqSurviveRestartAt(parseInt(document.getElementById('f_mqFrom').value,10))">શરૂ કરો</button></div></div>`);
+}
+function mqSurviveRestartAt(n){
+  const S = mqSession; if(!S || S.mode!=='survive') return;
+  const f = S.pos + 1;
+  if(!(n>=1 && n<=f)){ toast(`1 થી ${f} વચ્ચેનો નંબર લખો`,'error'); return; }
+  closeSheet();
+  const keep = {};
+  S.idx.slice(0, n-1).forEach(qi=>{ if(S.answers[qi]!==undefined) keep[qi] = S.answers[qi]; });
+  S.answers = keep; S.pos = n-1; S.dead = false; S.runs++;
+  mqSurviveSave(false);
   renderMain(); mqScrollTop();
 }
+function mqSurviveRestart(){ mqSurviveRestartAt(1); }
 function mqMove(d){
   const S = mqSession; S.pos = Math.max(0, Math.min(S.idx.length-1, S.pos+d)); renderMain(); mqScrollTop();
 }
