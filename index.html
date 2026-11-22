@@ -522,8 +522,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.22-14';
-const APP_BUILT = '2026-11-22T09:17:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.22-15';
+const APP_BUILT = '2026-11-22T09:27:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -4325,6 +4325,19 @@ function mqAutoReviseSession(S){
   const t = mqTest(); if(!t) return;
   const list = (t.virtual && t.srcs) ? [...new Set(Object.values(t.srcs).map(x=>x&&x.t))].map(id=>DB.qtests.find(q=>q.id===id)).filter(Boolean) : [t];
   mqAutoReviseTopics(list);
+  /* ટેસ્ટ પોતે: પહેલી વાર = અભ્યાસ, પછીની દરેક વાર = ટેસ્ટ રિવિઝન (આજે એક ટેસ્ટનું એક) */
+  let nt = 0;
+  list.forEach(x=>{ const had = (S.mode==='survive') ? (mqTimes(x)>0) : !!(S.testHad && S.testHad[x.id]); if(had && mqAutoTestRev(x)) nt++; });
+  if(nt){ save(); setTimeout(()=>toast(`🔁 ${nt} ટેસ્ટ રિવિઝનમાં ઉમેર્યા`),1100); }
+}
+function mqAutoTestRev(t){
+  const today = todayStr(); const mine = (DB.qrevs||[]).filter(r=>r.testId===t.id);
+  if(mine.some(r=>r.status==='completed' && (r.completedDate||r.dueDate)===today)) return false;
+  const due = mine.filter(r=>r.status==='pending' && r.dueDate<=today).sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
+  if(due){ due.status='completed'; due.completedDate=today; return true; }
+  const stage = Math.max(0, ...mine.map(r=>r.stage||0)) + 1;
+  (DB.qrevs = DB.qrevs||[]).push({id:uid(), testId:t.id, dueDate:today, status:'completed', completedDate:today, stage, auto:true});
+  return true;
 }
 /* ચેલેન્જ: ફક્ત છેલ્લા પ્રયત્નનો આંકડો ટેસ્ટમાં સેવ થાય (કોઈ સ્કોર/ટકાવારી/કેલેન્ડરમાં ગણતરી નહીં) */
 function mqSurviveSave(done){
@@ -4409,6 +4422,7 @@ function mqFinish(){
       const tot = items.length;
       const sc = Math.round((c*mk.pos - w*mk.neg)*100)/100, mx = Math.round(tot*mk.pos*100)/100;
       const pc = mx>0 ? Math.max(0, Math.round(sc/mx*100)) : 0;
+      (S.testHad = S.testHad||{})[rt.id] = mqTimes(rt)>0;
       mqRecordAttempt(rt, {id:uid(), date:todayStr(), mode:S.mode, set:S.setCode||'A', correct:c, wrong:w, skipped:sk, total:tot, pct:pc, score:sc, maxScore:mx, pos:mk.pos, neg:mk.neg, timeSec:Math.round(timeSec*tot/Math.max(1,total)), combined:true});
       const due = (DB.qrevs||[]).filter(r=>r.testId===rt.id && r.status==='pending' && r.dueDate<=todayStr()).sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
       if(due){ due.status='completed'; due.completedDate=todayStr(); revDone++; }
@@ -4418,6 +4432,7 @@ function mqFinish(){
     if(breakdown.length){ save(); setTimeout(()=>toast(`${breakdown.length} ટેસ્ટનું પરિણામ સેવ થયું ✅${revDone?` · ${revDone} રિવિઝન પૂર્ણ`:''}`),400); }
   }
   if(!t.virtual && S.idx.length===t.questions.length){
+    (S.testHad = S.testHad||{})[t.id] = mqTimes(t)>0;
     mqRecordAttempt(t, {id:uid(), date:todayStr(), mode:S.mode, set:S.setCode||'A', ...S.result});
     const due = (DB.qrevs||[]).filter(r=>r.testId===t.id && r.status==='pending' && r.dueDate<=todayStr()).sort((a,b)=>a.dueDate.localeCompare(b.dueDate))[0];
     if(due){ due.status='completed'; due.completedDate=todayStr(); setTimeout(()=>toast('આ ટેસ્ટનું રિવિઝન પૂર્ણ ગણાયું ✅'),400); }
