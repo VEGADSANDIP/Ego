@@ -525,8 +525,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.23-22';
-const APP_BUILT = '2026-11-23T16:28:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.23-23';
+const APP_BUILT = '2026-11-23T16:33:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3991,26 +3991,37 @@ function shMgrInit(){
   const ex = DB.exams; if(!shMgrSrc || !ex.some(e=>e.id===shMgrSrc)) shMgrSrc = ((getActiveExam()||ex[0]||{}).id)||null;
   if(!shMgrDst || shMgrDst===shMgrSrc || !ex.some(e=>e.id===shMgrDst)){ const o = ex.find(e=>e.id!==shMgrSrc); shMgrDst = o ? o.id : null; }
 }
+var shMgrTab = 'mcq', shMgrOpen = new Set();
+function shMgrKids(pid){ return DB.qfolders.filter(f=>f.examId===shMgrSrc && (f.parentId||null)===(pid||null)); }
 function shMgrRow(kind, o, depth, ico){
   const on = shTargets(kind, o.id).includes(shMgrDst);
-  return `<label class="mq-pick-row" style="padding-left:${depth*16}px;"><input type="checkbox" ${on?'checked':''} onchange="shMgrToggle('${kind}','${o.id}',this.checked)"><span style="flex:1;min-width:0;">${ico} ${esc(o.name)}</span>${on?'<span class="ink-dim fs-12">🔗</span>':''}</label>`;
+  const hasKids = kind==='qfolder' && shMgrKids(o.id).length>0, open = shMgrOpen.has(o.id);
+  return `<div class="mq-pick-row" style="padding-left:${depth*18}px; gap:8px;">
+    <span onclick="shMgrExp('${o.id}')" style="width:22px; text-align:center; cursor:pointer; opacity:${hasKids?1:.2};">${hasKids?(open?'▾':'▸'):'·'}</span>
+    <input type="checkbox" ${on?'checked':''} onchange="shMgrToggle('${kind}','${o.id}',this.checked)">
+    <span style="flex:1;min-width:0;cursor:pointer;" onclick="shMgrExp('${o.id}')">${ico} ${esc(o.name)}</span>${on?'<span class="ink-dim fs-12">🔗</span>':''}</div>`;
 }
-function shMgrQ(pid, depth){ let h=''; DB.qfolders.filter(f=>f.examId===shMgrSrc && (f.parentId||null)===(pid||null)).forEach(f=>{ h += shMgrRow('qfolder', f, depth, mqIsSubj(f)?'📘':(f.parentId?'📁':'📂')) + shMgrQ(f.id, depth+1); }); return h; }
+function shMgrQ(pid, depth){ let h=''; shMgrKids(pid).forEach(f=>{ h += shMgrRow('qfolder', f, depth, mqIsSubj(f)?'📘':(f.parentId?'📁':'📂')); if(shMgrOpen.has(f.id)) h += shMgrQ(f.id, depth+1); }); return h; }
+function shMgrExp(id){ if(shMgrOpen.has(id)) shMgrOpen.delete(id); else shMgrOpen.add(id); renderMain(); }
 function shMgrToggle(kind, id, on){
-  const cur = new Set(shTargets(kind, id)); if(on) cur.add(shMgrDst); else cur.delete(shMgrDst);
+  const cur = new Set(shTargets(kind, id)); if(on){ cur.add(shMgrDst); if(kind==='qfolder') shMgrOpen.add(id); } else cur.delete(shMgrDst);
   shSet(kind, id, [...cur]); save(); renderMain();
 }
 function shMgrPageHTML(){
   shMgrInit();
   if(DB.exams.length<2) return card('🔗 શેર', `<div class="ink-dim">શેર કરવા માટે ઓછામાં ઓછી બે પરીક્ષા જોઈએ.</div>`);
-  const opt = (sel)=>DB.exams.map(e=>`<option value="${e.id}" ${e.id===sel?'selected':''}>${esc(e.name)}</option>`).join('');
+  const sel = (fn, cur, list)=>`<select onchange="${fn}=this.value; renderMain();" style="flex:1; min-width:0; padding:8px 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit;">${list.map(e=>`<option value="${e.id}" ${e.id===cur?'selected':''}>${esc(e.name)}</option>`).join('')}</select>`;
   const secs = DB.sections.filter(x=>x.examId===shMgrSrc);
-  return card('🔗 શેર મેનેજમેન્ટ', `
-    <div class="field"><label>કઈ પરીક્ષામાંથી</label><select onchange="shMgrSrc=this.value; renderMain();">${opt(shMgrSrc)}</select></div>
-    <div class="field"><label>કઈ પરીક્ષામાં શેર કરવું</label><select onchange="shMgrDst=this.value; renderMain();">${DB.exams.filter(e=>e.id!==shMgrSrc).map(e=>`<option value="${e.id}" ${e.id===shMgrDst?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>
-    <div class="ink-dim fs-12 mb-6">ટિક કરેલું બીજી પરીક્ષામાં પણ દેખાશે. એક જ ડેટા રહે છે (નકલ નહીં), એટલે ફેરફાર/પ્રગતિ બંનેમાં સરખી. ટિક કાઢો તો શેર બંધ.</div>`)
-   + card('🎓 પરીક્ષા — વિભાગ', secs.length ? `<div style="border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${secs.map(sc=>shMgrRow('section', sc, 0, '📂')).join('')}</div>` : '<div class="ink-dim">કોઈ વિભાગ નથી</div>')
-   + card('🧠 MCQ — વિભાગ / ફોલ્ડર / વિષય', DB.qfolders.some(f=>f.examId===shMgrSrc) ? `<div style="border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${shMgrQ(null,0)}</div>` : '<div class="ink-dim">કોઈ ફોલ્ડર નથી</div>');
+  const body = shMgrTab==='exam'
+    ? (secs.length ? secs.map(sc=>shMgrRow('section', sc, 0, '📂')).join('') : '<div class="ink-dim" style="padding:8px;">કોઈ વિભાગ નથી</div>')
+    : (DB.qfolders.some(f=>f.examId===shMgrSrc) ? shMgrQ(null,0) : '<div class="ink-dim" style="padding:8px;">કોઈ વિભાગ નથી</div>');
+  return `<div class="card">
+    <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;"><span class="ink-dim fs-12" style="width:34px;">માંથી</span>${sel('shMgrSrc', shMgrSrc, DB.exams)}</div>
+    <div style="display:flex; gap:6px; align-items:center;"><span class="ink-dim fs-12" style="width:34px;">માં</span>${sel('shMgrDst', shMgrDst, DB.exams.filter(e=>e.id!==shMgrSrc))}</div>
+    <div class="seg" style="margin:10px 0 8px;"><button class="${shMgrTab==='mcq'?'on':''}" onclick="shMgrTab='mcq'; renderMain();">🧠 MCQ</button><button class="${shMgrTab==='exam'?'on':''}" onclick="shMgrTab='exam'; renderMain();">🎓 પરીક્ષા</button></div>
+    <div class="ink-dim fs-12 mb-6">ટિક કરો → બીજી પરીક્ષામાં શેર, અને અંદરનું ખુલે. ▸ દબાવી ખોલ-બંધ કરો. ટિક કાઢો → શેર બંધ.</div>
+    <div style="border:1px solid var(--border); border-radius:12px; padding:2px 8px;">${body}</div>
+  </div>`;
 }
 function mqPickGo(id, mode){
   closeSheet();
