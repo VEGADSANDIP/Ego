@@ -522,8 +522,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.23-17';
-const APP_BUILT = '2026-11-23T09:49:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.23-18';
+const APP_BUILT = '2026-11-23T10:13:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -2930,13 +2930,13 @@ function xmBuild(kind, examId, prog){
     const withP = (o, src, keys)=>{ if(prog) keys.forEach(k=>{ if(src[k]!=null) o[k]=src[k]; }); return o; };
     return {exampathModule:1, kind:'exam', name:e.name, prog,
       sections: DB.sections.filter(x=>x.examId===examId).map(x=>({id:x.id, name:x.name})),
-      sfolders: (DB.sfolders||[]).filter(f=>f.examId===examId).map(f=>({id:f.id, sectionId:f.sectionId, parentId:f.parentId||null, name:f.name})),
+      sfolders: (DB.sfolders||[]).filter(f=>f.examId===examId).map(f=>({id:f.id, sectionId:f.sectionId, parentId:f.parentId||null, name:f.name, kind:f.kind})),
       subjects: subs.map(x=>({id:x.id, name:x.name, sectionId:x.sectionId||null, folderId:x.folderId||null})),
       topics: tops.map(t=>withP({id:t.id, subjectId:t.subjectId, name:t.name}, t, ['status','completedDate','revCount','lastRev'])),
       subtopics: (DB.subtopics||[]).filter(s=>tids.has(s.topicId)).map(s=>withP({id:s.id, topicId:s.topicId, subjectId:s.subjectId, name:s.name}, s, ['completed','completedDate','revCount','lastRev']))};
   }
   return {exampathModule:1, kind:'mcq', name:e.name, prog,
-    qfolders: DB.qfolders.filter(f=>f.examId===examId).map(f=>({id:f.id, parentId:f.parentId||null, name:f.name})),
+    qfolders: DB.qfolders.filter(f=>f.examId===examId).map(f=>({id:f.id, parentId:f.parentId||null, name:f.name, kind:f.kind})),
     qtests: DB.qtests.filter(t=>t.examId===examId).map(t=>{
       const o = {id:t.id, folderId:t.folderId||null, name:t.name, questions:(t.questions||[]).map(q=>Object.assign(xmClone(q),{star:false}))};
       if(prog) ['attempts','timesBase','bestPct','revCount','lastRev','chal'].forEach(k=>{ if(t[k]!=null) o[k]=xmClone(t[k]); });
@@ -3055,7 +3055,7 @@ function xmImportApply(){
       if(doneF.has(f.id)) return; if(f.parentId && !map[f.parentId] && fs.some(y=>y.id===f.parentId)) return;
       const par = f.parentId?(map[f.parentId]||null):null;
       let ex = DB.qfolders.find(y=>y.examId===examId && (y.parentId||null)===par && same(y.name,f.name));
-      if(!ex){ ex = {id:uid(), examId, parentId:par, name:f.name}; DB.qfolders.push(ex); added++; }
+      if(!ex){ ex = {id:uid(), examId, parentId:par, name:f.name, ...(f.kind?{kind:f.kind}:{})}; DB.qfolders.push(ex); added++; }
       map[f.id]=ex.id; doneF.add(f.id); });
     p.qtests.forEach(t=>{ const fol = t.folderId?(map[t.folderId]||null):null;
       if(DB.qtests.find(y=>y.examId===examId && (y.folderId||null)===fol && same(y.name,t.name))) return;
@@ -3370,12 +3370,12 @@ function structBuild(examId, withTests, withQs){
   const subIds = new Set(subs.map(x=>x.id));
   const out = {exampathTemplate:1, name:e.name,
     sections: secs.map(x=>({id:x.id, name:x.name, totalMarks:x.totalMarks||0})),
-    sfolders: (DB.sfolders||[]).filter(f=>f.examId===examId).map(f=>({id:f.id, sectionId:f.sectionId, parentId:f.parentId||null, name:f.name})),
+    sfolders: (DB.sfolders||[]).filter(f=>f.examId===examId).map(f=>({id:f.id, sectionId:f.sectionId, parentId:f.parentId||null, name:f.name, kind:f.kind})),
     subjects: subs.map(x=>({id:x.id, name:x.name, sectionId:x.sectionId||null, folderId:x.folderId||null})),
     topics: DB.topics.filter(t=>subIds.has(t.subjectId)).map(t=>({id:t.id, subjectId:t.subjectId, name:t.name})),
     qfolders: [], qtests: []};
   if(withTests){
-    out.qfolders = DB.qfolders.filter(f=>f.examId===examId).map(f=>({id:f.id, parentId:f.parentId||null, name:f.name}));
+    out.qfolders = DB.qfolders.filter(f=>f.examId===examId).map(f=>({id:f.id, parentId:f.parentId||null, name:f.name, kind:f.kind}));
     out.qtests = DB.qtests.filter(t=>t.examId===examId).map(t=>({id:t.id, folderId:t.folderId||null, name:t.name,
       questions: withQs ? (t.questions||[]).map(q=>({q:q.q, opts:(q.opts||[]).slice(0,4), ans:(q.ans==null?null:q.ans), star:false})) : []}));
   }
@@ -3419,10 +3419,10 @@ function structApply(){
   const nid = old=>{ if(old==null) return null; if(!map[old]) map[old]=uid(); return map[old]; };
   DB.exams.push({id:examId, name, date, description:'', active:DB.exams.length===0});
   p.sections.forEach(x=>DB.sections.push({id:nid(x.id), examId, name:x.name, totalMarks:x.totalMarks||0}));
-  (p.sfolders||[]).forEach(f=>sfAll().push({id:nid(f.id), examId, sectionId:nid(f.sectionId), parentId:nid(f.parentId), name:f.name}));
+  (p.sfolders||[]).forEach(f=>sfAll().push({id:nid(f.id), examId, sectionId:nid(f.sectionId), parentId:nid(f.parentId), name:f.name, ...(f.kind?{kind:f.kind}:{})}));
   p.subjects.forEach(x=>DB.subjects.push({id:nid(x.id), examId, name:x.name, sectionId:nid(x.sectionId), folderId:nid(x.folderId)}));
   p.topics.forEach(t=>DB.topics.push({id:uid(), subjectId:nid(t.subjectId), name:t.name, status:'not_started'}));
-  (p.qfolders||[]).forEach(f=>DB.qfolders.push({id:nid(f.id), examId, parentId:nid(f.parentId), name:f.name}));
+  (p.qfolders||[]).forEach(f=>DB.qfolders.push({id:nid(f.id), examId, parentId:nid(f.parentId), name:f.name, ...(f.kind?{kind:f.kind}:{})}));
   (p.qtests||[]).forEach(t=>DB.qtests.push({id:uid(), examId, folderId:nid(t.folderId), name:t.name, attempts:[], created:todayStr(),
     questions:(t.questions||[]).map(q=>({q:q.q, opts:(q.opts||['','','','']).slice(0,4), ans:(q.ans==null?null:q.ans), star:false}))}));
   _structPending = null;
@@ -3796,6 +3796,7 @@ function mqPickRender(){
       <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','survive')">🔥 ચેલેન્જ</button>
       <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','read')">📖 વાંચન</button>
       <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','pdf')">PDF</button>
+      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqMoveOpen()">📦 ખસેડો</button>
     </div>`);
   const l = document.getElementById('mqPickList'); if(l) l.scrollTop = sc;
   document.querySelectorAll('#mqPickList input[data-part]').forEach(i=>{ i.indeterminate = true; });
@@ -3803,6 +3804,26 @@ function mqPickRender(){
 function mqPickToggle(id){ const l=document.getElementById('mqPickList'); const st=l?l.scrollTop:0; if(mqPickSel.has(id)) mqPickSel.delete(id); else mqPickSel.add(id); mqPickRender(); const n=document.getElementById('mqPickList'); if(n) n.scrollTop=st; }
 function mqPickFolder(fid, on){ const l=document.getElementById('mqPickList'); const st=l?l.scrollTop:0; mqPickTestsUnder(fid).forEach(t=>{ if(on) mqPickSel.add(t.id); else mqPickSel.delete(t.id); }); mqPickRender(); const n=document.getElementById('mqPickList'); if(n) n.scrollTop=st; }
 function mqPickAll(on){ mqPickSel = new Set(on ? mqPickTestsUnder(mqFolderId).map(t=>t.id) : []); mqPickRender(); }
+/* પસંદ કરેલી ટેસ્ટ બીજા વિષયમાં ખસેડવી — ટેસ્ટનો બધો ડેટા (પ્રયત્નો, રિવિઝન, ટોપિક લિંક) એ જ રહે */
+function mqMoveOpen(){
+  const ids = [...mqPickSel].filter(id=>DB.qtests.some(t=>t.id===id));
+  if(!ids.length){ toast('પહેલાં ટેસ્ટ પસંદ કરો','error'); return; }
+  const opts = []; let n = 0;
+  const walk = (pid, trail)=>{ mqFolders(pid).forEach(f=>{ if(mqIsPathOnly(f.id)) return; const t2 = trail.concat([f.name]);
+    if(mqIsSubj(f)){ n++; opts.push(`<option value="${f.id}">📘 ${esc(t2.join(' › '))}</option>`); } else walk(f.id, t2); }); };
+  walk(null, []);
+  if(!n){ toast('પહેલાં કોઈ વિભાગ → ફોલ્ડર → વિષય બનાવો','error'); return; }
+  openSheet(`<h3>📦 ટેસ્ટ ખસેડો</h3>
+    <div class="ink-dim fs-12 mb-6"><b>${ids.length}</b> ટેસ્ટ નવા વિષયમાં જશે. ટેસ્ટનો કોઈ ડેટા બદલાતો નથી.</div>
+    <div class="field"><label>કયા વિષયમાં?</label><select id="f_mvTarget">${opts.join('')}</select></div>
+    <div class="sheet-actions"><button class="btn btn-secondary" onclick="mqPickRender()">← પાછા</button><button class="btn btn-primary btn-block" onclick="mqMoveDo()">ખસેડો</button></div>`);
+}
+function mqMoveDo(){
+  const to = val('f_mvTarget'); const fo = DB.qfolders.find(x=>x.id===to); if(!fo || !mqIsSubj(fo)){ toast('વિષય પસંદ કરો','error'); return; }
+  let n = 0;
+  DB.qtests.forEach(t=>{ if(mqPickSel.has(t.id) && !t.virtual){ t.folderId = to; t.examId = fo.examId; n++; } });
+  mqPickSel = new Set(); save(); closeSheet(); renderMain(); toast(`${n} ટેસ્ટ ખસેડાઈ ✅`);
+}
 function mqPickGo(id, mode){
   closeSheet();
   if(mode==='read') mqStart(id,'read');
@@ -3824,7 +3845,9 @@ function mqListHTML(){
   if(!folders.length && !tests.length){
     if(q) return emptyRow('કોઈ ટેસ્ટ કે ફોલ્ડર મળ્યું નથી');
     const cur = DB.qfolders.find(f=>f.id===mqFolderId);
-    return emptyState('🧠', cur?'આ ફોલ્ડર ખાલી છે':'કોઈ MCQ ટેસ્ટ નથી','ફોલ્ડર બનાવો અને PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)');
+    if(!cur) return emptyState('🧠','કોઈ MCQ ટેસ્ટ નથી','પહેલાં વિભાગ બનાવો → ફોલ્ડર → વિષય → પછી ટેસ્ટ ઉમેરો','+ વિભાગ ઉમેરો',"openQFolderForm(null,'section')");
+    if(mqIsSubj(cur)) return emptyState('📘','આ વિષય ખાલી છે','PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)');
+    return emptyState('📁','આ ફોલ્ડર ખાલી છે','ફોલ્ડર કે વિષય ઉમેરો (ટેસ્ટ વિષયની અંદર જ ઉમેરાય)','+ વિષય ઉમેરો',"openQFolderForm(null,'subject')");
   }
   return folders.map(f=>mqFolderBookHTML(f)).join('') + tests.map(t=>mqTestCardHTML(t, !!q)).join('');
 }
@@ -3840,28 +3863,48 @@ function renderMockQuiz(seg){
       ${MQ_SORTS.map(([v,l])=>`<option value="${v}" ${cur_sort===v?'selected':''}>${l}</option>`).join('')}
     </select></div>`;
   return mqSticky(seg + pageTopHTML(cur?`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`:'',
-     `<button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null)">+ ${cur?'ફોલ્ડર':'વિભાગ'}</button><button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`,
+     (!cur ? `<button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-primary" onclick="openQFolderForm(null,'section')">+ વિભાગ</button>`
+      : (mqIsSubj(cur) ? `<button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`
+      : `<button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null,'folder')">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openQFolderForm(null,'subject')">+ વિષય</button>`)),
      path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:'') + `
    ${toolbar}${mqTabSegHTML()}`) + `<div id="mqListWrap">${mqListHTML()}</div>`;
 }
 function mqOpenFolder(id){ mqFolderId = id||null; mqQuery = ''; renderMain(); mainTop(); }
 
-function mqFolderOptions(selId, excludeId){
+function mqIsSubj(id){ const f = (typeof id==='string') ? DB.qfolders.find(x=>x.id===id) : id; return !!(f && f.kind==='subject'); }
+/* mode: 'parent' = ફોલ્ડર/વિષય ક્યાં રાખવો (વિષયની અંદર નહીં) · 'home' = ટેસ્ટ કયા વિષયમાં (ફક્ત વિષય) */
+function mqFolderOptions(selId, excludeId, mode){
   const ban = excludeId ? new Set(mqCollectFolderIds(excludeId)) : new Set();
-  const out = [`<option value="">📂 (મુખ્ય — ફોલ્ડર વગર)</option>`];
+  const home = mode==='home';
+  const out = [];
+  if(!home) out.push(`<option value="">📂 (મુખ્ય — વિભાગ તરીકે)</option>`);
+  else if(!selId) out.push(`<option value="">(ફોલ્ડર વગર — જૂની ટેસ્ટ)</option>`);
   const walk = (pid, depth)=>{ mqFolders(pid).forEach(f=>{ if(ban.has(f.id)) return;
-    out.push(`<option value="${f.id}" ${selId===f.id?'selected':''} ${mqIsPathOnly(f.id)?'disabled':''}>${'\u00A0\u00A0'.repeat(depth)}📁 ${esc(f.name)}${mqIsPathOnly(f.id)?' (ફક્ત રસ્તો)':''}</option>`); walk(f.id, depth+1); }); };
+    const subj = mqIsSubj(f), po = mqIsPathOnly(f.id);
+    const ok = home ? (subj || f.id===selId) : !subj;
+    const dis = po || !ok;
+    const ico = subj ? '📘' : (f.parentId ? '📁' : '📂');
+    const note = po ? ' (ફક્ત રસ્તો)' : (home && !subj ? (f.id===selId ? ' (જૂનું ફોલ્ડર)' : '') : '');
+    out.push(`<option value="${f.id}" ${selId===f.id?'selected':''} ${(dis && !(f.id===selId))?'disabled':''}>${'  '.repeat(depth)}${ico} ${esc(f.name)}${note}</option>`);
+    if(!subj) walk(f.id, depth+1); }); };
   walk(null,0);
   return out.join('');
 }
-function openQFolderForm(id){
+function openQFolderForm(id, kind){
   const f = id ? DB.qfolders.find(x=>x.id===id) : null;
+  const isTop = f ? !f.parentId : (kind==='section' || (!kind && !mqFolderId));
+  const curKind = f ? (f.kind==='subject'?'subject':'folder') : (kind==='subject'?'subject':'folder');
+  const word = isTop ? 'વિભાગ' : (curKind==='subject' ? 'વિષય' : 'ફોલ્ડર');
+  const nT = f ? DB.qtests.filter(t=>t.folderId===f.id).length : 0;
   openSheet(`
-    <h3>${(f?!f.parentId:!mqFolderId)?(f?'વિભાગ એડિટ':'નવો વિભાગ'):(f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર')} 📁</h3>
-    <div class="field"><label>નામ</label><input type="text" id="f_qfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: Daily Test Series"></div>
-    <div class="field"><label>ક્યાં રાખવું?</label><select id="f_qfparent">${mqFolderOptions(f ? (f.parentId||'') : (mqFolderId||''), id)}</select></div>
-    ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ફોલ્ડરની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>
-    <button class="btn btn-secondary btn-block" style="margin-top:6px;" onclick="shOpen('qfolder','${f.id}')">🔗 બીજી પરીક્ષામાં શેર કરો${shIsShared('qfolder',f.id)?' ('+(shHolders('qfolder',f.id).length-1)+')':''}</button>`:''}
+    <h3>${f?word+' એડિટ':'નવો '+word} ${curKind==='subject'&&!isTop?'📘':'📁'}</h3>
+    <div class="field"><label>નામ</label><input type="text" id="f_qfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: ${isTop?'કોમ્પ્યુટર':(curKind==='subject'?'કમ્પ્યુટરનો ઇતિહાસ':'કોમ્પ્યુટર બેઝિક')}"></div>
+    ${isTop?'':`<div class="field"><label>પ્રકાર</label><select id="f_qfkind">
+      <option value="folder" ${curKind==='folder'?'selected':''}>📁 ફોલ્ડર — અંદર ફોલ્ડર/વિષય રહે</option>
+      <option value="subject" ${curKind==='subject'?'selected':''}>📘 વિષય — અંદર ટેસ્ટ રહે</option></select>
+      ${f?`<div class="ink-dim fs-12" style="margin-top:4px;">ફોલ્ડર ↔ વિષય ફેરવી શકાય. ડેટા ગુમાવાતો નથી.${nT?` અત્યારે અંદર ${nT} ટેસ્ટ છે.`:''}</div>`:''}</div>`}
+    <div class="field"><label>ક્યાં રાખવું?</label><select id="f_qfparent">${mqFolderOptions(f ? (f.parentId||'') : (mqFolderId||''), id, 'parent')}</select></div>
+    ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ${word}ની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>`:''}
     <div class="sheet-actions">
       ${f?`<button class="btn btn-danger" onclick="deleteQFolder('${f.id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveQFolder(${f?`'${f.id}'`:'null'})">સેવ કરો</button>
@@ -3870,11 +3913,23 @@ function openQFolderForm(id){
 function saveQFolder(id){
   const name = val('f_qfname'); if(!name){ toast('નામ લખો','error'); return; }
   const parentId = val('f_qfparent') || null;
+  const kindEl = document.getElementById('f_qfkind');
+  const wantSubj = kindEl ? kindEl.value==='subject' : false;
   const par = parentId ? DB.qfolders.find(x=>x.id===parentId) : null;
+  if(par && mqIsSubj(par)){ toast('વિષયની અંદર ફોલ્ડર કે વિષય ન બની શકે','error'); return; }
+  if(wantSubj && !parentId){ toast('વિભાગ વિષય ન બની શકે — પહેલાં વિભાગ પસંદ કરો','error'); return; }
   const ownerEx = par ? par.examId : mqExamId();
-  if(id){ const f = DB.qfolders.find(x=>x.id===id); const moved = (f.parentId||null)!==parentId; f.name = name; f.parentId = parentId;
-    if(moved){ const ids = mqCollectFolderIds(id); DB.qfolders.forEach(x=>{ if(ids.includes(x.id)) x.examId = ownerEx; }); DB.qtests.forEach(t=>{ if(ids.includes(t.folderId)) t.examId = ownerEx; }); } }
-  else DB.qfolders.push({id:uid(), examId:ownerEx, parentId, name});
+  if(id){
+    const f = DB.qfolders.find(x=>x.id===id);
+    if(wantSubj && !mqIsSubj(f) && DB.qfolders.some(x=>x.parentId===f.id)){ toast('આમાં સબફોલ્ડર છે — વિષય બનાવતાં પહેલાં તેમને ખસેડો','error'); return; }
+    if(kindEl && !wantSubj && mqIsSubj(f)){ const nT = DB.qtests.filter(t=>t.folderId===f.id).length;
+      if(nT && !confirm(`આમાં ${nT} ટેસ્ટ છે. ફોલ્ડર બનાવશો તો ટેસ્ટ અંદર જ રહેશે (ડેટા જાય નહીં), પણ પછી તેને વિષયમાં ખસેડવી પડશે. ચાલુ રાખવું છે?`)) return; }
+    const moved = (f.parentId||null)!==parentId; f.name = name; f.parentId = parentId;
+    if(kindEl){ if(wantSubj) f.kind = 'subject'; else delete f.kind; }
+    if(moved){ const ids = mqCollectFolderIds(id); DB.qfolders.forEach(x=>{ if(ids.includes(x.id)) x.examId = ownerEx; }); DB.qtests.forEach(t=>{ if(ids.includes(t.folderId)) t.examId = ownerEx; }); }
+  } else {
+    const o = {id:uid(), examId:ownerEx, parentId, name}; if(wantSubj) o.kind = 'subject'; DB.qfolders.push(o);
+  }
   save(); closeSheet(); renderMain();
 }
 function mqCollectFolderIds(id){ let ids=[id]; DB.qfolders.filter(f=>f.parentId===id).forEach(f=>{ ids = ids.concat(mqCollectFolderIds(f.id)); }); return ids; }
@@ -3896,7 +3951,7 @@ function openQTestForm(id){
   openSheet(`
     <h3>${t?'ટેસ્ટ એડિટ':'નવી MCQ ટેસ્ટ'} 🧠</h3>
     <div class="field"><label>ટેસ્ટનું નામ</label><input type="text" id="f_qtname" value="${t?esc(t.name):''}" placeholder="જેમ કે: Test 65"></div>
-    <div class="field"><label>કયા ફોલ્ડરમાં?</label><select id="f_qtfolder">${mqFolderOptions(t ? (t.folderId||'') : (mqFolderId||''))}</select></div>
+    <div class="field"><label>કયા વિષયમાં?</label><select id="f_qtfolder">${mqFolderOptions(t ? (t.folderId||'') : (mqFolderId||''), null, 'home')}</select></div>
     <div class="field"><label>પ્રશ્નો (PDF માંથી કોપી કરીને પેસ્ટ કરો)</label>
       <textarea class="mq-ta" id="f_qttext" oninput="mqPreview()" placeholder="1) પ્રશ્ન...&#10;(A) ... (B) ...&#10;(C) ... (D) ...">${t?esc(mqQuestionsText(t.questions)):''}</textarea></div>
     <div class="field"><label>જવાબ ચાવી (દા.ત. DACBBC… અથવા 1-D 2-A 3-A…)</label>
@@ -3928,6 +3983,7 @@ function saveQTest(id){
   const fix = false;
   const r = mqParse(txt, fix);
   if(!name){ toast('ટેસ્ટનું નામ લખો','error'); return; }
+  if(!id && !val('f_qtfolder')){ toast('પહેલાં વિષય બનાવો/પસંદ કરો — ટેસ્ટ વિષયની અંદર જ ઉમેરાય','error'); return; }
   if(!r.questions.length){ toast('કોઈ પ્રશ્ન મળ્યો નથી','error'); return; }
   const key = mqParseKey(val('f_qtkey'), r.questions.length);
   r.questions.forEach((q,i)=>{ q.ans = key[i]; });
@@ -4722,7 +4778,8 @@ function mqFolderBookHTML(f){
       <div class="subject-mini-stat"><b>${rTot}</b><span>કુલ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rDone}</b><span>પૂર્ણ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rTot-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
-  return `<div style="margin-bottom:12px;">${folderCardHTML(pct, '📁 '+esc(f.name)+shb, `${nF?nF+' સબફોલ્ડર · ':''}${nT} ટેસ્ટ — ખોલવા ટેપ કરો →`, editCode, `mqOpenFolder('${f.id}')`, det)}</div>`;
+  const subj = mqIsSubj(f), loose = !subj && mqTests(f.id).length>0;
+  return `<div style="margin-bottom:12px;">${folderCardHTML(pct, (subj?'📘 ':'📁 ')+esc(f.name)+shb, `${nF?nF+' સબફોલ્ડર · ':''}${nT} ટેસ્ટ — ખોલવા ટેપ કરો →${loose?'<br><span style="color:var(--warning,#e0a020);">⚠ ટેસ્ટ સીધી છે — ✎ માં "વિષય" બનાવો</span>':''}`, editCode, `mqOpenFolder('${f.id}')`, det)}</div>`;
 }
 function dashboardQuizPages(exam){
   const tests = mqExamTests(mqExamId());
