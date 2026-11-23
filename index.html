@@ -209,6 +209,9 @@ a{color:inherit;}
 .mq-name{font-weight:800; font-size:15.5px; line-height:1.35; word-break:break-word;}
 .mq-meta{font-size:12.5px; color:var(--ink-dim); margin-top:3px;}
 .mq-res{font-size:12px; color:var(--ink-dim); margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);}
+.pk-bar{display:flex; gap:6px; margin-top:12px;}
+.pk-bar .btn{flex:1; min-width:0; padding:10px 0; font-size:20px; line-height:1; justify-content:center; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;}
+.tip-bubble{position:fixed; z-index:99999; background:#111; color:#fff; border:1px solid #555; padding:5px 10px; border-radius:8px; font-size:13px; font-weight:700; transform:translate(-50%,-100%); pointer-events:none; white-space:nowrap;}
 .mq-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
 .mq-actions .btn{flex:1; min-width:0; white-space:nowrap;}
 .pg-top{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
@@ -522,8 +525,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.23-18';
-const APP_BUILT = '2026-11-23T10:13:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.23-20';
+const APP_BUILT = '2026-11-23T15:46:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1615,7 +1618,7 @@ function renderSectionDetail(sectionId){
   const folders = sfChildren(sec.id, subjFolderId);
   const crumb = `<div class="mq-crumb">📁 <a onclick="sfOpen(null)" style="cursor:pointer;${path.length?'text-decoration:underline;':''}">${esc(sec.name)}</a>${path.map((f,i)=>' › '+(i<path.length-1?`<a onclick="sfOpen('${f.id}')" style="cursor:pointer;text-decoration:underline;">${esc(f.name)}</a>`:esc(f.name))).join('')}</div>`;
   const hdr = pageTopHTML(cur ? `sfOpen(${cur.parentId?`'${cur.parentId}'`:'null'})` : "sectionDetailId=null; renderMain();",
-     `${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}<button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${(getActiveExam()||{}).id||sec.examId}','${sec.id}')">+ વિષય</button>`, crumb);
+     `${sectionSubjects(sec.id).length>1?`<button class="btn btn-sm btn-secondary" onclick="openSectionSubjectReorder('${sec.id}')">ક્રમ બદલો</button>`:''}<button class="btn btn-sm btn-secondary" onclick="exPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-secondary" onclick="openSFolderForm(null,'${sec.id}')">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openSubjectForm(null,'${(getActiveExam()||{}).id||sec.examId}','${sec.id}')">+ વિષય</button>`, crumb);
   const mid = folders.length ? `<div style="margin-top:6px;">${folders.map(sfFolderCard).join('')}</div>` : '';
   if(subs.length) return subjectListHTML(subs, sec.id, hdr, mid);
   return `<div class="hs-sticky hs-mid">${hdr}</div>${mid}${folders.length?'':emptyRow(cur?'આ ફોલ્ડર ખાલી છે':'કોઈ વિષય ઉમેર્યો નથી')}`;
@@ -3650,8 +3653,8 @@ function mqQuestionsText(qs){
 
 /* ---- હોમ / ફોલ્ડર ---- */
 let mqQuery = '';
-const MQ_SORTS = [['name','નામ A→Z'],['name_desc','નામ Z→A'],['new','નવી પહેલા'],['old','જૂની પહેલા'],['unattempted','ન આપેલી પહેલા'],['attempted','આપેલી પહેલા'],['score_asc','ઓછો સ્કોર પહેલા'],['score_desc','વધુ સ્કોર પહેલા'],['rev_due','રિવિઝન બાકી પહેલા']];
-function getQSort(){ return (DB.settings && DB.settings.qSort) || 'name'; }
+const MQ_SORTS = [['manual','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['name_desc','નામ Z→A'],['new','નવી પહેલા'],['old','જૂની પહેલા'],['unattempted','ન આપેલી પહેલા'],['attempted','આપેલી પહેલા'],['score_asc','ઓછો સ્કોર પહેલા'],['score_desc','વધુ સ્કોર પહેલા'],['rev_due','રિવિઝન બાકી પહેલા']];
+function getQSort(){ return (DB.settings && DB.settings.qSort) || 'manual'; }
 function setQSort(v){ DB.settings.qSort = v; save(); renderMain(); }
 function mqSearchInput(v){
   mqQuery = v;
@@ -3678,6 +3681,7 @@ function mqCmp(mode, a, b){
   const byName = ()=>a.name.localeCompare(b.name,'gu',{numeric:true});
   const nullLast = (x,y,fn)=> x==null&&y==null ? 0 : (x==null?1:(y==null?-1:fn(x,y)));
   let r = 0;
+  if(mode==='manual') return (a.idx-b.idx) || byName();
   if(mode==='name') return byName();
   if(mode==='name_desc') return -byName();
   if(mode==='new') r = b.idx-a.idx;
@@ -3790,13 +3794,14 @@ function mqPickRender(){
       <span class="ink-dim fs-12" style="margin-left:auto; align-self:center;"><b>${sel.length}</b> ટેસ્ટ · <b>${nQ}</b> પ્રશ્નો</span>
     </div>
     <div id="mqPickList" style="max-height:46vh; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${mqPickTree(mqFolderId,0)}</div>
-    <div class="mq-actions" style="margin-top:12px;">
-      <button class="btn btn-primary btn-sm" ${dis} onclick="mqPickGo('${ids}','test')">⏱ ટેસ્ટ</button>
-      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','practice')">✍ પ્રેક્ટિસ</button>
-      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','survive')">🔥 ચેલેન્જ</button>
-      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','read')">📖 વાંચન</button>
-      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqPickGo('${ids}','pdf')">PDF</button>
-      <button class="btn btn-secondary btn-sm" ${dis} onclick="mqMoveOpen()">📦 ખસેડો</button>
+    <div class="pk-bar">
+      <button class="btn btn-primary" ${dis} data-tip="ટેસ્ટ" onclick="mqPickGo('${ids}','test')">⏱</button>
+      <button class="btn btn-secondary" ${dis} data-tip="પ્રેક્ટિસ" onclick="mqPickGo('${ids}','practice')">✍</button>
+      <button class="btn btn-secondary" ${dis} data-tip="ચેલેન્જ" onclick="mqPickGo('${ids}','survive')">🔥</button>
+      <button class="btn btn-secondary" ${dis} data-tip="વાંચન" onclick="mqPickGo('${ids}','read')">📖</button>
+      <button class="btn btn-secondary" ${dis} data-tip="PDF" onclick="mqPickGo('${ids}','pdf')">📄</button>
+      <button class="btn btn-secondary" ${dis} data-tip="ખસેડો" onclick="mqMoveOpen()">📦</button>
+      <button class="btn btn-secondary" ${dis} data-tip="ડિલીટ" onclick="mqPickDelete()">🗑</button>
     </div>`);
   const l = document.getElementById('mqPickList'); if(l) l.scrollTop = sc;
   document.querySelectorAll('#mqPickList input[data-part]').forEach(i=>{ i.indeterminate = true; });
@@ -3824,6 +3829,95 @@ function mqMoveDo(){
   DB.qtests.forEach(t=>{ if(mqPickSel.has(t.id) && !t.virtual){ t.folderId = to; t.examId = fo.examId; n++; } });
   mqPickSel = new Set(); save(); closeSheet(); renderMain(); toast(`${n} ટેસ્ટ ખસેડાઈ ✅`);
 }
+/* ===== આઇકન પર લાંબો દબાવો → નામ દેખાય ===== */
+(function(){
+  let tm=null, fired=false;
+  const SEL = '[data-tip], .act-row button[title]';
+  const tipOf = el => el.getAttribute('data-tip') || el.getAttribute('title') || '';
+  document.addEventListener('pointerdown', e=>{
+    const b = e.target.closest && e.target.closest(SEL); if(!b){ return; }
+    fired=false; clearTimeout(tm);
+    tm = setTimeout(()=>{ const t = tipOf(b); if(!t) return; fired=true;
+      const r = b.getBoundingClientRect(); const d = document.createElement('div'); d.className='tip-bubble'; d.textContent=t;
+      d.style.left = Math.min(Math.max(r.left+r.width/2, 40), window.innerWidth-40)+'px'; d.style.top = (r.top-6)+'px';
+      document.body.appendChild(d); setTimeout(()=>d.remove(), 1500); }, 380);
+  }, true);
+  ['pointerup','pointercancel','scroll'].forEach(ev=>document.addEventListener(ev, ()=>clearTimeout(tm), true));
+  document.addEventListener('click', e=>{ if(fired && e.target.closest && e.target.closest(SEL)){ e.stopPropagation(); e.preventDefault(); } fired=false; }, true);
+  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest(SEL)) e.preventDefault(); });
+})();
+function mqPickDelete(){
+  const ids = new Set([...mqPickSel].filter(id=>DB.qtests.some(t=>t.id===id)));
+  if(!ids.size){ toast('પહેલાં ટેસ્ટ પસંદ કરો','error'); return; }
+  if(!confirm(`${ids.size} ટેસ્ટ ડિલીટ થશે (પ્રશ્નો, પ્રયત્નો, રિવિઝન બધું). ચાલુ રાખવું છે?`)) return;
+  DB.qtests = DB.qtests.filter(t=>!ids.has(t.id)); DB.qrevs = (DB.qrevs||[]).filter(r=>!ids.has(r.testId));
+  mqPickSel = new Set(); save(); closeSheet(); renderMain(); toast(`${ids.size} ટેસ્ટ ડિલીટ થઈ`);
+}
+/* ===== પરીક્ષા: વિષય/ફોલ્ડર પસંદ કરી ખસેડો કે ડિલીટ ===== */
+var exPickSel = new Set();
+function exPickRows(secId, fid, depth){
+  let h = '';
+  DB.subjects.filter(x=>x.sectionId===secId && (x.folderId||null)===(fid||null)).forEach(x=>{
+    h += `<label class="mq-pick-row" style="padding-left:${depth*16}px;"><input type="checkbox" ${exPickSel.has('s:'+x.id)?'checked':''} onchange="exPickToggle('s:${x.id}')"><span style="flex:1;min-width:0;">${esc(x.name)}</span></label>`;
+  });
+  sfChildren(secId, fid||null).forEach(f=>{
+    h += `<label class="mq-pick-row mq-pick-folder" style="padding-left:${depth*16}px;"><input type="checkbox" ${exPickSel.has('f:'+f.id)?'checked':''} onchange="exPickToggle('f:${f.id}')"><span style="flex:1;min-width:0;">📁 ${esc(f.name)}</span></label>`;
+    h += exPickRows(secId, f.id, depth+1);
+  });
+  return h;
+}
+function exPickToggle(k){ if(exPickSel.has(k)) exPickSel.delete(k); else exPickSel.add(k); exPickOpen(true); }
+function exPickOpen(keep){
+  if(!keep) exPickSel = new Set();
+  const sc = (document.querySelector('#exPickList')||{}).scrollTop || 0;
+  const n = exPickSel.size, dis = n ? '' : 'disabled';
+  openSheet(`<div class="sheet-title">✅ પસંદ કરો</div>
+    <div class="ink-dim fs-12 mb-6"><b>${n}</b> પસંદ કર્યા · ફોલ્ડર પસંદ કરો તો તેની અંદરનું બધું સાથે ખસે</div>
+    <div id="exPickList" style="max-height:46vh; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${exPickRows(sectionDetailId, subjFolderId||null, 0) || '<div class="ink-dim" style="padding:10px;">કંઈ નથી</div>'}</div>
+    <div class="pk-bar">
+      <button class="btn btn-secondary" ${dis} data-tip="ખસેડો" onclick="exMoveOpen()">📦</button>
+      <button class="btn btn-secondary" ${dis} data-tip="ડિલીટ" onclick="exPickDelete()">🗑</button>
+    </div>`);
+  const l = document.getElementById('exPickList'); if(l) l.scrollTop = sc;
+}
+function exMoveOpen(){
+  const sec = DB.sections.find(x=>x.id===sectionDetailId); if(!sec) return;
+  const selF = [...exPickSel].filter(k=>k[0]==='f').map(k=>k.slice(2));
+  const ban = new Set(); selF.forEach(id=>sfDescIds(id).forEach(x=>ban.add(x)));
+  const opts = [];
+  examSections(sec.examId).forEach(sc=>{
+    opts.push(`<option value="${sc.id}|">📂 ${esc(sc.name)}</option>`);
+    const walk = (pid, trail)=>sfChildren(sc.id, pid).forEach(f=>{ if(ban.has(f.id)) return; const t2 = trail.concat([f.name]); opts.push(`<option value="${sc.id}|${f.id}">📁 ${esc(sc.name+' › '+t2.join(' › '))}</option>`); walk(f.id, t2); });
+    walk(null, []);
+  });
+  openSheet(`<h3>📦 ખસેડો</h3><div class="ink-dim fs-12 mb-6"><b>${exPickSel.size}</b> વસ્તુ નવી જગ્યાએ જશે. ટોપિક, રિવિઝન બધો ડેટા એમ જ રહે.</div>
+    <div class="field"><label>ક્યાં?</label><select id="f_exMv">${opts.join('')}</select></div>
+    <div class="sheet-actions"><button class="btn btn-secondary" onclick="exPickOpen(true)">← પાછા</button><button class="btn btn-primary btn-block" onclick="exMoveDo()">ખસેડો</button></div>`);
+}
+function exMoveDo(){
+  const [secId, fid0] = val('f_exMv').split('|'); const fid = fid0 || null; let n = 0;
+  [...exPickSel].forEach(k=>{
+    const id = k.slice(2);
+    if(k[0]==='s'){ const x = DB.subjects.find(y=>y.id===id); if(x){ x.sectionId = secId; x.folderId = fid; n++; } }
+  });
+  [...exPickSel].filter(k=>k[0]==='f').forEach(k=>{
+    const id = k.slice(2), f = sfAll().find(y=>y.id===id); if(!f) return;
+    if(fid && sfDescIds(id).includes(fid)) return;
+    const ids = new Set(sfDescIds(id));
+    f.parentId = fid; sfAll().forEach(y=>{ if(ids.has(y.id)) y.sectionId = secId; });
+    DB.subjects.forEach(x=>{ if(ids.has(x.folderId)) x.sectionId = secId; }); n++;
+  });
+  exPickSel = new Set(); save(); closeSheet(); renderMain(); toast(`${n} ખસેડાયું ✅`);
+}
+function exPickDelete(){
+  const subs = [...exPickSel].filter(k=>k[0]==='s').map(k=>k.slice(2)), fols = [...exPickSel].filter(k=>k[0]==='f').map(k=>k.slice(2));
+  if(!confirm(`${subs.length} વિષય (ટોપિક/રિવિઝન/લોગ સાથે) ડિલીટ થશે.${fols.length?` ${fols.length} ફોલ્ડર ડિલીટ થશે, પણ તેની અંદરના વિષય/ફોલ્ડર ઉપરના સ્તરે રહેશે.`:''} ચાલુ રાખવું છે?`)) return;
+  subs.forEach(id=>{ cascadeDeleteSubjectData(id); DB.subjects = DB.subjects.filter(x=>x.id!==id); if(topicDetailId===id) topicDetailId=null; });
+  fols.forEach(id=>{ const f = sfAll().find(x=>x.id===id); if(!f) return; const up = f.parentId||null;
+    DB.subjects.forEach(x=>{ if(x.folderId===id) x.folderId = up; }); sfAll().forEach(x=>{ if(x.parentId===id) x.parentId = up; });
+    DB.sfolders = sfAll().filter(x=>x.id!==id); if(subjFolderId===id) subjFolderId = up; });
+  exPickSel = new Set(); save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
 function mqPickGo(id, mode){
   closeSheet();
   if(mode==='read') mqStart(id,'read');
@@ -3849,7 +3943,12 @@ function mqListHTML(){
     if(mqIsSubj(cur)) return emptyState('📘','આ વિષય ખાલી છે','PDF માંથી કોપી કરેલા પ્રશ્નો પેસ્ટ કરો','+ ટેસ્ટ ઉમેરો','openQTestForm(null)');
     return emptyState('📁','આ ફોલ્ડર ખાલી છે','ફોલ્ડર કે વિષય ઉમેરો (ટેસ્ટ વિષયની અંદર જ ઉમેરાય)','+ વિષય ઉમેરો',"openQFolderForm(null,'subject')");
   }
-  return folders.map(f=>mqFolderBookHTML(f)).join('') + tests.map(t=>mqTestCardHTML(t, !!q)).join('');
+  const topLvl = !mqFolderId && !q;
+  if(topLvl) return `<div class="subject-list">${folders.map(f=>mqFolderBookHTML(f)).join('')}</div>`;
+  const fo = folders.filter(f=>!mqIsSubj(f)), su = folders.filter(f=>mqIsSubj(f));
+  return (fo.length ? `<div style="margin-top:6px;">${fo.map(f=>mqFolderBookHTML(f)).join('')}</div>` : '')
+    + (su.length ? `<div class="subject-list" id="mqSubjWrap">${su.map(f=>mqFolderBookHTML(f)).join('')}</div>` : '')
+    + tests.map(t=>mqTestCardHTML(t, !!q)).join('');
 }
 function renderMockQuiz(seg){
   const exam = getActiveExam();
@@ -3857,17 +3956,44 @@ function renderMockQuiz(seg){
   const cur = DB.qfolders.find(f=>f.id===mqFolderId);
   const path = mqFolderPath(mqFolderId);
   const cur_sort = getQSort();
-  const toolbar = `<div class="flex-gap-6">
-    <input type="text" id="mqSearchInput" value="${esc(mqQuery)}" placeholder="🔍 ટેસ્ટ શોધો..." oninput="mqSearchInput(this.value)" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
+  const toolbar = `<div class="flex-gap-6 mb-6">
+    <input type="text" id="mqSearchInput" value="${esc(mqQuery)}" placeholder="🔍 શોધો..." oninput="mqSearchInput(this.value)" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13.5px;">
     <select onchange="setQSort(this.value)" style="flex-shrink:0; max-width:135px; padding:8px 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit;">
       ${MQ_SORTS.map(([v,l])=>`<option value="${v}" ${cur_sort===v?'selected':''}>${l}</option>`).join('')}
     </select></div>`;
-  return mqSticky(seg + pageTopHTML(cur?`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`:'',
-     (!cur ? `<button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-primary" onclick="openQFolderForm(null,'section')">+ વિભાગ</button>`
-      : (mqIsSubj(cur) ? `<button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`
-      : `<button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button><button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null,'folder')">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openQFolderForm(null,'subject')">+ વિષય</button>`)),
-     path.length?`<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`:'') + `
-   ${toolbar}${mqTabSegHTML()}`) + `<div id="mqListWrap">${mqListHTML()}</div>`;
+  const nSib = cur ? (mqIsSubj(cur) ? mqTests(cur.id).length : mqFolders(cur.id).length) : mqFolders(null).length;
+  const ordBtn = nSib>1 ? `<button class="btn btn-sm btn-secondary" onclick="mqReorderOpen()">ક્રમ બદલો</button>` : '';
+  const pickBtn = `<button class="btn btn-sm btn-secondary" onclick="mqPickOpen()">✅ પસંદ કરો</button>`;
+  const btns = !cur ? `${ordBtn}${pickBtn}<button class="btn btn-sm btn-primary" onclick="openQFolderForm(null,'section')">+ વિભાગ</button>`
+    : (mqIsSubj(cur) ? `${ordBtn}${pickBtn}<button class="btn btn-sm btn-primary" onclick="openQTestForm(null)">+ ટેસ્ટ</button>`
+    : `${ordBtn}${pickBtn}<button class="btn btn-sm btn-secondary" onclick="openQFolderForm(null,'folder')">+ ફોલ્ડર</button><button class="btn btn-sm btn-primary" onclick="openQFolderForm(null,'subject')">+ વિષય</button>`);
+  const top = cur ? pageTopHTML(`mqOpenFolder(${cur.parentId?`'${cur.parentId}'`:'null'})`, btns, `<div class="mq-crumb">📁 ${path.map(esc).join(' › ')}</div>`)
+    : `<div class="section-header mb-6" style="justify-content:flex-end;"><span class="flex-gap-6">${btns}</span></div>`;
+  return mqSticky(seg + top + toolbar + mqTabSegHTML()) + `<div id="mqListWrap">${mqListHTML()}</div>`;
+}
+/* ક્રમ બદલો — હાલના લેવલની વસ્તુઓ (ફોલ્ડર/વિભાગ કે વિષયની ટેસ્ટ) ▲▼ */
+function mqSiblingsArr(){
+  const cur = DB.qfolders.find(f=>f.id===mqFolderId);
+  if(cur && mqIsSubj(cur)) return {arr:DB.qtests, list:mqTests(cur.id), icon:'📝'};
+  return {arr:DB.qfolders, list:mqFolders(mqFolderId||null), icon:'📁'};
+}
+function mqReorderListHTML(){
+  const {list, icon} = mqSiblingsArr();
+  return list.map((x,i)=>`<div class="item"><span style="flex:1;font-weight:700;">${(x.kind==='subject'?'📘':(icon==='📝'?'📝':(x.parentId?'📁':'📂')))} ${esc(x.name)}</span><span class="flex-gap-6">
+    <button class="btn btn-sm btn-secondary" ${i===0?'disabled':''} onclick="mqMoveItem('${x.id}',-1)">▲</button>
+    <button class="btn btn-sm btn-secondary" ${i===list.length-1?'disabled':''} onclick="mqMoveItem('${x.id}',1)">▼</button></span></div>`).join('');
+}
+function mqReorderOpen(){
+  if(getQSort()!=='manual'){ DB.settings.qSort = 'manual'; save(); renderMain(); }
+  openSheet(`<h3>ક્રમ બદલો</h3><div class="scroll-list-sm" id="reorderList">${mqReorderListHTML()}</div>`);
+}
+function mqMoveItem(id, dir){
+  const {arr, list} = mqSiblingsArr();
+  const pos = list.findIndex(x=>x.id===id), np = pos+dir; if(pos<0 || np<0 || np>=list.length) return;
+  const i1 = arr.indexOf(list[pos]), i2 = arr.indexOf(list[np]);
+  const tmp = arr[i1]; arr[i1] = arr[i2]; arr[i2] = tmp;
+  save(); renderMain();
+  const el = document.getElementById('reorderList'); if(el) el.innerHTML = mqReorderListHTML();
 }
 function mqOpenFolder(id){ mqFolderId = id||null; mqQuery = ''; renderMain(); mainTop(); }
 
@@ -3904,7 +4030,8 @@ function openQFolderForm(id, kind){
       <option value="subject" ${curKind==='subject'?'selected':''}>📘 વિષય — અંદર ટેસ્ટ રહે</option></select>
       ${f?`<div class="ink-dim fs-12" style="margin-top:4px;">ફોલ્ડર ↔ વિષય ફેરવી શકાય. ડેટા ગુમાવાતો નથી.${nT?` અત્યારે અંદર ${nT} ટેસ્ટ છે.`:''}</div>`:''}</div>`}
     <div class="field"><label>ક્યાં રાખવું?</label><select id="f_qfparent">${mqFolderOptions(f ? (f.parentId||'') : (mqFolderId||''), id, 'parent')}</select></div>
-    ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ${word}ની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>`:''}
+    ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ${word}ની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>
+    <button class="btn btn-secondary btn-block" style="margin-top:6px;" onclick="shOpen('qfolder','${f.id}')">🔗 બીજી પરીક્ષામાં શેર કરો${shIsShared('qfolder',f.id)?' ('+(shHolders('qfolder',f.id).length-1)+')':''}</button>`:''}
     <div class="sheet-actions">
       ${f?`<button class="btn btn-danger" onclick="deleteQFolder('${f.id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveQFolder(${f?`'${f.id}'`:'null'})">સેવ કરો</button>
@@ -4758,28 +4885,52 @@ function mqFolderBookHTML(f){
   if(!f.parentId){ /* મુખ્ય વિભાગ — પરીક્ષાના વિભાગ કાર્ડ જેવું જ */
     const pc = nT ? Math.round(attempted/nT*100) : 0;
     return `<div class="card cursor-pointer" data-search="${esc(f.name.toLowerCase())}" onclick="mqOpenFolder('${f.id}')">
-      ${progressCardHeader(pc, `📂 ${esc(f.name)} <span class="badge badge-primary" style="font-weight:700;">${nT} ટેસ્ટ</span>${shb}`, editCode)}
-      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${nF?nF+' ફોલ્ડર · ':''}${attempted}/${nT} આપેલી — વિગત જોવા ટેપ કરો →</div>
+      ${progressCardHeader(pc, `📂 ${esc(f.name)}${shb}`, editCode)}
+      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">${nF} ફોલ્ડર · ${nT} ટેસ્ટ — વિગત જોવા ટેપ કરો →</div>
     </div>`;
   }
-  const totalTimes = tests.reduce((a,t)=>a+mqTimes(t),0);
   const pct = nT ? Math.round(attempted/nT*100) : 0;
   const ids = new Set(tests.map(t=>t.id));
   const revs = (DB.qrevs||[]).filter(r=>ids.has(r.testId));
   const rBase = qrevBase(ids);
   const rDone = revs.filter(r=>r.status==='completed').length + rBase;
   const rTot = revs.length + rBase;
+  const revPct = rTot ? Math.round(rDone/rTot*100) : 0;
+  const subj = mqIsSubj(f), loose = !subj && mqTests(f.id).length>0;
+  const warn = loose ? '<br><span style="color:var(--warning,#e0a020);">⚠ ટેસ્ટ સીધી છે — ✎ માં "વિષય" બનાવો</span>' : '';
+  if(subj){
+    const nav = `if(bookClickOK()){ mqOpenFolder('${f.id}'); }`;
+    const front = `<div class="card cursor-pointer" onclick="${nav}">
+      ${progressCardHeader(pct, esc(f.name)+shb, editCode)}
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
+        <div class="subject-mini-stat"><b>${nT}</b><span>કુલ ટેસ્ટ</span></div>
+        <div class="subject-mini-stat"><b>${attempted}</b><span>આપેલી ટેસ્ટ</span></div>
+        <div class="subject-mini-stat"><b>${nT-attempted}</b><span>બાકી ટેસ્ટ</span></div>
+      </div>
+      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો → · રિવિઝન માટે સ્વાઇપ કરો</div>
+    </div>`;
+    const back = `<div class="card cursor-pointer" onclick="${nav}">
+      ${progressCardHeader(revPct, esc(f.name)+shb, editCode)}
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;">
+        <div class="subject-mini-stat"><b>${rTot}</b><span>કુલ રિવિઝન</span></div>
+        <div class="subject-mini-stat"><b>${rDone}</b><span>પૂર્ણ રિવિઝન</span></div>
+        <div class="subject-mini-stat"><b>${rTot-rDone}</b><span>બાકી રિવિઝન</span></div>
+      </div>
+      <div class="ink-dim" style="text-align:center; margin-top:10px; font-size:12px;">વિગત જોવા ટેપ કરો → · ટેસ્ટ માટે સ્વાઇપ કરો</div>
+    </div>`;
+    return `<div class="sub-book-wrap" data-search="${esc(f.name.toLowerCase())}">${bookHTML('qsub_'+f.id, [front, back], 'book-card')}</div>`;
+  }
+  const nSub = mqCollectFolderIds(f.id).filter(id=>id!==f.id && mqIsSubj(id)).length;
   const det = `<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
-      <div class="subject-mini-stat"><b>${nT}</b><span>કુલ ટેસ્ટ</span></div>
-      <div class="subject-mini-stat"><b>${attempted}</b><span>આપેલી</span></div>
-      <div class="subject-mini-stat"><b>${nT-attempted}</b><span>બાકી</span></div>
-      <div class="subject-mini-stat" style="background:color-mix(in srgb, var(--primary) 16%, transparent);"><b>${totalTimes}</b><span>કુલ વખત</span></div></div>
+      <div class="subject-mini-stat"><b>${nF}</b><span>ફોલ્ડર</span></div>
+      <div class="subject-mini-stat"><b>${nSub}</b><span>વિષય</span></div>
+      <div class="subject-mini-stat"><b>${attempted}</b><span>આપેલી ટેસ્ટ</span></div>
+      <div class="subject-mini-stat"><b>${nT-attempted}</b><span>બાકી ટેસ્ટ</span></div></div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;">
       <div class="subject-mini-stat"><b>${rTot}</b><span>કુલ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rDone}</b><span>પૂર્ણ રિવિઝન</span></div>
       <div class="subject-mini-stat"><b>${rTot-rDone}</b><span>બાકી રિવિઝન</span></div></div>`;
-  const subj = mqIsSubj(f), loose = !subj && mqTests(f.id).length>0;
-  return `<div style="margin-bottom:12px;">${folderCardHTML(pct, (subj?'📘 ':'📁 ')+esc(f.name)+shb, `${nF?nF+' સબફોલ્ડર · ':''}${nT} ટેસ્ટ — ખોલવા ટેપ કરો →${loose?'<br><span style="color:var(--warning,#e0a020);">⚠ ટેસ્ટ સીધી છે — ✎ માં "વિષય" બનાવો</span>':''}`, editCode, `mqOpenFolder('${f.id}')`, det)}</div>`;
+  return folderCardHTML(pct, '📁 '+esc(f.name)+shb, `${nF?nF+' ફોલ્ડર · ':''}${nSub} વિષય — ખોલવા ટેપ કરો →${warn}`, editCode, `mqOpenFolder('${f.id}')`, det).replace('<div class="card cursor-pointer"','<div class="card cursor-pointer" style="margin-bottom:12px;"');
 }
 function dashboardQuizPages(exam){
   const tests = mqExamTests(mqExamId());
