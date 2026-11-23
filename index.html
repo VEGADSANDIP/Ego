@@ -51,7 +51,7 @@ body{
 input, textarea{
   -webkit-user-select:text; user-select:text; -webkit-touch-callout:default;
 }
-.app-shell{max-width:480px;margin:0 auto;position:relative;height:100vh; height:100dvh; background:var(--bg); display:flex; flex-direction:column; overflow:hidden;}
+.app-shell{max-width:480px;margin:0 auto;position:fixed;top:0;bottom:0;left:0;right:0; background:var(--bg); display:flex; flex-direction:column; overflow:hidden;}
 @media (min-width:600px){ .app-shell{box-shadow:var(--shadow);} body{background:var(--surface2);} }
 .hidden{display:none !important;}
 .mt-8{margin-top:8px;} .mt-10{margin-top:10px;} .mt-12{margin-top:12px;} .mt-14{margin-top:14px;} .mb-6{margin-bottom:6px;} .m-0{margin:0;}
@@ -525,8 +525,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.23-20';
-const APP_BUILT = '2026-11-23T15:46:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.23-23';
+const APP_BUILT = '2026-11-23T16:33:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -2277,7 +2277,6 @@ function openSectionForm(id, examId){
   openSheet(`
     <h3>${sec?'વિભાગ એડિટ':'નવો વિભાગ'}</h3>
     <div class="field"><label>વિભાગનું નામ</label><input type="text" id="f_name" value="${sec?esc(sec.name):''}" placeholder="દા.ત. સામાન્ય જ્ઞાન"></div>
-    ${sec?`<button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="shOpen('section','${id}')">🔗 બીજી પરીક્ષામાં શેર કરો${shIsShared('section',id)?' ('+(shHolders('section',id).length-1)+')':''}</button>`:''}
     <div class="sheet-actions">
       ${sec?`<button class="btn btn-danger" onclick="deleteSection('${id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveSection(${sec?`'${id}'`:'null'},'${exId}')">સેવ કરો</button>
@@ -2861,6 +2860,7 @@ const SET_ROWS = [
   ['notif','🔔','નોટિફિકેશન',()=>notificationStatusText()],
   ['lock','🔒','પાસવર્ડ સુરક્ષા',()=>lockHasPw()?'ચાલુ':'સેટ નથી'],
   ['data','💾','ડેટા અને સ્ટોરેજ',()=>{ const u=storageUsage(); return storageMB(u.chars)+' વપરાયું'; }],
+  ['share','🔗','શેર',()=>'બીજી પરીક્ષા સાથે શેર મેનેજમેન્ટ'],
   ['xport','📤','એક્સપોર્ટ / ઇમ્પોર્ટ',()=>'બેકઅપ · પરીક્ષા · ટેસ્ટ · નકશો'],
   ['maint','🧹','જાળવણી',()=>'ઇતિહાસ ટૂંકો, છૂટો ડેટા સાફ'],
   ['about','ℹ️','એપ વિશે',()=>'વર્ઝન '+APP_VERSION]
@@ -2882,6 +2882,7 @@ function setPageBody(p){
      ${(('Notification' in window) && Notification.permission==='granted') ? `<button class="btn btn-secondary btn-block" onclick="showAppNotification('ટેસ્ટ ✅','આ એક ટેસ્ટ નોટિફિકેશન છે','test')">ટેસ્ટ નોટિફિકેશન મોકલો</button>` : ''}`);
   if(p==='lock') return card('પાસવર્ડ સુરક્ષા', lockCardHTML()) + `<div class="ink-dim fs-12">પાસવર્ડ એક્સપોર્ટ, ઇમ્પોર્ટ, સાફ-સફાઈ અને રીસેટ વખતે પૂછાય છે.</div>`;
   if(p==='data') return card('સ્ટોરેજ 💾', storageCardHTML()) + card('📂 ડેટા કેટલી જગ્યા રોકે છે', `<div id="stTree">${stTreeHTML()}</div><div class="ink-dim fs-12 mt-8">ટેપ કરીને અંદર ખોલો. સાઇઝ આશરે (સેવ થતા લખાણ પ્રમાણે) છે.</div>`);
+  if(p==='share') return shMgrPageHTML();
   if(p==='xport') return xportPageHTML();
   if(p==='maint') return card('જાળવણી 🧹', `
      <button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="guard('ઇતિહાસ ટૂંકો કરવા માટે', openCompactSheet)">🧹 જૂનો ઇતિહાસ ટૂંકો કરો ${(DB.settings&&DB.settings.compactOn)?'(✓ ચાલુ)':''}</button>
@@ -3791,6 +3792,7 @@ function mqPickRender(){
     <div style="display:flex; gap:8px; margin-bottom:8px;">
       <button class="btn btn-sm btn-secondary" onclick="mqPickAll(true)">બધી</button>
       <button class="btn btn-sm btn-secondary" onclick="mqPickAll(false)">કોઈ નહીં</button>
+      <button class="btn btn-sm btn-secondary" data-tip="ફોલ્ડર/વિષય ખસેડો-ડિલીટ" onclick="mgOpen()">🗂</button>
       <span class="ink-dim fs-12" style="margin-left:auto; align-self:center;"><b>${sel.length}</b> ટેસ્ટ · <b>${nQ}</b> પ્રશ્નો</span>
     </div>
     <div id="mqPickList" style="max-height:46vh; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${mqPickTree(mqFolderId,0)}</div>
@@ -3832,19 +3834,26 @@ function mqMoveDo(){
 /* ===== આઇકન પર લાંબો દબાવો → નામ દેખાય ===== */
 (function(){
   let tm=null, fired=false;
-  const SEL = '[data-tip], .act-row button[title]';
-  const tipOf = el => el.getAttribute('data-tip') || el.getAttribute('title') || '';
+  const MAP = {'✎':'એડિટ','✏':'એડિટ','📑':'સબ-ટોપિક','🔁':'રિવિઝન','🔄':'બદલો','🧠':'MCQ ટેસ્ટ','🟢':'સ્થિતિ (પૂર્ણ)','🟡':'સ્થિતિ (ચાલુ)','🔴':'સ્થિતિ (શરૂ નથી)','⏱':'ટેસ્ટ','✍':'પ્રેક્ટિસ','🔥':'ચેલેન્જ','📖':'વાંચન','📄':'PDF','🔗':'ટોપિક જોડો','📍':'નકશા પર','📦':'ખસેડો','🗑':'ડિલીટ','▲':'ઉપર','▼':'નીચે','✕':'બંધ','✖':'બંધ','×':'બંધ','＋':'ઉમેરો','+':'ઉમેરો','←':'પાછા','⚙':'સેટિંગ્સ','✅':'પસંદ','🔍':'શોધો','⋮':'વધુ','⋯':'વધુ','📅':'તારીખ','🔔':'રિમાઇન્ડર','📷':'ફોટો','📤':'નિકાસ','📥':'આયાત','⬇':'ડાઉનલોડ','⬆':'અપલોડ','📋':'કોપી','💾':'સેવ','↩':'પાછું','↕':'ક્રમ બદલો','⭐':'મનપસંદ','🏠':'હોમ','📝':'નોંધ','🎯':'લક્ષ્ય','📊':'આંકડા','🗂':'ફોલ્ડર','📁':'ફોલ્ડર','📂':'વિભાગ'};
+  const SEL = 'button, .btn, [role=button], [data-tip]';
+  function tipOf(el){
+    const d = el.getAttribute('data-tip') || el.getAttribute('aria-label') || el.getAttribute('title'); if(d) return d;
+    const t = (el.textContent||'').trim(); if(!t || /\p{L}/u.test(t)) return '';
+    const ch = [...t.replace(/[0-9\s]/g,'')]; for(const c of ch){ const k = c.replace(/️/g,''); if(MAP[k]) return MAP[k]; }
+    return '';
+  }
   document.addEventListener('pointerdown', e=>{
     const b = e.target.closest && e.target.closest(SEL); if(!b){ return; }
     fired=false; clearTimeout(tm);
-    tm = setTimeout(()=>{ const t = tipOf(b); if(!t) return; fired=true;
+    const t = tipOf(b); if(!t) return;
+    tm = setTimeout(()=>{ fired=true;
       const r = b.getBoundingClientRect(); const d = document.createElement('div'); d.className='tip-bubble'; d.textContent=t;
-      d.style.left = Math.min(Math.max(r.left+r.width/2, 40), window.innerWidth-40)+'px'; d.style.top = (r.top-6)+'px';
+      d.style.left = Math.min(Math.max(r.left+r.width/2, 40), window.innerWidth-40)+'px'; d.style.top = Math.max(r.top-6, 30)+'px';
       document.body.appendChild(d); setTimeout(()=>d.remove(), 1500); }, 380);
   }, true);
   ['pointerup','pointercancel','scroll'].forEach(ev=>document.addEventListener(ev, ()=>clearTimeout(tm), true));
   document.addEventListener('click', e=>{ if(fired && e.target.closest && e.target.closest(SEL)){ e.stopPropagation(); e.preventDefault(); } fired=false; }, true);
-  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest(SEL)) e.preventDefault(); });
+  document.addEventListener('contextmenu', e=>{ const b = e.target.closest && e.target.closest(SEL); if(b && tipOf(b)) e.preventDefault(); });
 })();
 function mqPickDelete(){
   const ids = new Set([...mqPickSel].filter(id=>DB.qtests.some(t=>t.id===id)));
@@ -3917,6 +3926,102 @@ function exPickDelete(){
     DB.subjects.forEach(x=>{ if(x.folderId===id) x.folderId = up; }); sfAll().forEach(x=>{ if(x.parentId===id) x.parentId = up; });
     DB.sfolders = sfAll().filter(x=>x.id!==id); if(subjFolderId===id) subjFolderId = up; });
   exPickSel = new Set(); save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+
+/* ===== MCQ: ફોલ્ડર/વિષય/ટેસ્ટ પસંદ કરી ખસેડો કે ડિલીટ ===== */
+var mgSel = new Set();
+function mgRows(fid, depth){
+  let h = '';
+  mqFolders(fid).forEach(f=>{ if(mqIsPathOnly(f.id)) return; const subj = mqIsSubj(f);
+    h += `<label class="mq-pick-row mq-pick-folder" style="padding-left:${depth*16}px;"><input type="checkbox" ${mgSel.has('f:'+f.id)?'checked':''} onchange="mgToggle('f:${f.id}')"><span style="flex:1;min-width:0;">${subj?'📘':'📁'} ${esc(f.name)}</span></label>`;
+    h += mgRows(f.id, depth+1); });
+  mqTests(fid).forEach(t=>{ h += `<label class="mq-pick-row" style="padding-left:${depth*16}px;"><input type="checkbox" ${mgSel.has('t:'+t.id)?'checked':''} onchange="mgToggle('t:${t.id}')"><span style="flex:1;min-width:0;">${esc(t.name)}</span><span class="ink-dim fs-12">${t.questions.length}</span></label>`; });
+  return h;
+}
+function mgToggle(k){ if(mgSel.has(k)) mgSel.delete(k); else mgSel.add(k); mgOpen(true); }
+function mgOpen(keep){
+  if(!keep) mgSel = new Set();
+  const sc = (document.querySelector('#mgList')||{}).scrollTop || 0;
+  const n = mgSel.size, dis = n ? '' : 'disabled';
+  openSheet(`<div class="sheet-title">🗂 ફોલ્ડર / વિષય / ટેસ્ટ પસંદ કરો</div>
+    <div class="ink-dim fs-12 mb-6"><b>${n}</b> પસંદ કર્યા · ફોલ્ડર કે વિષય પસંદ કરો તો અંદરનું બધું સાથે ખસે</div>
+    <div id="mgList" style="max-height:46vh; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:4px 8px;">${mgRows(mqFolderId||null, 0) || '<div class="ink-dim" style="padding:10px;">કંઈ નથી</div>'}</div>
+    <div class="pk-bar"><button class="btn btn-secondary" ${dis} data-tip="ખસેડો" onclick="mgMoveOpen()">📦</button><button class="btn btn-secondary" ${dis} data-tip="ડિલીટ" onclick="mgDelete()">🗑</button></div>`);
+  const l = document.getElementById('mgList'); if(l) l.scrollTop = sc;
+}
+function mgSplit(){ const fs = [...mgSel].filter(k=>k[0]==='f').map(k=>k.slice(2)), ts = [...mgSel].filter(k=>k[0]==='t').map(k=>k.slice(2)); return {fs, ts}; }
+function mgMoveOpen(){
+  const {fs, ts} = mgSplit();
+  if(ts.length && fs.length){ toast('ટેસ્ટ અને ફોલ્ડર/વિષય એકસાથે નહીં — અલગ અલગ ખસેડો','error'); return; }
+  const ban = new Set(); fs.forEach(id=>mqCollectFolderIds(id).forEach(x=>ban.add(x)));
+  const hasSubj = fs.some(id=>mqIsSubj(id)), hasFold = fs.some(id=>!mqIsSubj(id));
+  const opts = []; 
+  if(fs.length && !hasSubj) opts.push(`<option value="">📂 (મુખ્ય — વિભાગ તરીકે)</option>`);
+  const walk = (pid, trail)=>mqFolders(pid).forEach(f=>{ if(mqIsPathOnly(f.id) || ban.has(f.id)) return; const t2 = trail.concat([f.name]); const subj = mqIsSubj(f);
+    const ok = ts.length ? subj : !subj;
+    if(ok) opts.push(`<option value="${f.id}">${subj?'📘':'📁'} ${esc(t2.join(' › '))}</option>`);
+    if(!subj) walk(f.id, t2); });
+  walk(null, []);
+  if(!opts.length){ toast(ts.length ? 'પહેલાં કોઈ વિષય બનાવો' : 'ખસેડવા માટે કોઈ જગ્યા નથી','error'); return; }
+  openSheet(`<h3>📦 ખસેડો</h3><div class="ink-dim fs-12 mb-6"><b>${mgSel.size}</b> વસ્તુ નવી જગ્યાએ જશે. ટેસ્ટનો બધો ડેટા (પ્રયત્નો, રિવિઝન, ટોપિક લિંક) એમ જ રહે.</div>
+    <div class="field"><label>ક્યાં?</label><select id="f_mgTo">${opts.join('')}</select></div>
+    <div class="sheet-actions"><button class="btn btn-secondary" onclick="mgOpen(true)">← પાછા</button><button class="btn btn-primary btn-block" onclick="mgMoveDo()">ખસેડો</button></div>`);
+}
+function mgMoveDo(){
+  const {fs, ts} = mgSplit(); const to = val('f_mgTo') || null; const par = to ? DB.qfolders.find(x=>x.id===to) : null;
+  const ownerEx = par ? par.examId : mqExamId(); let n = 0;
+  ts.forEach(id=>{ const t = DB.qtests.find(x=>x.id===id); if(t && par && mqIsSubj(par)){ t.folderId = to; t.examId = ownerEx; n++; } });
+  fs.forEach(id=>{ const f = DB.qfolders.find(x=>x.id===id); if(!f) return; const ids = mqCollectFolderIds(id); if(to && ids.includes(to)) return;
+    if(mqIsSubj(f) && !to) return;
+    f.parentId = to; DB.qfolders.forEach(x=>{ if(ids.includes(x.id)) x.examId = ownerEx; }); DB.qtests.forEach(t=>{ if(ids.includes(t.folderId)) t.examId = ownerEx; }); n++; });
+  mgSel = new Set(); _mqSetsCache = null; save(); closeSheet(); renderMain(); toast(`${n} ખસેડાયું ✅`);
+}
+function mgDelete(){
+  const {fs, ts} = mgSplit();
+  const allF = new Set(); fs.forEach(id=>mqCollectFolderIds(id).forEach(x=>allF.add(x)));
+  const tIds = new Set(ts); DB.qtests.forEach(t=>{ if(allF.has(t.folderId)) tIds.add(t.id); });
+  if(!confirm(`${fs.length} ફોલ્ડર/વિષય અને કુલ ${tIds.size} ટેસ્ટ (અંદરની બધી, પ્રશ્નો/પ્રયત્નો/રિવિઝન સાથે) કાયમ ડિલીટ થશે. ચાલુ રાખવું છે?`)) return;
+  DB.qtests = DB.qtests.filter(t=>!tIds.has(t.id)); DB.qrevs = (DB.qrevs||[]).filter(r=>!tIds.has(r.testId));
+  DB.qfolders = DB.qfolders.filter(f=>!allF.has(f.id)); if(allF.has(mqFolderId)) mqFolderId = null;
+  mgSel = new Set(); _mqSetsCache = null; save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
+}
+/* ===== સેટિંગ્સ → શેર મેનેજમેન્ટ ===== */
+var shMgrSrc = null, shMgrDst = null;
+function shMgrInit(){
+  const ex = DB.exams; if(!shMgrSrc || !ex.some(e=>e.id===shMgrSrc)) shMgrSrc = ((getActiveExam()||ex[0]||{}).id)||null;
+  if(!shMgrDst || shMgrDst===shMgrSrc || !ex.some(e=>e.id===shMgrDst)){ const o = ex.find(e=>e.id!==shMgrSrc); shMgrDst = o ? o.id : null; }
+}
+var shMgrTab = 'mcq', shMgrOpen = new Set();
+function shMgrKids(pid){ return DB.qfolders.filter(f=>f.examId===shMgrSrc && (f.parentId||null)===(pid||null)); }
+function shMgrRow(kind, o, depth, ico){
+  const on = shTargets(kind, o.id).includes(shMgrDst);
+  const hasKids = kind==='qfolder' && shMgrKids(o.id).length>0, open = shMgrOpen.has(o.id);
+  return `<div class="mq-pick-row" style="padding-left:${depth*18}px; gap:8px;">
+    <span onclick="shMgrExp('${o.id}')" style="width:22px; text-align:center; cursor:pointer; opacity:${hasKids?1:.2};">${hasKids?(open?'▾':'▸'):'·'}</span>
+    <input type="checkbox" ${on?'checked':''} onchange="shMgrToggle('${kind}','${o.id}',this.checked)">
+    <span style="flex:1;min-width:0;cursor:pointer;" onclick="shMgrExp('${o.id}')">${ico} ${esc(o.name)}</span>${on?'<span class="ink-dim fs-12">🔗</span>':''}</div>`;
+}
+function shMgrQ(pid, depth){ let h=''; shMgrKids(pid).forEach(f=>{ h += shMgrRow('qfolder', f, depth, mqIsSubj(f)?'📘':(f.parentId?'📁':'📂')); if(shMgrOpen.has(f.id)) h += shMgrQ(f.id, depth+1); }); return h; }
+function shMgrExp(id){ if(shMgrOpen.has(id)) shMgrOpen.delete(id); else shMgrOpen.add(id); renderMain(); }
+function shMgrToggle(kind, id, on){
+  const cur = new Set(shTargets(kind, id)); if(on){ cur.add(shMgrDst); if(kind==='qfolder') shMgrOpen.add(id); } else cur.delete(shMgrDst);
+  shSet(kind, id, [...cur]); save(); renderMain();
+}
+function shMgrPageHTML(){
+  shMgrInit();
+  if(DB.exams.length<2) return card('🔗 શેર', `<div class="ink-dim">શેર કરવા માટે ઓછામાં ઓછી બે પરીક્ષા જોઈએ.</div>`);
+  const sel = (fn, cur, list)=>`<select onchange="${fn}=this.value; renderMain();" style="flex:1; min-width:0; padding:8px 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit;">${list.map(e=>`<option value="${e.id}" ${e.id===cur?'selected':''}>${esc(e.name)}</option>`).join('')}</select>`;
+  const secs = DB.sections.filter(x=>x.examId===shMgrSrc);
+  const body = shMgrTab==='exam'
+    ? (secs.length ? secs.map(sc=>shMgrRow('section', sc, 0, '📂')).join('') : '<div class="ink-dim" style="padding:8px;">કોઈ વિભાગ નથી</div>')
+    : (DB.qfolders.some(f=>f.examId===shMgrSrc) ? shMgrQ(null,0) : '<div class="ink-dim" style="padding:8px;">કોઈ વિભાગ નથી</div>');
+  return `<div class="card">
+    <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;"><span class="ink-dim fs-12" style="width:34px;">માંથી</span>${sel('shMgrSrc', shMgrSrc, DB.exams)}</div>
+    <div style="display:flex; gap:6px; align-items:center;"><span class="ink-dim fs-12" style="width:34px;">માં</span>${sel('shMgrDst', shMgrDst, DB.exams.filter(e=>e.id!==shMgrSrc))}</div>
+    <div class="seg" style="margin:10px 0 8px;"><button class="${shMgrTab==='mcq'?'on':''}" onclick="shMgrTab='mcq'; renderMain();">🧠 MCQ</button><button class="${shMgrTab==='exam'?'on':''}" onclick="shMgrTab='exam'; renderMain();">🎓 પરીક્ષા</button></div>
+    <div class="ink-dim fs-12 mb-6">ટિક કરો → બીજી પરીક્ષામાં શેર, અને અંદરનું ખુલે. ▸ દબાવી ખોલ-બંધ કરો. ટિક કાઢો → શેર બંધ.</div>
+    <div style="border:1px solid var(--border); border-radius:12px; padding:2px 8px;">${body}</div>
+  </div>`;
 }
 function mqPickGo(id, mode){
   closeSheet();
@@ -4025,13 +4130,8 @@ function openQFolderForm(id, kind){
   openSheet(`
     <h3>${f?word+' એડિટ':'નવો '+word} ${curKind==='subject'&&!isTop?'📘':'📁'}</h3>
     <div class="field"><label>નામ</label><input type="text" id="f_qfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: ${isTop?'કોમ્પ્યુટર':(curKind==='subject'?'કમ્પ્યુટરનો ઇતિહાસ':'કોમ્પ્યુટર બેઝિક')}"></div>
-    ${isTop?'':`<div class="field"><label>પ્રકાર</label><select id="f_qfkind">
-      <option value="folder" ${curKind==='folder'?'selected':''}>📁 ફોલ્ડર — અંદર ફોલ્ડર/વિષય રહે</option>
-      <option value="subject" ${curKind==='subject'?'selected':''}>📘 વિષય — અંદર ટેસ્ટ રહે</option></select>
-      ${f?`<div class="ink-dim fs-12" style="margin-top:4px;">ફોલ્ડર ↔ વિષય ફેરવી શકાય. ડેટા ગુમાવાતો નથી.${nT?` અત્યારે અંદર ${nT} ટેસ્ટ છે.`:''}</div>`:''}</div>`}
-    <div class="field"><label>ક્યાં રાખવું?</label><select id="f_qfparent">${mqFolderOptions(f ? (f.parentId||'') : (mqFolderId||''), id, 'parent')}</select></div>
-    ${f?`<button class="btn btn-secondary btn-block" onclick="tlOpenFolder('${f.id}')">🔗 આ ${word}ની બધી ટેસ્ટ સાથે ટોપિક જોડો</button>
-    <button class="btn btn-secondary btn-block" style="margin-top:6px;" onclick="shOpen('qfolder','${f.id}')">🔗 બીજી પરીક્ષામાં શેર કરો${shIsShared('qfolder',f.id)?' ('+(shHolders('qfolder',f.id).length-1)+')':''}</button>`:''}
+    <input type="hidden" id="f_qfparent" value="${f ? (f.parentId||'') : (mqFolderId||'')}">
+    ${isTop?'':`<input type="hidden" id="f_qfkind" value="${curKind}">`}
     <div class="sheet-actions">
       ${f?`<button class="btn btn-danger" onclick="deleteQFolder('${f.id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveQFolder(${f?`'${f.id}'`:'null'})">સેવ કરો</button>
@@ -4078,7 +4178,7 @@ function openQTestForm(id){
   openSheet(`
     <h3>${t?'ટેસ્ટ એડિટ':'નવી MCQ ટેસ્ટ'} 🧠</h3>
     <div class="field"><label>ટેસ્ટનું નામ</label><input type="text" id="f_qtname" value="${t?esc(t.name):''}" placeholder="જેમ કે: Test 65"></div>
-    <div class="field"><label>કયા વિષયમાં?</label><select id="f_qtfolder">${mqFolderOptions(t ? (t.folderId||'') : (mqFolderId||''), null, 'home')}</select></div>
+    <input type="hidden" id="f_qtfolder" value="${t ? (t.folderId||'') : (mqFolderId||'')}">
     <div class="field"><label>પ્રશ્નો (PDF માંથી કોપી કરીને પેસ્ટ કરો)</label>
       <textarea class="mq-ta" id="f_qttext" oninput="mqPreview()" placeholder="1) પ્રશ્ન...&#10;(A) ... (B) ...&#10;(C) ... (D) ...">${t?esc(mqQuestionsText(t.questions)):''}</textarea></div>
     <div class="field"><label>જવાબ ચાવી (દા.ત. DACBBC… અથવા 1-D 2-A 3-A…)</label>
@@ -6426,6 +6526,12 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('service-worker.js').catch(function(e){ console.error('SW register failed', e); });
   });
 }
+
+/* ===== દરેક ડિલીટ પહેલાં ફિંગરપ્રિન્ટ/પાસવર્ડ (guard) ===== */
+['deleteStudyLog','deleteSFolder','deleteExam','deleteSection','deleteSubject','deleteTopic','deleteSubtopic','deleteRevision','deleteQFolder','deleteQTest','deleteQQuestion','deleteMapCat','deleteMapPlace','mqPickDelete','exPickDelete','mgDelete'].forEach(n=>{
+  const o = window[n]; if(typeof o!=='function') return;
+  window[n] = function(){ const a = arguments, t = this; guard('ડિલીટ કરવા માટે', ()=>o.apply(t, a)); };
+});
 </script>
 </body>
 </html>
