@@ -291,7 +291,7 @@ a{color:inherit;}
 .mq-chips span.ch-test{background:color-mix(in srgb, #3b82f6 20%, transparent); color:var(--ink);}
 .mq-chips span.ch-prac{background:color-mix(in srgb, #22c55e 20%, transparent); color:var(--ink);}
 .mq-chips span.ch-total{background:color-mix(in srgb, #a855f7 22%, transparent); color:var(--ink); font-weight:700;}
-.mq-revchip{font-size:12px; line-height:1.35; padding:4px 10px; border-radius:8px; background:color-mix(in srgb, #14b8a6 20%, transparent); color:var(--ink); flex:1; min-width:0;}
+.mq-revchip{font-size:12px; line-height:1.35; padding:4px 10px; border-radius:8px; background:color-mix(in srgb, #14b8a6 20%, transparent); color:var(--ink); flex:0 1 auto; min-width:0; max-width:100%;}
 .mq-chips span.ch-fire{background:color-mix(in srgb, #ff7a1a 18%, transparent); color:var(--ink);}
 .topic-row-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px; font-size:15px;}
 .topic-name{flex:1; min-width:0; font-weight:600; line-height:1.4; word-break:break-word; padding-top:4px;}
@@ -531,8 +531,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.24-28';
-const APP_BUILT = '2026-11-24T08:41:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.24-29';
+const APP_BUILT = '2026-11-24T14:20:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -5071,7 +5071,7 @@ function mqRevLineHTML(t){
   const bits = [];
   if(last) bits.push(`🔁 છેલ્લું રિવિઝન: ${formatDate(last)}`);
   if(tot) bits.push(`${done}/${tot} પૂર્ણ`);
-  return (bits.length||next)?`<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">${bits.length?`<span class="mq-revchip">${bits.join(' · ')}</span>`:'<span style="flex:1;"></span>'}${next?`<span class="badge ${overdue?'badge-danger':'badge-warning'}">${overdue?'મોડું · ':'આગામી · '}${formatDateShort(next.dueDate)}</span>`:''}</div>`:'';
+  return (bits.length||next)?`<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">${bits.length?`<span class="mq-revchip">${bits.join(' · ')}</span>`:'<span style="flex:1;"></span>'}${next?`<span class="badge ${overdue?'badge-danger':'badge-warning'}" style="margin-left:auto;">${overdue?'મોડું · ':'આગામી · '}${formatDateShort(next.dueDate)}</span>`:''}</div>`:'';
 }
 function openQTestRevisionSheet(testId){
   const t = mqGetTest(testId); if(!t) return;
