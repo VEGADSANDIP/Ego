@@ -209,6 +209,8 @@ a{color:inherit;}
 .mq-name{font-weight:800; font-size:15.5px; line-height:1.35; word-break:break-word;}
 .mq-meta{font-size:12.5px; color:var(--ink-dim); margin-top:3px;}
 .mq-res{font-size:12px; color:var(--ink-dim); margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);}
+.mv-row{display:flex; align-items:center; gap:8px; padding:13px 12px; border-bottom:1px solid var(--border); cursor:pointer; font-weight:600;}
+.mv-row:last-child{border-bottom:none;}
 .pk-bar{display:flex; gap:6px; margin-top:12px;}
 .pk-bar .btn{flex:1; min-width:0; padding:10px 0; font-size:20px; line-height:1; justify-content:center; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;}
 .tip-bubble{position:fixed; z-index:99999; background:#111; color:#fff; border:1px solid #555; padding:5px 10px; border-radius:8px; font-size:13px; font-weight:700; transform:translate(-50%,-100%); pointer-events:none; white-space:nowrap;}
@@ -529,8 +531,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.24-26';
-const APP_BUILT = '2026-11-24T08:20:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.24-27';
+const APP_BUILT = '2026-11-24T08:32:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1670,7 +1672,7 @@ function openSFolderForm(id, sectionId){
   openSheet(`
     <h3>${f?'ફોલ્ડર એડિટ':'નવું ફોલ્ડર'} 📁</h3>
     <div class="field"><label>નામ</label><input type="text" id="f_sfname" value="${f?esc(f.name):''}" placeholder="જેમ કે: ઇતિહાસ"></div>
-    <div class="field"><label>ક્યાં રાખવું?</label><select id="f_sfparent">${sfFolderOptions(secId, parent, id)}</select></div>
+    <input type="hidden" id="f_sfparent" value="${parent}">
     <div class="sheet-actions">
       ${f?`<button class="btn btn-danger" onclick="deleteSFolder('${f.id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveSFolder(${f?`'${f.id}'`:'null'},'${secId}')">સેવ કરો</button>
@@ -2280,10 +2282,8 @@ function openSubjectForm(id, examId, sectionId){
   openSheet(`
     <h3>${s?'વિષય એડિટ':'નવો વિષય'}</h3>
     <div class="field"><label>વિષયનું નામ</label><input type="text" id="f_name" value="${s?esc(s.name):''}"></div>
-    <div class="field"><label>કયા વિભાગમાં?</label><select id="f_section" onchange="document.getElementById('f_sfolder').innerHTML=sfFolderOptions(this.value,'')">
-      ${sections.map(sec=>`<option value="${sec.id}" ${(currentSectionId===sec.id || (!currentSectionId && sec.id===sections[0].id))?'selected':''}>📂 ${esc(sec.name)}</option>`).join('')}
-    </select></div>
-    <div class="field"><label>કયા ફોલ્ડરમાં?</label><select id="f_sfolder">${sfFolderOptions(currentSectionId || sections[0].id, s ? (s.folderId||'') : (subjFolderId||''))}</select></div>
+    <input type="hidden" id="f_section" value="${currentSectionId || sections[0].id}">
+    <input type="hidden" id="f_sfolder" value="${s ? (s.folderId||'') : (subjFolderId||'')}">
     <div class="sheet-actions">
       ${s?`<button class="btn btn-danger" onclick="deleteSubject('${id}')">ડિલીટ</button>`:''}
       <button class="btn btn-primary btn-block" onclick="saveSubject(${s?`'${id}'`:'null'},'${exId}')">સેવ કરો</button>
@@ -3855,15 +3855,7 @@ function mqPickAll(on){ mqPickSel = new Set(on ? mqPickTestsUnder(mqFolderId).ma
 function mqMoveOpen(){
   const ids = [...mqPickSel].filter(id=>DB.qtests.some(t=>t.id===id));
   if(!ids.length){ toast('પહેલાં ટેસ્ટ પસંદ કરો','error'); return; }
-  const opts = []; let n = 0;
-  const walk = (pid, trail)=>{ mqFolders(pid).forEach(f=>{ if(mqIsPathOnly(f.id)) return; const t2 = trail.concat([f.name]);
-    if(mqIsSubj(f)){ n++; opts.push(`<option value="${f.id}">📘 ${esc(t2.join(' › '))}</option>`); } else walk(f.id, t2); }); };
-  walk(null, []);
-  if(!n){ toast('પહેલાં કોઈ વિભાગ → ફોલ્ડર → વિષય બનાવો','error'); return; }
-  openSheet(`<h3>📦 ટેસ્ટ ખસેડો</h3>
-    <div class="ink-dim fs-12 mb-6"><b>${ids.length}</b> ટેસ્ટ નવા વિષયમાં જશે. ટેસ્ટનો કોઈ ડેટા બદલાતો નથી.</div>
-    <div class="field"><label>કયા વિષયમાં?</label><select id="f_mvTarget">${opts.join('')}</select></div>
-    <div class="sheet-actions"><button class="btn btn-secondary" onclick="mqPickRender()">← પાછા</button><button class="btn btn-primary btn-block" onclick="mqMoveDo()">ખસેડો</button></div>`);
+  mgSel = new Set(ids.map(i=>'t:'+i)); window._mgFromPick = true; mgMoveOpen();
 }
 function mqMoveDo(){
   const to = val('f_mvTarget'); const fo = DB.qfolders.find(x=>x.id===to); if(!fo || !mqIsSubj(fo)){ toast('વિષય પસંદ કરો','error'); return; }
@@ -3933,18 +3925,22 @@ function exMoveOpen(){
   const sec = DB.sections.find(x=>x.id===sectionDetailId); if(!sec) return;
   const selF = [...exPickSel].filter(k=>k[0]==='f').map(k=>k.slice(2));
   const ban = new Set(); selF.forEach(id=>sfDescIds(id).forEach(x=>ban.add(x)));
-  const opts = [];
-  examSections(sec.examId).forEach(sc=>{
-    opts.push(`<option value="${sc.id}|">📂 ${esc(sc.name)}</option>`);
-    const walk = (pid, trail)=>sfChildren(sc.id, pid).forEach(f=>{ if(ban.has(f.id)) return; const t2 = trail.concat([f.name]); opts.push(`<option value="${sc.id}|${f.id}">📁 ${esc(sc.name+' › '+t2.join(' › '))}</option>`); walk(f.id, t2); });
-    walk(null, []);
-  });
-  openSheet(`<h3>📦 ખસેડો</h3><div class="ink-dim fs-12 mb-6"><b>${exPickSel.size}</b> વસ્તુ નવી જગ્યાએ જશે. ટોપિક, રિવિઝન બધો ડેટા એમ જ રહે.</div>
-    <div class="field"><label>ક્યાં?</label><select id="f_exMv">${opts.join('')}</select></div>
-    <div class="sheet-actions"><button class="btn btn-secondary" onclick="exPickOpen(true)">← પાછા</button><button class="btn btn-primary btn-block" onclick="exMoveDo()">ખસેડો</button></div>`);
+  const fol = id=>sfAll().find(x=>x.id===id);
+  mvOpen({ title:'ખસેડો', mode:'folder', back:()=>exPickOpen(true),
+    info:`<b>${exPickSel.size}</b> વસ્તુ — વિભાગ → ફોલ્ડર ખોલતાં જાઓ અને "📍 અહીં ખસેડો" દબાવો. ટોપિક/રિવિઝનનો ડેટા એમ જ રહે.`,
+    items:(loc)=>{
+      if(loc==null) return examSections(sec.examId).map(x=>({id:'s:'+x.id, name:x.name, ico:'📂', enter:true}));
+      const [k,id] = [loc[0], loc.slice(2)]; const secId = k==='s' ? id : (fol(id)||{}).sectionId; const pid = k==='s' ? null : id;
+      return sfChildren(secId, pid).filter(f=>!ban.has(f.id)).map(f=>({id:'f:'+f.id, name:f.name, ico:'📁', enter:true})); },
+    pathOf:(loc)=>{ if(loc==null) return []; const out=[]; let k=loc[0], id=loc.slice(2);
+      while(k==='f'){ const f=fol(id); if(!f) break; out.unshift(f.name); if(f.parentId){ id=f.parentId; } else { k='s'; id=f.sectionId; } }
+      const sc = DB.sections.find(x=>x.id===id); if(sc) out.unshift(sc.name); return out; },
+    parentOf:(loc)=>{ if(loc[0]==='s') return null; const f=fol(loc.slice(2)); return f ? (f.parentId ? 'f:'+f.parentId : 's:'+f.sectionId) : null; },
+    canHere:(loc)=>loc!=null,
+    onHere:(loc)=>{ const k=loc[0], id=loc.slice(2); if(k==='s') exMoveDo(id, null); else exMoveDo((fol(id)||{}).sectionId, id); } });
 }
-function exMoveDo(){
-  const [secId, fid0] = val('f_exMv').split('|'); const fid = fid0 || null; let n = 0;
+function exMoveDo(secId, fid){
+  fid = fid || null; let n = 0;
   [...exPickSel].forEach(k=>{
     const id = k.slice(2);
     if(k[0]==='s'){ const x = DB.subjects.find(y=>y.id===id); if(x){ x.sectionId = secId; x.folderId = fid; n++; } }
@@ -3956,7 +3952,7 @@ function exMoveDo(){
     f.parentId = fid; sfAll().forEach(y=>{ if(ids.has(y.id)) y.sectionId = secId; });
     DB.subjects.forEach(x=>{ if(ids.has(x.folderId)) x.sectionId = secId; }); n++;
   });
-  exPickSel = new Set(); save(); closeSheet(); renderMain(); toast(`${n} ખસેડાયું ✅`);
+  exPickSel = new Set(); mvNav = null; save(); closeSheet(); renderMain(); toast(`${n} ખસેડાયું ✅`);
 }
 function exPickDelete(){
   const subs = [...exPickSel].filter(k=>k[0]==='s').map(k=>k.slice(2)), fols = [...exPickSel].filter(k=>k[0]==='f').map(k=>k.slice(2));
@@ -3968,6 +3964,27 @@ function exPickDelete(){
   exPickSel = new Set(); save(); closeSheet(); renderMain(); toast('ડિલીટ થયું');
 }
 
+
+/* ===== ગૂગલ ફાઇલ-મેનેજર જેવું "ક્યાં ખસેડવું" — ક્લિક કરતાં અંદર જાઓ, પાછા આવો ===== */
+var mvNav = null;
+function mvOpen(cfg){ mvNav = cfg; cfg.loc = null; mvRender(); }
+function mvGo(loc){ mvNav.loc = (loc==='' ? null : loc); mvRender(); }
+function mvUp(){ if(mvNav.loc==null){ const b = mvNav.back; mvNav = null; if(b) b(); else closeSheet(); } else { mvNav.loc = mvNav.parentOf(mvNav.loc); mvRender(); } }
+function mvPick(id){ const c = mvNav; c.onHere(id, true); }
+function mvHere(){ const c = mvNav; if(c.canHere(c.loc)) c.onHere(c.loc, false); }
+function mvRender(){
+  const c = mvNav, items = c.items(c.loc), here = c.canHere(c.loc);
+  const rows = items.map(it=> it.enter
+      ? `<div class="mv-row" onclick="mvGo('${it.id}')"><span style="flex:1;min-width:0;">${it.ico} ${esc(it.name)}</span><span class="ink-dim">›</span></div>`
+      : (it.pick ? `<div class="mv-row"><span style="flex:1;min-width:0;">${it.ico} ${esc(it.name)}</span><button class="btn btn-sm btn-primary" onclick="mvPick('${it.id}')">અહીં ખસેડો</button></div>`
+                 : `<div class="mv-row" style="opacity:.45;"><span style="flex:1;min-width:0;">${it.ico} ${esc(it.name)}</span></div>`)).join('');
+  openSheet(`<h3>📦 ${c.title}</h3>
+    <div class="ink-dim fs-12 mb-6">${c.info}</div>
+    <div class="mq-crumb" style="margin-bottom:6px;">📍 ${c.pathOf(c.loc).map(esc).join(' › ') || 'બધા વિભાગ'}</div>
+    <div id="mvList" style="max-height:42vh; overflow:auto; border:1px solid var(--border); border-radius:12px;">${rows || '<div class="ink-dim" style="padding:14px;">અહીં અંદર કંઈ નથી</div>'}</div>
+    <div class="sheet-actions" style="margin-top:10px;"><button class="btn btn-secondary" onclick="mvUp()">← ${c.loc==null?'પાછા':'ઉપર'}</button>
+      ${c.mode==='folder' ? `<button class="btn btn-primary btn-block" ${here?'':'disabled'} onclick="mvHere()">📍 અહીં ખસેડો</button>` : ''}</div>`);
+}
 /* ===== MCQ: ફોલ્ડર/વિષય/ટેસ્ટ પસંદ કરી ખસેડો કે ડિલીટ ===== */
 var mgSel = new Set();
 function mgRows(fid, depth){
@@ -3994,27 +4011,25 @@ function mgMoveOpen(){
   const {fs, ts} = mgSplit();
   if(ts.length && fs.length){ toast('ટેસ્ટ અને ફોલ્ડર/વિષય એકસાથે નહીં — અલગ અલગ ખસેડો','error'); return; }
   const ban = new Set(); fs.forEach(id=>mqCollectFolderIds(id).forEach(x=>ban.add(x)));
-  const hasSubj = fs.some(id=>mqIsSubj(id)), hasFold = fs.some(id=>!mqIsSubj(id));
-  const opts = []; 
-  if(fs.length && !hasSubj) opts.push(`<option value="">📂 (મુખ્ય — વિભાગ તરીકે)</option>`);
-  const walk = (pid, trail)=>mqFolders(pid).forEach(f=>{ if(mqIsPathOnly(f.id) || ban.has(f.id)) return; const t2 = trail.concat([f.name]); const subj = mqIsSubj(f);
-    const ok = ts.length ? subj : !subj;
-    if(ok) opts.push(`<option value="${f.id}">${subj?'📘':'📁'} ${esc(t2.join(' › '))}</option>`);
-    if(!subj) walk(f.id, t2); });
-  walk(null, []);
-  if(!opts.length){ toast(ts.length ? 'પહેલાં કોઈ વિષય બનાવો' : 'ખસેડવા માટે કોઈ જગ્યા નથી','error'); return; }
-  openSheet(`<h3>📦 ખસેડો</h3><div class="ink-dim fs-12 mb-6"><b>${mgSel.size}</b> વસ્તુ નવી જગ્યાએ જશે. ટેસ્ટનો બધો ડેટા (પ્રયત્નો, રિવિઝન, ટોપિક લિંક) એમ જ રહે.</div>
-    <div class="field"><label>ક્યાં?</label><select id="f_mgTo">${opts.join('')}</select></div>
-    <div class="sheet-actions"><button class="btn btn-secondary" onclick="mgOpen(true)">← પાછા</button><button class="btn btn-primary btn-block" onclick="mgMoveDo()">ખસેડો</button></div>`);
+  const hasSubj = fs.some(id=>mqIsSubj(id)), movingTests = ts.length>0;
+  const back = ()=>{ if(window._mgFromPick){ window._mgFromPick=false; mqPickRender(); } else mgOpen(true); };
+  mvOpen({ title:'ખસેડો', mode: movingTests ? 'pick' : 'folder', back,
+    info: movingTests ? `<b>${ts.length}</b> ટેસ્ટ — વિભાગ → ફોલ્ડર ખોલતાં જાઓ, અને જે વિષયમાં મૂકવી હોય ત્યાં "અહીં ખસેડો" દબાવો.` : `<b>${fs.length}</b> ફોલ્ડર/વિષય — ફોલ્ડરમાં જઈને "📍 અહીં ખસેડો" દબાવો.${hasSubj?'':' (મુખ્ય સ્તરે મૂકવું હોય તો સૌથી ઉપર જ ખસેડો.)'}`,
+    items: (loc)=>mqFolders(loc||null).filter(f=>!mqIsPathOnly(f.id) && !ban.has(f.id)).map(f=>{ const subj = mqIsSubj(f);
+      return {id:f.id, name:f.name, ico: subj?'📘':(f.parentId?'📁':'📂'), enter: !subj, pick: subj && movingTests}; }),
+    pathOf: (loc)=>mqFolderPath(loc||null),
+    parentOf: (loc)=>{ const f = DB.qfolders.find(x=>x.id===loc); return f ? (f.parentId||null) : null; },
+    canHere: (loc)=> movingTests ? false : (loc!=null || !hasSubj),
+    onHere: (id)=>mgMoveDo(id||'') });
 }
-function mgMoveDo(){
-  const {fs, ts} = mgSplit(); const to = val('f_mgTo') || null; const par = to ? DB.qfolders.find(x=>x.id===to) : null;
+function mgMoveDo(toId){
+  const {fs, ts} = mgSplit(); const to = toId || null; const par = to ? DB.qfolders.find(x=>x.id===to) : null;
   const ownerEx = par ? par.examId : mqExamId(); let n = 0;
   ts.forEach(id=>{ const t = DB.qtests.find(x=>x.id===id); if(t && par && mqIsSubj(par)){ t.folderId = to; t.examId = ownerEx; n++; } });
   fs.forEach(id=>{ const f = DB.qfolders.find(x=>x.id===id); if(!f) return; const ids = mqCollectFolderIds(id); if(to && ids.includes(to)) return;
     if(mqIsSubj(f) && !to) return;
     f.parentId = to; DB.qfolders.forEach(x=>{ if(ids.includes(x.id)) x.examId = ownerEx; }); DB.qtests.forEach(t=>{ if(ids.includes(t.folderId)) t.examId = ownerEx; }); n++; });
-  mgSel = new Set(); _mqSetsCache = null; save(); closeSheet(); renderMain(); toast(`${n} ખસેડાયું ✅`);
+  mgSel = new Set(); mqPickSel = new Set(); mvNav = null; _mqSetsCache = null; save(); closeSheet(); renderMain(); toast(`${n} ખસેડાયું ✅`);
 }
 function mgDelete(){
   const {fs, ts} = mgSplit();
