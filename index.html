@@ -563,8 +563,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.26-32';
-const APP_BUILT = '2026-11-26T18:26:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.26-33';
+const APP_BUILT = '2026-11-26T18:43:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -6402,6 +6402,51 @@ function populateBrand(){
   if(avatar){
     avatar.innerHTML = DB.settings.photoData ? `<img src="${DB.settings.photoData}" alt="photo">` : '📚';
   }
+  try{ applyDynamicManifest(); }catch(e){ console.error('manifest', e); }
+}
+/* ===== એપનું નામ + ફોટો → ઇન્સ્ટોલ વખતે વપરાતું manifest (ફોટો/નામ બદલો પછી ફરી ઇન્સ્ટોલ કરો ત્યારે નવું નામ/આઇકન મળે) ===== */
+var _dmSig = '', _dmUrl = null;
+function dmIcon(img, size, pad, bg){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const x = c.getContext('2d');
+  if(bg){ x.fillStyle = bg; x.fillRect(0,0,size,size); }
+  const inner = size - pad*2;
+  const r = Math.min(img.width, img.height);
+  x.drawImage(img, (img.width-r)/2, (img.height-r)/2, r, r, pad, pad, inner, inner);
+  return c.toDataURL('image/png');
+}
+function applyDynamicManifest(){
+  const name = (DB.settings.brandName || 'ExamPath').trim() || 'ExamPath';
+  const photo = DB.settings.photoData || '';
+  const sig = name + '|' + photo.length + '|' + photo.slice(-40);
+  if(sig === _dmSig) return;
+  _dmSig = sig;
+  document.title = name;
+  const at = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+  if(at) at.setAttribute('content', name);
+  const build = function(icons){
+    const base = new URL('./', location.href);
+    const startUrl = location.origin + location.pathname;
+    const scopeUrl = location.origin + location.pathname.replace(/[^\/]*$/, '');
+    const theme = (document.querySelector('meta[name="theme-color"]')||{}).content || '#2E3AA8';
+    const m = {name:name, short_name:Array.from(name).slice(0,12).join(''), start_url:startUrl, scope:scopeUrl, display:'standalone', lang:'gu', background_color:'#FFFFFF', theme_color:theme, icons:icons};
+    const link = document.querySelector('link[rel="manifest"]');
+    const blob = new Blob([JSON.stringify(m)], {type:'application/manifest+json'});
+    if(_dmUrl) { try{ URL.revokeObjectURL(_dmUrl); }catch(e){} }
+    _dmUrl = URL.createObjectURL(blob);
+    if(link) link.setAttribute('href', _dmUrl);
+  };
+  if(!photo){ return; } /* ફોટો ન હોય તો મૂળ manifest.json જ ચાલે */
+  const img = new Image();
+  img.onload = function(){
+    try{
+      const i192 = dmIcon(img,192,0,null), i512 = dmIcon(img,512,0,null), im = dmIcon(img,512,64,'#FFFFFF');
+      const ic = document.querySelector('link[rel="icon"]'); if(ic) ic.setAttribute('href', i192);
+      const ap = document.querySelector('link[rel="apple-touch-icon"]'); if(ap) ap.setAttribute('href', i192);
+      build([{src:i192, sizes:'192x192', type:'image/png', purpose:'any'}, {src:i512, sizes:'512x512', type:'image/png', purpose:'any'}, {src:im, sizes:'512x512', type:'image/png', purpose:'maskable'}]);
+    }catch(e){ console.error('dm icon', e); }
+  };
+  img.src = photo;
 }
 function triggerPhotoUpload(){
   document.getElementById('brandPhotoInput').click();
