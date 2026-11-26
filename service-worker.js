@@ -28,6 +28,7 @@ self.addEventListener('activate', function(e){
 
 self.addEventListener('fetch', function(e){
   if(e.request.method !== 'GET') return;
+  if(new URL(e.request.url).origin !== self.location.origin) return; /* Google Drive / બહારની વિનંતીઓ કેશ ન કરવી */
   e.respondWith(
     caches.match(e.request).then(function(cached){
       const fetchPromise = fetch(e.request).then(function(networkResponse){

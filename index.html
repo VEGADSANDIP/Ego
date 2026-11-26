@@ -402,6 +402,36 @@ a{color:inherit;}
 .dh-seg button{flex:1; border:none; background:transparent; color:var(--ink-dim); padding:11px 6px; border-radius:12px; font-weight:800; font-size:14px; font-family:inherit; transition:background .2s, color .2s, box-shadow .2s;}
 .dh-seg button.on.study{background:linear-gradient(135deg,var(--primary),#1B2680); color:#fff; box-shadow:0 4px 12px rgba(46,58,168,.35);}
 .dh-seg button.on.mcq{background:linear-gradient(135deg,#0F766E,#14B8A6); color:#fff; box-shadow:0 4px 12px rgba(15,118,110,.35);}
+/* ===== 🔔 નોટિફિકેશન (Instagram શૈલી) ===== */
+.tb-right{display:flex; align-items:center; gap:8px;}
+.tb-bell{position:relative; width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:var(--surface2); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;}
+.tb-bell i{position:absolute; top:-3px; right:-3px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:#ed4956; color:#fff; font:700 10.5px/17px sans-serif; text-align:center; font-style:normal; display:none; box-sizing:border-box; border:2px solid var(--surface);}
+.tb-bell i.on{display:block;}
+#nfStack{position:fixed; top:calc(8px + env(safe-area-inset-top)); left:10px; right:10px; z-index:400; display:flex; flex-direction:column; gap:8px; pointer-events:none;}
+.nf-pop{pointer-events:auto; display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:22px; background:color-mix(in srgb, var(--surface) 92%, transparent); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); color:var(--ink); box-shadow:0 8px 28px rgba(0,0,0,.22), 0 0 0 1px var(--border); transform:translateY(-130%); opacity:0; transition:transform .35s cubic-bezier(.2,.9,.3,1.2), opacity .25s ease; touch-action:pan-y; max-width:520px; margin:0 auto; width:100%;}
+.nf-pop.in{transform:translateY(0); opacity:1;}
+.nf-pop.out{transform:translateY(-130%); opacity:0; transition:transform .25s ease, opacity .2s ease;}
+.nf-av{position:relative; width:46px; height:46px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:22px; background:linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5); padding:2px;}
+.nf-av b{width:100%; height:100%; border-radius:50%; background:var(--surface); display:flex; align-items:center; justify-content:center; font-weight:400;}
+.nf-av.seen{background:var(--border);}
+.nf-tx{flex:1; min-width:0; line-height:1.3;}
+.nf-tx .t{font-weight:700; font-size:14px; display:flex; gap:6px; align-items:baseline;}
+.nf-tx .t em{font-style:normal; font-weight:400; font-size:11.5px; color:var(--ink-dim,#8e8e8e);}
+.nf-tx .b{font-size:13px; color:var(--ink-dim,#8e8e8e); margin-top:1px; word-break:break-word;}
+.nf-x{border:none; background:none; color:var(--ink-dim,#8e8e8e); font-size:18px; padding:4px 6px; cursor:pointer;}
+.nf-grp{font-weight:800; font-size:14px; margin:14px 2px 6px;}
+.nf-row{display:flex; align-items:center; gap:12px; padding:10px 2px; cursor:pointer; position:relative;}
+.nf-row .nf-tx .b{color:var(--ink);}
+.nf-row .nf-tx .tm{font-size:11.5px; color:var(--ink-dim,#8e8e8e); margin-top:2px;}
+.nf-dot{width:9px; height:9px; border-radius:50%; background:#0095f6; flex-shrink:0;}
+.nf-row .nf-del{border:none; background:none; color:var(--ink-dim,#8e8e8e); font-size:16px; padding:6px; cursor:pointer;}
+.nf-mod{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);}
+.nf-mod:last-child{border-bottom:none;}
+.nf-mod .set-ico{width:36px; height:36px; font-size:18px;}
+.nf-mod .mid{flex:1; min-width:0;} .nf-mod .mid b{display:block; font-size:14px;} .nf-mod .mid small{color:var(--ink-dim,#8e8e8e); font-size:11.5px; line-height:1.35; display:block;}
+.nf-time{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);}
+.nf-time input[type=time]{padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--ink); font-size:14px;}
+
 .toast{position:fixed; bottom:92px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13.5px; z-index:200; box-shadow:var(--shadow); max-width:85%; text-align:center;}
 .toast.hidden{display:none;}
 .toast-error{background:var(--danger); color:#fff;}
@@ -497,7 +527,8 @@ input:checked + .slider:before{transform:translateX(19px);}
         <span class="brand-avatar" id="brandAvatar" onclick="openBrandForm()">📚</span>
         <span class="brand" id="brandText" onclick="openBrandForm()"></span>
       </span>
-      <select id="examSwitcher" onchange="handleExamSwitcherChange(this)"></select>
+      <span class="tb-right"><button class="tb-bell" id="tbBell" onclick="nfOpenInbox()" data-tip="નોટિફિકેશન ઇનબોક્સ">🔔<i id="tbBellN"></i></button>
+      <select id="examSwitcher" onchange="handleExamSwitcherChange(this)"></select></span>
     </div>
   </header>
   <input type="file" id="brandPhotoInput" accept="image/*" style="display:none" onchange="handleBrandPhoto(event)">
@@ -513,6 +544,7 @@ input:checked + .slider:before{transform:translateX(19px);}
 </div>
 
 <div class="toast hidden" id="toast"></div>
+<div id="nfStack"></div>
 
 <script>
 /* ===================== DATA LAYER ===================== */
@@ -531,8 +563,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.24-29';
-const APP_BUILT = '2026-11-24T14:20:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.26-32';
+const APP_BUILT = '2026-11-26T18:26:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -616,6 +648,7 @@ async function flushSave(){
   try{
     if(useIDB) await idbSet(IDB_KEY, str); else localStorage.setItem(STORAGE_KEY, str);
     _lastSaveStr = str;
+    if(window.gdMarkDirty) gdMarkDirty();
     storageCheck(str.length);
   }catch(e){ storageFailed(e); }
 }
@@ -2892,9 +2925,10 @@ function navigateToRevisionDate(dateStr, revisionId){
 var setPage = null, stOpen = new Set();
 const SET_ROWS = [
   ['theme','🎨','દેખાવ',()=>DB.settings.theme==='dark'?'ડાર્ક મોડ ચાલુ':'લાઇટ મોડ'],
-  ['notif','🔔','નોટિફિકેશન',()=>notificationStatusText()],
+  ['notif','🔔','નોટિફિકેશન',()=>nfRowSub()],
   ['lock','🔒','પાસવર્ડ સુરક્ષા',()=>lockHasPw()?'ચાલુ':'સેટ નથી'],
   ['data','💾','ડેટા અને સ્ટોરેજ',()=>{ const u=storageUsage(); return storageMB(u.chars)+' વપરાયું'; }],
+  ['gdrive','☁️','Google Drive બેકઅપ',()=>gdRowSub()],
   ['share','🔗','શેર',()=>'બીજી પરીક્ષા સાથે શેર મેનેજમેન્ટ'],
   ['xport','📤','એક્સપોર્ટ / ઇમ્પોર્ટ',()=>'બેકઅપ · પરીક્ષા · ટેસ્ટ · નકશો'],
   ['maint','🧹','જાળવણી',()=>'ઇતિહાસ ટૂંકો, છૂટો ડેટા સાફ'],
@@ -2905,18 +2939,16 @@ function renderSettings(){
   if(!setPage) return `<h2>સેટિંગ્સ ⚙️</h2>
     <div class="card" style="padding:4px 14px;">${SET_ROWS.map(r=>`<div class="set-row" onclick="setOpen('${r[0]}')"><span class="set-ico">${r[1]}</span><span class="set-txt"><b>${r[2]}</b><small>${esc(String(r[3]()))}</small></span><span class="set-arr">›</span></div>`).join('')}
       <div class="set-row" onclick="guard('બધો ડેટા રીસેટ કરવા માટે', resetAllData)"><span class="set-ico">⚠️</span><span class="set-txt"><b style="color:var(--danger);">બધો ડેટા રીસેટ</b><small>કાયમ માટે ભૂંસાય છે</small></span><span class="set-arr">›</span></div></div>`;
+  if(String(setPage).indexOf('notif_')===0){ const sp = NF_PAGES[setPage]||['🔔','નોટિફિકેશન']; return pageTopHTML("setPage='notif'; renderMain();", '', '') + `<h2>${sp[0]} ${sp[1]}</h2>` + setPageBody(setPage); }
   const row = SET_ROWS.find(r=>r[0]===setPage);
   return pageTopHTML("setPage=null; renderMain();", '', '') + `<h2>${row?row[1]+' '+row[2]:''}</h2>` + setPageBody(setPage);
 }
 function setPageBody(p){
   if(p==='theme') return card('થીમ', `<div class="item cursor-default"><span>ડાર્ક મોડ</span><label class="switch"><input type="checkbox" ${DB.settings.theme==='dark'?'checked':''} onchange="toggleTheme(this.checked)"><span class="slider"></span></label></div>`);
-  if(p==='notif') return card('નોટિફિકેશન 🔔', `
-     <div class="item cursor-default"><span>સ્ટેટસ</span><b>${notificationStatusText()}</b></div>
-     <div class="ink-dim fs-12 mt-8 mb-6">બાકી/ઓવરડ્યુ રિવિઝન, અને સ્ટ્રીક રિમાઇન્ડર — app ખુલ્લી હોય ત્યારે મળશે. (App સંપૂર્ણ બંધ હોય ત્યારે નહીં — એ free રીતે શક્ય નથી.)</div>
-     ${(('Notification' in window) && Notification.permission==='default') ? `<button class="btn btn-primary btn-block" onclick="requestNotificationPermission()">🔔 નોટિફિકેશન ચાલુ કરો</button>` : ''}
-     ${(('Notification' in window) && Notification.permission==='granted') ? `<button class="btn btn-secondary btn-block" onclick="showAppNotification('ટેસ્ટ ✅','આ એક ટેસ્ટ નોટિફિકેશન છે','test')">ટેસ્ટ નોટિફિકેશન મોકલો</button>` : ''}`);
+  if(String(p).indexOf('notif')===0) return nfPageBody(p);
   if(p==='lock') return card('પાસવર્ડ સુરક્ષા', lockCardHTML()) + `<div class="ink-dim fs-12">પાસવર્ડ એક્સપોર્ટ, ઇમ્પોર્ટ, સાફ-સફાઈ અને રીસેટ વખતે પૂછાય છે.</div>`;
   if(p==='data') return card('સ્ટોરેજ 💾', storageCardHTML()) + card('📂 ડેટા કેટલી જગ્યા રોકે છે', `<div id="stTree">${stTreeHTML()}</div><div class="ink-dim fs-12 mt-8">ટેપ કરીને અંદર ખોલો. સાઇઝ આશરે (સેવ થતા લખાણ પ્રમાણે) છે.</div>`);
+  if(p==='gdrive') return gdPageHTML();
   if(p==='share') return shMgrPageHTML();
   if(p==='xport') return xportPageHTML();
   if(p==='maint') return card('જાળવણી 🧹', `
@@ -3690,8 +3722,9 @@ function mqQuestionsText(qs){
 /* ---- હોમ / ફોલ્ડર ---- */
 let mqQuery = '';
 const MQ_SORTS = [['manual','ક્રમ પ્રમાણે'],['name','નામ પ્રમાણે'],['name_desc','નામ Z→A'],['new','નવી પહેલા'],['old','જૂની પહેલા'],['unattempted','ન આપેલી પહેલા'],['attempted','આપેલી પહેલા'],['score_asc','ઓછો સ્કોર પહેલા'],['score_desc','વધુ સ્કોર પહેલા'],['rev_due','રિવિઝન બાકી પહેલા']];
-function getQSort(){ return (DB.settings && DB.settings.qSort) || 'manual'; }
-function setQSort(v){ DB.settings.qSort = v; save(); renderMain(); }
+function mqSortKey(){ return mqFolderId || 'root'; }
+function getQSort(){ const m = DB.settings && DB.settings.qSortBy; return (m && m[mqSortKey()]) || 'manual'; }
+function setQSort(v){ DB.settings.qSortBy = DB.settings.qSortBy || {}; DB.settings.qSortBy[mqSortKey()] = v; save(); renderMain(); }
 function mqSearchInput(v){
   mqQuery = v;
   const wrap = document.getElementById('mqListWrap'); if(!wrap) return;
@@ -4217,7 +4250,7 @@ function mqReorderListHTML(){
     <button class="btn btn-sm btn-secondary" ${i===list.length-1?'disabled':''} onclick="mqMoveItem('${x.id}',1)">▼</button></span></div>`).join('');
 }
 function mqReorderOpen(){
-  if(getQSort()!=='manual'){ DB.settings.qSort = 'manual'; save(); renderMain(); }
+  if(getQSort()!=='manual'){ setQSort('manual'); }
   openSheet(`<h3>ક્રમ બદલો</h3><div class="scroll-list-sm" id="reorderList">${mqReorderListHTML()}</div>`);
 }
 function mqMoveItem(id, dir){
@@ -6508,6 +6541,41 @@ function saveBrandName(){
   save(); populateBrand(); closeSheet(); toast('સેવ થયું');
 }
 /* ===================== NOTIFICATIONS ===================== */
+/* સેટિંગ્સ DB.settings.notif માં: {on, mods:{exam,mq,app}, types:{id:bool}, m:'07:00', e:'20:00', quiet:{on,from,to}, inbox:[...]} */
+const NF_PAGES = {notif_perm:['⚙️','સ્ટેટસ અને પરવાનગી'], notif_inbox:['📥','ઇનબોક્સ'], notif_exam:['📚','પરીક્ષા નોટિફિકેશન'], notif_mq:['🧠','MCQ ટેસ્ટ નોટિફિકેશન'], notif_app:['🛠️','એપ નોટિફિકેશન'], notif_time:['⏰','સમય અને શાંત કલાકો']};
+const NF_MODS = {exam:['📚','પરીક્ષા'], mq:['🧠','MCQ ટેસ્ટ'], app:['🛠️','એપ']};
+/* [id, મોડ્યુલ, આઇકન, નામ, વિગત, સમય: m=સવાર / e=સાંજ / n=તરત] */
+const NF_TYPES = [
+  ['revToday','exam','🔁','આજની રિવિઝન','આજની તારીખની બાકી રિવિઝન (સવારના સમયે)','m'],
+  ['revOver','exam','⚠️','ઓવરડ્યુ રિવિઝન','તારીખ નીકળી ગયેલી બાકી રિવિઝન (સવારના સમયે)','m'],
+  ['streak','exam','🔥','સ્ટ્રીક બચાવો','સ્ટ્રીક ચાલુ હોય પણ આજે અભ્યાસ ન થયો હોય (સાંજના સમયે)','e'],
+  ['noStudy','exam','📖','આજે અભ્યાસ બાકી','સ્ટ્રીક નથી અને આજે અભ્યાસ નથી થયો (સાંજના સમયે)','e'],
+  ['countdown','exam','⏳','પરીક્ષા કાઉન્ટડાઉન','પરીક્ષાને 100, 60, 30, 15, 10, 7, 5, 3, 2, 1 દિવસ બાકી હોય ત્યારે','m'],
+  ['milestone','exam','🏆','સિદ્ધિ અભિનંદન','સ્ટ્રીકના 7/14/30… દિવસ અને આજની બધી રિવિઝન પૂર્ણ થાય ત્યારે','n'],
+  ['weekly','exam','📊','સાપ્તાહિક સારાંશ','દર રવિવારે છેલ્લા 7 દિવસનો અભ્યાસ સારાંશ (સાંજના સમયે)','e'],
+  ['qRevToday','mq','🔁','ટેસ્ટ રિવિઝન — આજે','આજે રિવિઝન બાકી હોય તેવી MCQ ટેસ્ટ (સવારના સમયે)','m'],
+  ['qRevOver','mq','⚠️','ટેસ્ટ રિવિઝન — ઓવરડ્યુ','તારીખ નીકળી ગયેલી ટેસ્ટ રિવિઝન (સવારના સમયે)','m'],
+  ['qIdle','mq','📝','આજે ટેસ્ટ/પ્રેક્ટિસ બાકી','આજે એક પણ ટેસ્ટ કે પ્રેક્ટિસ નથી આપી (સાંજના સમયે)','e'],
+  ['gdBackup','app','☁️','Drive બેકઅપ યાદ','Drive બેકઅપ 2 દિવસથી વધુ જૂનું હોય ત્યારે (સવારના સમયે)','m'],
+  ['storage','app','💾','સ્ટોરેજ ભરાવા આવ્યું','સ્ટોરેજ 80% થી વધુ ભરાય ત્યારે (દિવસમાં એક વાર)','m']
+];
+const NF_GO = {rev:()=>navigateToRevisionDate(todayStr()), cal:()=>showTab('calendar'), mock:()=>showTab('mock'), dash:()=>showTab('dashboard'), exams:()=>showTab('exams'), storage:()=>{ showTab('settings'); setPage='data'; renderMain(); }, gdrive:()=>{ showTab('settings'); setPage='gdrive'; renderMain(); }};
+function nfCfg(){
+  const st = DB.settings; let c = st.notif;
+  if(!c || typeof c!=='object') c = st.notif = {};
+  if(c.on===undefined) c.on = true;
+  if(!c.mods) c.mods = {};
+  if(!c.types) c.types = {};
+  if(!c.m) c.m = '07:00';
+  if(!c.e) c.e = '20:00';
+  if(!c.quiet) c.quiet = {on:false, from:'22:00', to:'06:00'};
+  if(!Array.isArray(c.inbox)) c.inbox = [];
+  return c;
+}
+function nfTypeOn(id){ const c = nfCfg(); const t = NF_TYPES.find(x=>x[0]===id); if(!t) return false; return !!c.on && c.mods[t[1]]!==false && c.types[id]!==false; }
+function nfUnread(){ return nfCfg().inbox.filter(x=>!x.seen).length; }
+function nfBadge(){ const el = document.getElementById('tbBellN'); if(!el) return; const n = nfUnread(); el.textContent = n>9 ? '9+' : String(n); el.classList.toggle('on', n>0); }
+function nfRowSub(){ const c = nfCfg(); const n = nfUnread(); return (c.on ? 'ચાલુ' : 'બંધ') + (n ? ' · '+n+' નવી' : '') + ' · સિસ્ટમ: ' + (!('Notification' in window) ? 'સપોર્ટ નથી' : Notification.permission==='granted' ? '✅' : Notification.permission==='denied' ? '🚫' : '⚪'); }
 function notificationStatusText(){
   if(!('Notification' in window)) return '❌ આ બ્રાઉઝર સપોર્ટ નથી કરતું';
   if(Notification.permission==='granted') return '✅ ચાલુ છે';
@@ -6517,61 +6585,371 @@ function notificationStatusText(){
 function requestNotificationPermission(){
   if(!('Notification' in window)){ toast('આ બ્રાઉઝર સપોર્ટ નથી કરતું','error'); return; }
   Notification.requestPermission().then(function(perm){
-    if(perm==='granted'){
-      toast('નોટિફિકેશન ચાલુ થયું 🔔');
-      showAppNotification('ExamPath 🎓','નોટિફિકેશન ચાલુ થઈ ગયું!','welcome');
-      checkNotifications();
-    } else toast('પરવાનગી ના મળી','error');
+    if(perm==='granted'){ toast('નોટિફિકેશન ચાલુ થયું 🔔'); nfPush('welcome','🎓','ExamPath','નોટિફિકેશન ચાલુ થઈ ગયું!','', true); checkNotifications(); }
+    else toast('પરવાનગી ના મળી','error');
     renderMain();
   });
 }
 function showAppNotification(title, body, tag){
   if(!('Notification' in window) || Notification.permission!=='granted') return;
+  const o = {body:body, icon:'icon-192.png', badge:'icon-192.png', tag:tag||undefined};
   if('serviceWorker' in navigator){
     navigator.serviceWorker.ready.then(function(reg){
-      if(reg && reg.showNotification) reg.showNotification(title, {body:body, icon:'icon-192.png', badge:'icon-192.png', tag:tag||undefined});
-      else new Notification(title, {body:body, icon:'icon-192.png', tag:tag||undefined});
-    }).catch(function(){ try{ new Notification(title, {body:body, icon:'icon-192.png', tag:tag||undefined}); }catch(e){} });
-  } else {
-    try{ new Notification(title, {body:body, icon:'icon-192.png', tag:tag||undefined}); }catch(e){}
-  }
+      if(reg && reg.showNotification) reg.showNotification(title, o); else new Notification(title, o);
+    }).catch(function(){ try{ new Notification(title, o); }catch(e){} });
+  } else { try{ new Notification(title, o); }catch(e){} }
 }
 function getNotifyLog(){
   try{
     const raw = localStorage.getItem('examPathNotifyLog_v1');
     const log = raw ? JSON.parse(raw) : {};
-    if(log.date !== todayStr()) return {date: todayStr()};
+    if(log.date !== todayStr()) return {date: todayStr(), sent:{}};
+    if(!log.sent) log.sent = {};
     return log;
-  }catch(e){ return {date: todayStr()}; }
+  }catch(e){ return {date: todayStr(), sent:{}}; }
 }
 function saveNotifyLog(log){ try{ localStorage.setItem('examPathNotifyLog_v1', JSON.stringify(log)); }catch(e){} }
+
+/* ---- નોટિફિકેશન મોકલવું: ઇનબોક્સમાં ઉમેરો + (app ખુલ્લી હોય તો) ઉપરથી બેનર, (બંધ/બેકગ્રાઉન્ડ હોય તો) સિસ્ટમ નોટિફિકેશન ---- */
+function nfPush(type, ico, title, body, go, force){
+  const c = nfCfg();
+  const it = {id:uid(), t:Date.now(), ico:ico, title:title, body:body, type:type, go:go||'', seen:false};
+  c.inbox.unshift(it);
+  if(c.inbox.length>60) c.inbox.length = 60;
+  save(); nfBadge();
+  if(document.visibilityState==='visible' || force){ nfPop(it); }
+  if(document.visibilityState!=='visible' || force){ showAppNotification(ico+' '+title, body, type); }
+  if(setPage==='notif_inbox' && currentTab==='settings') renderMain();
+}
+function nfAgo(ts){
+  const m = Math.floor((Date.now()-ts)/60000);
+  if(m<1) return 'હમણાં';
+  if(m<60) return m+' મિનિટ';
+  const h = Math.floor(m/60);
+  if(h<24) return h+' કલાક';
+  return Math.floor(h/24)+' દિવસ';
+}
+function nfGo(id){
+  const c = nfCfg(); const it = c.inbox.find(x=>x.id===id);
+  if(it){ it.seen = true; save(); nfBadge(); }
+  document.querySelectorAll('.nf-pop').forEach(el=>{ if(el.dataset.id===id) el.remove(); });
+  const f = it && NF_GO[it.go]; if(f){ try{ f(); }catch(e){} } else if(it && !it.go){ nfOpenInbox(); }
+}
+function nfPop(it){
+  const box = document.getElementById('nfStack'); if(!box) return;
+  while(box.children.length>=3) box.removeChild(box.firstChild);
+  const el = document.createElement('div');
+  el.className = 'nf-pop'; el.dataset.id = it.id;
+  el.innerHTML = `<div class="nf-av"><b>${it.ico}</b></div><div class="nf-tx"><div class="t">${esc(it.title)}<em>હમણાં</em></div><div class="b">${esc(it.body)}</div></div><button class="nf-x" aria-label="બંધ">✕</button>`;
+  box.appendChild(el);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('in')));
+  let timer = null, sx=0, sy=0, moved=false;
+  const kill = ()=>{ clearTimeout(timer); el.classList.remove('in'); el.classList.add('out'); setTimeout(()=>{ if(el.parentNode) el.remove(); }, 300); };
+  const arm = ()=>{ clearTimeout(timer); timer = setTimeout(kill, 6000); };
+  arm();
+  el.querySelector('.nf-x').onclick = function(e){ e.stopPropagation(); kill(); };
+  el.addEventListener('touchstart', function(e){ const t=e.touches[0]; sx=t.clientX; sy=t.clientY; moved=false; clearTimeout(timer); }, {passive:true});
+  el.addEventListener('touchmove', function(e){ const t=e.touches[0]; const dx=t.clientX-sx, dy=t.clientY-sy; if(Math.abs(dx)>8||Math.abs(dy)>8) moved=true; if(dy<0||Math.abs(dx)>0){ el.style.transition='none'; el.style.transform='translate('+dx+'px,'+Math.min(0,dy)+'px)'; el.style.opacity=String(Math.max(.2,1-Math.abs(dx)/260-Math.abs(Math.min(0,dy))/120)); } }, {passive:true});
+  el.addEventListener('touchend', function(e){ const t=e.changedTouches[0]; const dx=t.clientX-sx, dy=t.clientY-sy; el.style.transition=''; if(dy<-30||Math.abs(dx)>70){ kill(); return; } el.style.transform=''; el.style.opacity=''; arm(); }, {passive:true});
+  el.onclick = function(){ if(moved) return; kill(); nfGo(it.id); };
+}
+function nfOpenInbox(){ showTab('settings'); setPage = 'notif_inbox'; renderMain(); }
+
+/* ---- સમય નિયમો ---- */
+function nfNowMin(){ const d = new Date(); return d.getHours()*60 + d.getMinutes(); }
+function nfMin(hhmm){ const a = String(hhmm||'0:0').split(':'); return (+a[0]||0)*60 + (+a[1]||0); }
+function nfQuietNow(c){ if(!c.quiet || !c.quiet.on) return false; const n = nfNowMin(), a = nfMin(c.quiet.from), b = nfMin(c.quiet.to); return a<=b ? (n>=a && n<b) : (n>=a || n<b); }
+
+/* ---- દર મિનિટે તપાસ: ક્યાં નોટિફિકેશન આપવું ---- */
 function checkNotifications(){
-  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  const c = nfCfg();
+  if(!c.on) return;
   const exam = getActiveExam();
   if(!exam) return;
+  if(nfQuietNow(c)) return;
   const log = getNotifyLog();
   let changed = false;
-
-  if(!log.revisionsNotified){
-    const pending = revisionsForActiveExam().filter(r=>r.dueDate===todayStr() && r.status==='pending').length;
-    if(pending>0) showAppNotification('🔁 આજની રિવિઝન', pending+' રિવિઝન બાકી છે', 'due-today');
-    log.revisionsNotified = true; changed = true;
-  }
-
-  if(!log.overdueNotified){
-    const overdue = revisionsForActiveExam().filter(r=>r.status==='pending' && r.dueDate<todayStr()).length;
-    if(overdue>0) showAppNotification('⚠️ ઓવરડ્યુ રિવિઝન', overdue+' રિવિઝન ઓવરડ્યુ છે', 'overdue');
-    log.overdueNotified = true; changed = true;
-  }
-
-  if(!log.streakNotified){
+  const n = nfNowMin(), M = nfMin(c.m), E = nfMin(c.e), today = todayStr();
+  const fire = function(key, type, ico, title, body, go){
+    if(log.sent[key] || !nfTypeOn(type)) return;
+    log.sent[key] = 1; changed = true;
+    nfPush(type, ico, title, body, go);
+  };
+  try{
+    const revs = revisionsForActiveExam();
+    if(n>=M){
+      const pend = revs.filter(r=>r.dueDate===today && r.status==='pending').length;
+      if(pend>0) fire('revToday','revToday','🔁','આજની રિવિઝન', pend+' રિવિઝન બાકી છે — ટેપ કરીને જુઓ','rev');
+      const over = revs.filter(r=>r.status==='pending' && r.dueDate<today).length;
+      if(over>0) fire('revOver','revOver','⚠️','ઓવરડ્યુ રિવિઝન', over+' રિવિઝન ઓવરડ્યુ છે — જલ્દી પૂરી કરો','rev');
+      if(exam.date){
+        const d = examDaysLeft(exam.date);
+        if([100,60,30,15,10,7,5,3,2,1].indexOf(d)>=0) fire('cd'+d,'countdown','⏳', exam.name+' — '+d+' દિવસ બાકી', 'તૈયારી ચાલુ રાખો, તમે કરી શકો છો! 💪','dash');
+        else if(d===0) fire('cd0','countdown','🍀','આજે પરીક્ષા છે!', exam.name+' — શુભેચ્છાઓ!','dash');
+      }
+    }
     const st = calcStudyStreak(exam);
-    if(st.streak>0 && !st.todayDone) showAppNotification('🔥 સ્ટ્રીક તૂટવાની તૈયારીમાં!', 'તમારી '+st.streak+' દિવસની સ્ટ્રીક છે — આજે કંઈક અભ્યાસ નોંધો!', 'streak');
-    log.streakNotified = true; changed = true;
-  }
-
+    if(n>=E){
+      if(st.streak>0 && !st.todayDone) fire('streak','streak','🔥','સ્ટ્રીક તૂટવાની તૈયારીમાં!', 'તમારી '+st.streak+' દિવસની સ્ટ્રીક છે — આજે થોડું વાંચો','exams');
+      if(st.streak===0 && !st.todayDone) fire('noStudy','noStudy','📖','આજે હજી અભ્યાસ નથી થયો','થોડી મિનિટ પણ વાંચો — નવી સ્ટ્રીક શરૂ કરો','exams');
+      if(new Date().getDay()===0){
+        const wk = studyWeek(exam).filter(x=>x.done).length;
+        fire('wk'+today,'weekly','📊','સાપ્તાહિક સારાંશ','છેલ્લા 7 દિવસમાંથી '+wk+' દિવસ અભ્યાસ કર્યો','dash');
+      }
+    }
+    if([7,14,21,30,50,75,100,150,200,365].indexOf(st.streak)>=0 && st.todayDone) fire('ms'+st.streak,'milestone','🏆',st.streak+' દિવસની સ્ટ્રીક!','અભિનંદન! આ રીતે ચાલુ રાખો 🎉','dash');
+    const dueAll = revs.filter(r=>r.dueDate===today);
+    if(dueAll.length>0 && revs.filter(r=>r.status==='pending' && r.dueDate<=today).length===0 && dueAll.some(r=>r.status==='completed')) fire('allDone','milestone','🎉','આજની બધી રિવિઝન પૂર્ણ!','શાબાશ! આજનું રિવિઝન લક્ષ્ય પૂરું થયું','dash');
+  }catch(e){ console.error('nf exam', e); }
+  try{
+    const qrs = qrevsForActiveExam();
+    if(n>=M){
+      const qp = qrs.filter(r=>r.status==='pending' && r.dueDate===today).length;
+      if(qp>0) fire('qRevToday','qRevToday','🔁','ટેસ્ટ રિવિઝન — આજે', qp+' MCQ ટેસ્ટની રિવિઝન બાકી છે','mock');
+      const qo = qrs.filter(r=>r.status==='pending' && r.dueDate<today).length;
+      if(qo>0) fire('qRevOver','qRevOver','⚠️','ટેસ્ટ રિવિઝન ઓવરડ્યુ', qo+' ટેસ્ટ રિવિઝન ઓવરડ્યુ છે','mock');
+    }
+    if(n>=E){
+      const tests = mqExamTests(mqExamId());
+      if(tests.length>0 && mqAttemptsOn(today).length===0) fire('qIdle','qIdle','📝','આજે ટેસ્ટ/પ્રેક્ટિસ બાકી','એક નાની ટેસ્ટ કે પ્રેક્ટિસ આપી દો','mock');
+    }
+  }catch(e){ console.error('nf mq', e); }
+  try{
+    if(n>=M){ const g = gdState(); if(g.hint && g.last && (Date.now()-g.last) > 2*86400000) fire('gd'+today,'gdBackup','☁️','Drive બેકઅપ જૂનું છે','છેલ્લું બેકઅપ '+gdFmt(g.last)+' — એપ ખોલીને બેકઅપ લો','gdrive'); }
+    if(n>=M){ const u = storageUsage(); if(u.pct>=80) fire('st'+today,'storage','💾','સ્ટોરેજ ભરાવા આવ્યું', u.pct+'% વપરાયું — જૂનો ઇતિહાસ ટૂંકો કરો','storage'); }
+  }catch(e){}
   if(changed) saveNotifyLog(log);
 }
+
+/* ---- સેટિંગ્સ પેજ ---- */
+function nfSw(on, code){ return `<label class="switch"><input type="checkbox" ${on?'checked':''} onchange="${code}"><span class="slider"></span></label>`; }
+function nfSetMaster(v){ nfCfg().on = !!v; save(); renderMain(); }
+function nfSetMod(m, v){ nfCfg().mods[m] = !!v; save(); renderMain(); }
+function nfSetType(id, v){ nfCfg().types[id] = !!v; save(); }
+function nfSetTime(k, v){ const c = nfCfg(); if(!v) return; if(k==='m'||k==='e') c[k] = v; else c.quiet[k] = v; save(); }
+function nfSetQuiet(v){ nfCfg().quiet.on = !!v; save(); renderMain(); }
+function nfMarkAll(){ nfCfg().inbox.forEach(x=>x.seen = true); save(); nfBadge(); renderMain(); }
+function nfClearAll(){ nfCfg().inbox = []; save(); nfBadge(); renderMain(); }
+function nfDel(id){ const c = nfCfg(); c.inbox = c.inbox.filter(x=>x.id!==id); save(); nfBadge(); renderMain(); }
+function nfTest(){ nfPush('test','✅','ટેસ્ટ નોટિફિકેશન','આ એક ટેસ્ટ નોટિફિકેશન છે — આવું જ દેખાશે','', true); }
+function nfModSummary(m){ const ts = NF_TYPES.filter(t=>t[1]===m); const c = nfCfg(); const on = ts.filter(t=>c.mods[m]!==false && c.types[t[0]]!==false).length; return on+'/'+ts.length+' ચાલુ'; }
+function nfPageBody(p){
+  const c = nfCfg();
+  if(p==='notif'){
+    const row = (pg, ico, name, sub)=>`<div class="set-row" onclick="setOpen('${pg}')"><span class="set-ico">${ico}</span><span class="set-txt"><b>${name}</b><small>${sub}</small></span><span class="set-arr">›</span></div>`;
+    const un = nfUnread();
+    return `<div class="card"><div class="item cursor-default"><span><b>બધા નોટિફિકેશન</b><br><span class="ink-dim fs-12">મુખ્ય સ્વિચ — બંધ કરો તો કોઈ નહીં આવે</span></span>${nfSw(c.on, 'nfSetMaster(this.checked)')}</div></div>
+      <div class="card" style="padding:4px 14px;${c.on?'':'opacity:.55;'}">
+        ${row('notif_inbox','📥','ઇનબોક્સ', un ? un+' નવી · કુલ '+c.inbox.length : (c.inbox.length ? 'કુલ '+c.inbox.length+' · બધી વાંચેલી' : 'હજી કોઈ નથી'))}
+        ${row('notif_exam','📚','પરીક્ષા', nfModSummary('exam')+' · રિવિઝન, સ્ટ્રીક, કાઉન્ટડાઉન')}
+        ${row('notif_mq','🧠','MCQ ટેસ્ટ', nfModSummary('mq')+' · ટેસ્ટ રિવિઝન, પ્રેક્ટિસ')}
+        ${row('notif_app','🛠️','એપ', nfModSummary('app')+' · સ્ટોરેજ')}
+        ${row('notif_time','⏰','સમય અને શાંત કલાકો','સવાર '+c.m+' · સાંજ '+c.e+(c.quiet.on?' · શાંત '+c.quiet.from+'–'+c.quiet.to:''))}
+        ${row('notif_perm','⚙️','સ્ટેટસ અને પરવાનગી', (!('Notification' in window)) ? 'સપોર્ટ નથી' : Notification.permission==='granted' ? '✅ ફોન નોટિફિકેશન ચાલુ' : Notification.permission==='denied' ? '🚫 બ્લોક છે' : '⚪ પરવાનગી બાકી')}
+      </div>`;
+  }
+  if(p==='notif_perm'){
+    const has = 'Notification' in window;
+    return card('સિસ્ટમ નોટિફિકેશન', `
+      <div class="item cursor-default"><span>સ્ટેટસ</span><b>${notificationStatusText()}</b></div>
+      <div class="ink-dim fs-12 mt-8 mb-6">App ખુલ્લી હોય ત્યારે નોટિફિકેશન ઉપરથી Instagram જેવા બેનર તરીકે આવે છે અને ઇનબોક્સમાં જમા થાય છે (આ માટે પરવાનગી જરૂરી નથી). App બેકગ્રાઉન્ડમાં હોય ત્યારે ફોનના નોટિફિકેશન તરીકે આવે તે માટે પરવાનગી ચાલુ કરો. App સંપૂર્ણ બંધ હોય ત્યારે આવશે નહીં — ખુલે ત્યારે ઇનબોક્સમાં દેખાશે.</div>
+      ${(has && Notification.permission==='default') ? `<button class="btn btn-primary btn-block" onclick="requestNotificationPermission()">🔔 નોટિફિકેશન પરવાનગી આપો</button>` : ''}
+      <button class="btn btn-secondary btn-block" style="margin-top:8px;" onclick="nfTest()">✅ ટેસ્ટ નોટિફિકેશન મોકલો</button>`);
+  }
+  if(p==='notif_inbox'){
+    const L = c.inbox;
+    const top = L.length ? `<div style="display:flex;gap:8px;margin-bottom:6px;"><button class="btn btn-sm btn-secondary flex-1" onclick="nfMarkAll()">✓ બધું વાંચેલું</button><button class="btn btn-sm btn-secondary flex-1" onclick="nfClearAll()">🗑️ બધું સાફ</button></div>` : '';
+    if(!L.length) return emptyState('🔔','કોઈ નોટિફિકેશન નથી','નવી રિવિઝન, સ્ટ્રીક અને સિદ્ધિની સૂચના અહીં જમા થશે');
+    const dayOf = t=>{ const d = new Date(t - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10); return d; };
+    const td = todayStr(); const yd = (()=>{ const d = new Date(td+'T00:00:00'); d.setDate(d.getDate()-1); return toLocalISODate(d); })();
+    const groups = {t:[], y:[], o:[]};
+    L.forEach(x=>{ const d = dayOf(x.t); (d===td?groups.t:d===yd?groups.y:groups.o).push(x); });
+    const rows = a=>a.map(x=>`<div class="nf-row" onclick="nfGo('${x.id}')"><div class="nf-av ${x.seen?'seen':''}"><b>${x.ico}</b></div><div class="nf-tx"><div class="b"><b>${esc(x.title)}</b> ${esc(x.body)}</div><div class="tm">${nfAgo(x.t)}</div></div>${x.seen?'':'<span class="nf-dot"></span>'}<button class="nf-del" onclick="event.stopPropagation();nfDel('${x.id}')" aria-label="કાઢો">✕</button></div>`).join('');
+    setTimeout(function(){ const cc = nfCfg(); if(cc.inbox.some(x=>!x.seen)){ cc.inbox.forEach(x=>x.seen=true); save(); nfBadge(); } }, 1500);
+    return top + (groups.t.length?`<div class="nf-grp">આજે</div>${rows(groups.t)}`:'') + (groups.y.length?`<div class="nf-grp">ગઈકાલે</div>${rows(groups.y)}`:'') + (groups.o.length?`<div class="nf-grp">અગાઉના</div>${rows(groups.o)}`:'');
+  }
+  if(p==='notif_exam' || p==='notif_mq' || p==='notif_app'){
+    const m = p.slice(6); const mi = NF_MODS[m]; const modOn = c.mods[m]!==false;
+    const items = NF_TYPES.filter(t=>t[1]===m).map(t=>`<div class="nf-mod"><span class="set-ico">${t[2]}</span><span class="mid"><b>${t[3]}</b><small>${t[4]}</small></span>${nfSw(c.types[t[0]]!==false, `nfSetType('${t[0]}',this.checked)`)}</div>`).join('');
+    return `<div class="card"><div class="item cursor-default"><span><b>${mi[0]} ${mi[1]} — બધા</b><br><span class="ink-dim fs-12">આખા વિભાગની સ્વિચ</span></span>${nfSw(modOn, `nfSetMod('${m}',this.checked)`)}</div></div>
+      <div class="card" style="padding:4px 14px;${modOn?'':'opacity:.5;pointer-events:none;'}">${items}</div>`;
+  }
+  if(p==='notif_time'){
+    return card('સમય', `
+      <div class="nf-time"><span><b>સવારનો સમય</b><br><span class="ink-dim fs-12">રિવિઝન, કાઉન્ટડાઉન, સ્ટોરેજ</span></span><input type="time" value="${c.m}" onchange="nfSetTime('m',this.value)"></div>
+      <div class="nf-time"><span><b>સાંજનો સમય</b><br><span class="ink-dim fs-12">સ્ટ્રીક, અભ્યાસ/પ્રેક્ટિસ, સાપ્તાહિક સારાંશ</span></span><input type="time" value="${c.e}" onchange="nfSetTime('e',this.value)"></div>`)
+      + card('શાંત કલાકો 🌙', `
+      <div class="item cursor-default"><span>શાંત કલાકો ચાલુ</span>${nfSw(c.quiet.on, 'nfSetQuiet(this.checked)')}</div>
+      <div style="${c.quiet.on?'':'opacity:.5;pointer-events:none;'}">
+        <div class="nf-time"><span>ક્યારથી</span><input type="time" value="${c.quiet.from}" onchange="nfSetTime('from',this.value)"></div>
+        <div class="nf-time"><span>ક્યાં સુધી</span><input type="time" value="${c.quiet.to}" onchange="nfSetTime('to',this.value)"></div>
+      </div>
+      <div class="ink-dim fs-12 mt-8">આ સમય દરમિયાન કોઈ નોટિફિકેશન નહીં આવે; સમય પૂરો થયે બાકી હોય તે આવશે.</div>`);
+  }
+  return '';
+}
+/* ===================== ☁️ GOOGLE DRIVE બેકઅપ ===================== */
+/* ડેટા Google Drive ના છુપાયેલા "appDataFolder" માં સેવ થાય (બીજી Drive ફાઇલોને અડકતું નથી). Client ID અહીં મૂકો અથવા સેટિંગ્સ પેજમાં ભરો. */
+const GD_CLIENT_ID = '976919288019-8i3804niqv7rc5499d3lga9omfmrh7al.apps.googleusercontent.com';
+const GD_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const GD_LS = 'examPathGd_v1';
+var gd = {tok:null, exp:0, busy:false, err:'', dirty:true, lastStr:'', need:false, msg:''};
+function gdState(){ try{ const o = JSON.parse(localStorage.getItem(GD_LS)||'{}'); if(o.auto===undefined) o.auto = true; return o; }catch(e){ return {auto:true}; } }
+function gdSet(p){ try{ localStorage.setItem(GD_LS, JSON.stringify(Object.assign(gdState(), p))); }catch(e){} }
+function gdClientId(){ try{ const v = localStorage.getItem('examPathGdClient'); if(v) return v; }catch(e){} return GD_CLIENT_ID; }
+function gdMarkDirty(){ gd.dirty = true; }
+function gdUI(){ if(currentTab==='settings' && setPage==='gdrive') renderMain(); }
+function gdFmt(ts){ if(!ts) return '—'; try{ return new Date(ts).toLocaleString('en-IN', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}); }catch(e){ return ''; } }
+function gdMB(n){ return (n/1048576).toFixed(2)+' MB'; }
+function gdRowSub(){ const s = gdState(); if(!gdClientId()) return 'સેટઅપ બાકી'; if(!s.hint) return 'જોડાયેલ નથી'; return (s.auto?'ઓટો ચાલુ':'ઓટો બંધ')+' · છેલ્લું: '+gdFmt(s.last); }
+function gdLoadLib(){ return new Promise(function(res, rej){
+  if(window.google && google.accounts && google.accounts.oauth2) return res();
+  const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.onload = function(){ res(); }; s.onerror = function(){ rej(new Error('offline')); }; document.head.appendChild(s);
+}); }
+function gdToken(interactive){ return new Promise(async function(res, rej){
+  if(gd.tok && Date.now() < gd.exp-60000) return res(gd.tok);
+  const cid = gdClientId(); if(!cid) return rej(new Error('noid'));
+  if(!navigator.onLine) return rej(new Error('offline'));
+  try{ await gdLoadLib(); }catch(e){ return rej(new Error('offline')); }
+  try{
+    const tc = google.accounts.oauth2.initTokenClient({client_id:cid, scope:GD_SCOPE,
+      callback:function(r){ if(r && r.access_token){ gd.tok = r.access_token; gd.exp = Date.now() + (r.expires_in||3600)*1000; gdSet({hint:true}); res(gd.tok); } else rej(new Error((r&&r.error)||'denied')); },
+      error_callback:function(e){ rej(new Error((e&&e.type)||'popup')); }});
+    tc.requestAccessToken({prompt: interactive ? (gdState().hint ? '' : 'consent') : 'none'});
+  }catch(e){ rej(e); }
+}); }
+async function gdApi(path, opt){
+  opt = opt || {};
+  const t = await gdToken(opt.interactive);
+  const url = 'https://www.googleapis.com' + path + (path.indexOf('?')>=0?'&':'?') + '_=' + Date.now();
+  const r = await fetch(url, {method:opt.method||'GET', headers:Object.assign({Authorization:'Bearer '+t}, opt.headers||{}), body:opt.body, cache:'no-store'});
+  if(r.status===401) gd.tok = null;
+  if(!r.ok) throw new Error('http'+r.status);
+  return r;
+}
+async function gdList(interactive){
+  const r = await gdApi('/drive/v3/files?spaces=appDataFolder&pageSize=100&fields='+encodeURIComponent('files(id,name,size,modifiedTime)'), {interactive:interactive});
+  const j = await r.json(); return (j.files||[]).sort(function(a,b){ return b.name.localeCompare(a.name); });
+}
+async function gdUpload(name, str, existingId, interactive){
+  const b = 'ep'+Date.now();
+  const meta = existingId ? {name:name} : {name:name, parents:['appDataFolder']};
+  const body = '--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+'\r\n--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+str+'\r\n--'+b+'--';
+  await gdApi((existingId ? '/upload/drive/v3/files/'+existingId : '/upload/drive/v3/files')+'?uploadType=multipart', {method:existingId?'PATCH':'POST', headers:{'Content-Type':'multipart/related; boundary='+b}, body:body, interactive:interactive});
+}
+function gdErrText(e){
+  const m = String(e && e.message || e);
+  if(m==='noid') return 'Client ID ભરેલો નથી';
+  if(m==='offline') return 'ઇન્ટરનેટ નથી — પછી ફરી પ્રયત્ન થશે';
+  if(m==='shrunk') return 'ડેટા પહેલાના બેકઅપ કરતાં ઘણો ઓછો છે — સુરક્ષા માટે ઓટો બેકઅપ અટક્યું. "હમણાં બેકઅપ" થી પુષ્ટિ સાથે કરો';
+  if(m==='empty') return 'ડેટા ખાલી છે — ખાલી ડેટાથી બેકઅપ નથી કરાતું';
+  if(m==='http403') return 'Drive API ચાલુ નથી કે પરવાનગી નથી (Google Cloud સેટઅપ તપાસો)';
+  if(/popup|denied|access_denied|interaction|login|consent/i.test(m)) return 'લૉગિન/પરવાનગી જરૂરી — "Google થી જોડાઓ" દબાવો';
+  return 'ભૂલ: '+m;
+}
+/* interactive=true: પોપઅપ ચાલે (બટન ટેપ). force=true: ઘટેલા ડેટાની ચેતવણી પુષ્ટિ સાથે અવગણી શકાય */
+async function gdBackup(interactive, force){
+  if(gd.busy) return false;
+  gd.busy = true; gd.err = ''; gdUI();
+  try{
+    if(!DB.exams.length && !(DB.qtests||[]).length) throw new Error('empty');
+    gd.dirty = false;
+    const str = JSON.stringify(DB);
+    const files = await gdList(interactive);
+    const name = 'exampath-'+todayStr()+'.json';
+    const newest = files.find(function(f){ return /^exampath-\d{4}/.test(f.name); });
+    if(newest && +newest.size > 20000 && str.length < (+newest.size)*0.5){
+      if(!(interactive && force && confirm('ડેટા પહેલાના બેકઅપ ('+gdMB(+newest.size)+') કરતાં ઘણો ઓછો છે ('+gdMB(str.length)+').\nબેકઅપ ઓવરરાઇટ કરવું?'))) throw new Error('shrunk');
+    }
+    const same = files.find(function(f){ return f.name===name; });
+    await gdUpload(name, str, same && same.id, interactive);
+    gd.lastStr = str; gd.need = false; bannerClose('gdneed');
+    gdSet({hint:true, last:Date.now(), size:str.length});
+    const olds = files.filter(function(f){ return f.name!==name && /^exampath-\d{4}-\d\d-\d\d\.json$/.test(f.name); }).slice(13);
+    for(const f of olds){ try{ await gdApi('/drive/v3/files/'+f.id, {method:'DELETE'}); }catch(e){} }
+    gd.busy = false; gdUI();
+    if(interactive) toast('☁️ Drive માં બેકઅપ થયું ✅');
+    return true;
+  }catch(e){
+    gd.busy = false; gd.dirty = true; gd.err = gdErrText(e);
+    if(!interactive && /લૉગિન|પરવાનગી/.test(gd.err) && gdState().hint && !gd.need){
+      gd.need = true;
+      appBanner('gdneed', '<span>☁️ Drive બેકઅપ માટે એક ટેપ જોઈએ છે.</span><button class="btn btn-sm btn-primary" onclick="bannerClose(\'gdneed\');gdBackup(true,false)">બેકઅપ</button><button class="btn btn-sm btn-secondary" onclick="bannerClose(\'gdneed\')">પછી</button>');
+    }
+    gdUI();
+    if(interactive) toast(gd.err, 'error');
+    return false;
+  }
+}
+function gdTick(){
+  const s = gdState();
+  if(!s.auto || !s.hint || !gdClientId() || !gd.dirty || gd.busy || gd.need) return;
+  if(Date.now() - (s.last||0) < 10*60000) return;
+  if(!navigator.onLine) return;
+  gdBackup(false, false);
+}
+function gdConnect(){ gdBackup(true, true); }
+function gdSaveClient(){ const v = (val('f_gdcid')||'').trim(); try{ localStorage.setItem('examPathGdClient', v); }catch(e){} toast('Client ID સેવ થયો'); renderMain(); }
+function gdAuto(v){ gdSet({auto:!!v}); gdUI(); }
+function gdDisconnect(){
+  try{ if(gd.tok && window.google && google.accounts) google.accounts.oauth2.revoke(gd.tok, function(){}); }catch(e){}
+  gd.tok = null; gd.exp = 0; gd.need = false; bannerClose('gdneed'); gdSet({hint:false});
+  toast('Drive જોડાણ બંધ કર્યું'); renderMain();
+}
+async function gdRestoreOpen(){
+  try{
+    toast('Drive માં શોધું છું…');
+    const files = (await gdList(true)).filter(function(f){ return /^exampath-/.test(f.name); });
+    if(!files.length){ toast('Drive માં કોઈ બેકઅપ મળ્યું નથી', 'error'); return; }
+    openSheet(`<h3>📥 Drive માંથી પાછું લાવો</h3>
+      <div class="ink-dim fs-12 mb-6">બેકઅપ પસંદ કરો. વર્તમાન ડેટા બદલાઈ જશે (બદલતા પહેલા Drive માં "before-restore" નકલ રખાય છે).</div>
+      ${files.map(function(f){ const lab = f.name==='exampath-before-restore.json' ? '↩️ રિસ્ટોર પહેલાની નકલ' : '📅 '+f.name.replace('exampath-','').replace('.json',''); return `<div class="item cursor-pointer" onclick="gdRestoreDo('${f.id}')"><span style="flex:1;"><b>${lab}</b><br><span class="ink-dim fs-12">${gdMB(+f.size||0)} · ${gdFmt(Date.parse(f.modifiedTime))}</span></span><span class="badge">પાછું લાવો</span></div>`; }).join('')}`);
+  }catch(e){ gd.err = gdErrText(e); toast(gd.err, 'error'); gdUI(); }
+}
+function gdRestoreDo(id){
+  const _run = async function(){
+    try{
+      toast('ડેટા લાવી રહ્યો છું…');
+      const r = await gdApi('/drive/v3/files/'+id+'?alt=media', {interactive:true});
+      const parsed = JSON.parse(await r.text());
+      if(!parsed || typeof parsed!=='object' || Array.isArray(parsed)) throw new Error('bad');
+      if((DB.exams.length || (DB.qtests||[]).length)){ try{ const files = await gdList(true); const old = files.find(function(f){ return f.name==='exampath-before-restore.json'; }); await gdUpload('exampath-before-restore.json', JSON.stringify(DB), old && old.id, true); }catch(e){} }
+      DB = normalizeData(parsed); _dataLocked = false;
+      save(); applyTheme(); populateBrand(); populateExamSwitcher(); examDetailId = null;
+      gd.lastStr = ''; gdSet({hint:true, auto:true});
+      bannerClose('gdrestore'); closeSheet(); renderMain();
+      toast('✅ ડેટા પાછો આવી ગયો');
+    }catch(e){ toast('પાછું લાવવામાં ભૂલ: '+String(e&&e.message||e), 'error'); }
+  };
+  /* ડેટા ખાલી હોય (ડેટા ઉડી ગયો હોય) ત્યારે પાસવર્ડ વગર સીધું; નહીંતર guard */
+  if(DB.exams.length || (DB.qtests||[]).length) guard('Drive માંથી ડેટા પાછો લાવવા માટે', _run); else _run();
+}
+function gdPageHTML(){
+  const s = gdState(), cid = gdClientId();
+  const connected = !!s.hint;
+  let h = '';
+  h += card('☁️ સ્ટેટસ', `
+    <div class="item cursor-default"><span>જોડાણ</span><b>${!cid?'⚪ સેટઅપ બાકી':connected?'✅ જોડાયેલ':'⚪ જોડાયેલ નથી'}</b></div>
+    <div class="item cursor-default"><span>છેલ્લું બેકઅપ</span><b>${s.last? gdFmt(s.last)+' · '+gdMB(s.size||0) : '—'}</b></div>
+    ${gd.busy?'<div class="ink-dim fs-12 mt-8">⏳ કામ ચાલુ છે…</div>':''}
+    ${gd.err?`<div class="fs-12 mt-8" style="color:var(--danger);">${esc(gd.err)}</div>`:''}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+      ${cid ? (connected ? '' : `<button class="btn btn-primary btn-block" onclick="gdConnect()">🔗 Google થી જોડાઓ અને બેકઅપ લો</button>`) : ''}
+      ${cid && connected ? `<button class="btn btn-primary btn-block" onclick="gdBackup(true,true)">☁️ હમણાં બેકઅપ લો</button>` : ''}
+      ${cid ? `<button class="btn btn-secondary btn-block" onclick="gdRestoreOpen()">📥 Drive માંથી પાછું લાવો</button>` : ''}
+    </div>`);
+  if(cid && connected) h += card('ઓટો બેકઅપ', `
+    <div class="item cursor-default"><span><b>આપમેળે બેકઅપ</b><br><span class="ink-dim fs-12">ફેરફાર થાય તો દર ~10 મિનિટે (ઇન્ટરનેટ હોય ત્યારે)</span></span>${nfSw(s.auto, 'gdAuto(this.checked)')}</div>
+    <button class="btn btn-secondary btn-block" style="margin-top:8px;" onclick="gdDisconnect()">🔌 જોડાણ બંધ કરો</button>`);
+  h += card('⚙️ Client ID (સામાન્ય રીતે બદલવાની જરૂર નથી)', `<div class="ink-dim fs-12 mb-6">એપમાં Client ID પહેલેથી મૂકેલો છે. લૉગિન વખતે "invalid client" જેવી ભૂલ આવે તો જ સાચો ID અહીં ભરો.</div>
+    <div class="field"><input type="text" id="f_gdcid" value="${esc(cid)}" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off"></div>
+    <button class="btn btn-secondary btn-block" onclick="gdSaveClient()">સેવ કરો</button>`);
+  h += `<div class="ink-dim fs-12" style="line-height:1.7;padding:2px 4px;">• બેકઅપ ફક્ત તમારા Drive ના છુપાયેલા એપ-ફોલ્ડરમાં જાય છે; રોજનું એક (છેલ્લા 14 દિવસ).<br>• ડેટા ઉડી જાય તો: એપ ખોલો → સેટિંગ્સ → Google Drive બેકઅપ → "પાછું લાવો".<br>• ડેટા ખાલી કે ઘણો ઘટી ગયો હોય તો ઓટો બેકઅપ જૂનું બેકઅપ ઓવરરાઇટ નથી કરતું.<br>• ઇન્ટરનેટ વગર એપ સામાન્ય ચાલે છે.</div>`;
+  return h;
+}
+document.addEventListener('click', function(){ gdTick(); }, {passive:true});
+setInterval(gdTick, 60000);
+setTimeout(function(){ try{ if(!DB.exams.length && !(DB.qtests||[]).length && gdClientId()) appBanner('gdrestore', '<span>☁️ ડેટા ખાલી છે. Drive માંથી પાછો લાવશો?</span><button class="btn btn-sm btn-primary" onclick="gdRestoreOpen()">પાછું લાવો</button><button class="btn btn-sm btn-secondary" onclick="bannerClose(\'gdrestore\')">ના</button>'); }catch(e){} }, 3000);
 function initHideOnScroll(){
   const main = document.getElementById('main'); if(!main) return;
   const tb = document.querySelector('.topbar');
@@ -6643,7 +7021,7 @@ async function init(){
   populateExamSwitcher();
   showTab('dashboard');
   [0,150,500,1200,2500].forEach(ms=>setTimeout(fixDocScroll, ms));
-  checkNotifications();
+  nfBadge(); checkNotifications();
   setInterval(checkNotifications, 60000);
   try{ storageCheck(JSON.stringify(DB).length); refreshStorageEstimate(); }catch(e){}
   setTimeout(()=>checkForUpdate(false), 4000);
