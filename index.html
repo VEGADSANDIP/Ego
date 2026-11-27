@@ -635,6 +635,25 @@ body{font-feature-settings:"liga" 1;}
 .section-header h3{font-size:15px; font-weight:800;}
 .card.cursor-pointer:active{background:var(--surface2);}
 .mq-crumb{background:var(--surface2); display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px;}
+
+/* ---- MCQ ટેસ્ટ (v-36) ---- */
+.flex-gap-6.mb-6>input[type=text]{min-width:0; flex:1 1 0;}
+.flex-gap-6.mb-6>select{max-width:124px !important; min-width:0; flex:0 1 124px;}
+.card .act-row .btn:nth-child(6){background:rgba(250,126,30,.16);}
+.card .act-row .btn:nth-child(7){background:rgba(18,161,138,.16);}
+.card .act-row .btn:nth-child(8){background:var(--surface2);}
+.mq-bar{height:5px; border-radius:3px;}
+.mq-bar i{background:linear-gradient(90deg,#FEDA75,#FA7E1E,#D62976,#962FBF,#4F5BD5);}
+.mq-opt{border-radius:12px; border:1px solid var(--border);}
+button.mq-opt:nth-of-type(1) .ltr{background:rgba(0,149,246,.16); color:#0070C0;}
+button.mq-opt:nth-of-type(2) .ltr{background:rgba(129,52,175,.16); color:#7B2FA3;}
+button.mq-opt:nth-of-type(3) .ltr{background:rgba(221,42,123,.16); color:#C0206A;}
+button.mq-opt:nth-of-type(4) .ltr{background:rgba(250,126,30,.2); color:#C25E0E;}
+[data-theme="dark"] button.mq-opt:nth-of-type(1) .ltr{color:#6CC4FF;} [data-theme="dark"] button.mq-opt:nth-of-type(2) .ltr{color:#D8A0F5;} [data-theme="dark"] button.mq-opt:nth-of-type(3) .ltr{color:#FF8FBF;} [data-theme="dark"] button.mq-opt:nth-of-type(4) .ltr{color:#FFB070;}
+.mq-opt.sel{border:1.5px solid var(--primary);}
+.mq-opt.sel .ltr{background:var(--primary) !important; color:#fff !important;}
+.mq-opt.ok .ltr{background:var(--success) !important; color:#fff !important;}
+.mq-opt.bad .ltr{background:var(--danger) !important; color:#fff !important;}
 </style>
 </head>
 <body>
@@ -682,8 +701,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.27-35';
-const APP_BUILT = '2026-11-27T08:13:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.27-36';
+const APP_BUILT = '2026-11-27T08:22:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
