@@ -600,9 +600,45 @@ body{font-feature-settings:"liga" 1;}
 .seg button.on{background:transparent !important; color:var(--ink); border-bottom:2px solid var(--ink); box-shadow:none !important;}
 .badge-primary{background:rgba(0,149,246,.14); color:var(--primary);}
 .switch input:checked + .slider{background:var(--primary);}
+
+/* ---- રંગીન ટૅબ બાર (v-35) ---- */
+.navbtn[data-tab="dashboard"]{--nc:#F58529;} .navbtn[data-tab="exams"]{--nc:#8134AF;} .navbtn[data-tab="mock"]{--nc:#DD2A7B;}
+.navbtn[data-tab="map"]{--nc:#12A150;} .navbtn[data-tab="calendar"]{--nc:#0095F6;} .navbtn[data-tab="settings"]{--nc:#E8590C;}
+.bottomnav{padding:6px 8px calc(6px + env(safe-area-inset-bottom)); gap:2px;}
+.navbtn{padding:0; height:46px; align-items:center; justify-content:center; background:none; color:color-mix(in srgb, var(--nc) 78%, var(--ink-dim));}
+.navbtn .navicon{display:flex; align-items:center; justify-content:center; width:58px; height:38px; border-radius:19px; transition:background .2s;}
+.navbtn.active{color:var(--nc);}
+.navbtn.active .navicon{background:color-mix(in srgb, var(--nc) 16%, transparent);}
+.navbtn.active::after{display:none;}
+.navicon svg{width:25px; height:25px; stroke-width:1.9;}
+.navbtn.active .navicon svg{stroke-width:2.6;}
+.tb-bell{color:#DD2A7B;}
+
+/* ---- પરીક્ષા સ્ક્રીન (v-35) ---- */
+.flex-gap-6.mb-6>input[type=text]{background:var(--surface2) !important; border:none !important; border-radius:10px !important; padding:10px 12px !important; font-size:14px;}
+.flex-gap-6.mb-6>select{background:var(--surface2) !important; border:none !important; border-radius:10px !important; padding:10px 8px !important; font-weight:700; color:var(--ink);}
+.subject-mini-stat{background:transparent; border:1px solid var(--border);}
+.subject-mini-stat:nth-child(1) b{color:#0095F6;} .subject-mini-stat:nth-child(2) b{color:#12A150;} .subject-mini-stat:nth-child(3) b{color:#E8590C;}
+.subject-mini-stat b{font-size:18px;}
+.act-row{border-top:1px solid var(--border);}
+.act-row .btn{border-radius:10px;}
+.act-row .btn:nth-child(1){background:var(--surface2);}
+.act-row .btn:nth-child(2){background:rgba(0,149,246,.14);}
+.act-row .btn:nth-child(3){background:rgba(129,52,175,.16);}
+.act-row .btn:nth-child(4){background:rgba(221,42,123,.14);}
+.act-row .btn:nth-child(5){background:rgba(18,161,80,.14);}
+.topic-meta span:nth-child(1){background:rgba(0,149,246,.12); color:#0070C0;}
+.topic-meta span:nth-child(2){background:rgba(129,52,175,.14); color:#7B2FA3;}
+[data-theme="dark"] .topic-meta span:nth-child(1){color:#6CC4FF;} [data-theme="dark"] .topic-meta span:nth-child(2){color:#D8A0F5;}
+.tl-chip{background:rgba(221,42,123,.12); color:inherit;}
+.topic-name{font-weight:700; font-size:15px;}
+.section-header h3{font-size:15px; font-weight:800;}
+.card.cursor-pointer:active{background:var(--surface2);}
+.mq-crumb{background:var(--surface2); display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px;}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="igG" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FEDA75"/><stop offset=".3" stop-color="#FA7E1E"/><stop offset=".55" stop-color="#D62976"/><stop offset=".8" stop-color="#962FBF"/><stop offset="1" stop-color="#4F5BD5"/></linearGradient></defs></svg>
 <div class="app-shell">
   <header class="topbar">
     <div class="topbar-inner">
@@ -646,8 +682,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.27-34';
-const APP_BUILT = '2026-11-27T00:23:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.27-35';
+const APP_BUILT = '2026-11-27T08:13:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1869,7 +1905,7 @@ function pctColor(pct){
 function miniRingSVG(pct){
   const r=27, c=2*Math.PI*r;
   const offset = c - (pct/100)*c;
-  const color = pctColor(pct);
+  const color = 'url(#igG)';
   return `<svg width="66" height="66" viewBox="0 0 66 66" style="flex-shrink:0;">
     <circle cx="33" cy="33" r="${r}" stroke="var(--surface2)" stroke-width="7" fill="none"/>
     <circle class="ring-progress" cx="33" cy="33" r="${r}" stroke="${color}" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c}" data-offset="${offset}" style="transition:stroke-dashoffset 0.9s ease;" transform="rotate(-90 33 33)"/>
