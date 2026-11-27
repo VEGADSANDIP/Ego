@@ -705,6 +705,11 @@ button.mq-opt:nth-of-type(4) .ltr{background:rgba(250,126,30,.2); color:#C25E0E;
 .mp-tile:nth-child(4n+4) .mp-tile-i{box-shadow:0 0 0 2.5px var(--surface), 0 0 0 5px #4F5BD5;}
 .mp-tile{gap:8px; padding:16px 14px;}
 .mp-tile-b i{background:linear-gradient(90deg,#FA7E1E,#D62976,#962FBF);}
+
+/* ---- પ્રોફાઇલ ઇમેઇલ / Google (v-39) ---- */
+.pf-mail{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:2px 0 8px; padding:9px 12px; border-radius:10px; background:var(--surface2); font-size:12.5px; font-weight:700; cursor:pointer; word-break:break-all;}
+.pf-ok{flex-shrink:0; font-size:11px; color:#12A150; background:rgba(18,161,80,.14); padding:3px 8px; border-radius:999px;}
+.pf-g{margin:2px 0 8px; border-radius:10px; padding:11px 0; background:linear-gradient(45deg,#4285F4,#0095F6) !important; color:#fff;}
 </style>
 </head>
 <body>
@@ -752,8 +757,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.27-38';
-const APP_BUILT = '2026-11-27T08:37:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.27-39';
+const APP_BUILT = '2026-11-27T09:10:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -1361,7 +1366,7 @@ const TABS = [
   {id:'mock', label:'MCQ ટેસ્ટ', icon:'🧠', svg:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'},
   {id:'map', label:'નકશો', icon:'🗺️', svg:'<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'},
   {id:'calendar', label:'કેલેન્ડર', icon:'📅', svg:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'},
-  {id:'settings', label:'સેટિંગ્સ', icon:'⚙️', svg:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'}
+  {id:'settings', label:'પ્રોફાઇલ', icon:'👤', svg:'<circle cx="12" cy="8" r="4"/><path d="M20 21v-1.5a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5V21"/>'}
 ];
 function buildNav(){
   document.getElementById('bottomnav').innerHTML = TABS.map(t=>
@@ -3130,6 +3135,7 @@ const SET_ROWS = [
   ['lock','🔒','પાસવર્ડ સુરક્ષા',()=>lockHasPw()?'ચાલુ':'સેટ નથી'],
   ['data','💾','ડેટા અને સ્ટોરેજ',()=>{ const u=storageUsage(); return storageMB(u.chars)+' વપરાયું'; }],
   ['gdrive','☁️','Google Drive બેકઅપ',()=>gdRowSub()],
+  ['appfiles','📦','એપનું નામ/આઇકન (ઇન્સ્ટોલ)',()=>'ફાઇલો બનાવો'],
   ['share','🔗','શેર',()=>'બીજી પરીક્ષા સાથે શેર મેનેજમેન્ટ'],
   ['xport','📤','એક્સપોર્ટ / ઇમ્પોર્ટ',()=>'બેકઅપ · પરીક્ષા · ટેસ્ટ · નકશો'],
   ['maint','🧹','જાળવણી',()=>'ઇતિહાસ ટૂંકો, છૂટો ડેટા સાફ'],
@@ -3151,6 +3157,7 @@ function pfHeadHTML(){
     </div>
   </div>
   <div class="pf-name">${esc(nm)}</div>
+  ${(function(){ const g = gdState(); if(g.email) return `<div class="pf-mail" onclick="setOpen('gdrive')">✉️ ${esc(g.email)}<span class="pf-ok">☁️ ઓટો બેકઅપ ${g.auto?'ચાલુ':'બંધ'}</span></div>`; if(gdClientId()) return `<button class="btn btn-primary btn-block pf-g" onclick="gdConnect()"><b style="font-size:16px;">G</b>&nbsp; Google થી લૉગિન (ઓટો બેકઅપ)</button>`; return ''; })()}
   <div class="pf-btns"><button class="btn btn-secondary" onclick="openBrandForm()">પ્રોફાઇલ સંપાદિત કરો</button><button class="btn btn-secondary" onclick="nfOpenInbox()">🔔 નોટિફિકેશન</button></div>`;
 }
 function renderSettings(){
@@ -3167,6 +3174,7 @@ function setPageBody(p){
   if(p==='lock') return card('પાસવર્ડ સુરક્ષા', lockCardHTML()) + `<div class="ink-dim fs-12">પાસવર્ડ એક્સપોર્ટ, ઇમ્પોર્ટ, સાફ-સફાઈ અને રીસેટ વખતે પૂછાય છે.</div>`;
   if(p==='data') return card('સ્ટોરેજ 💾', storageCardHTML()) + card('📂 ડેટા કેટલી જગ્યા રોકે છે', `<div id="stTree">${stTreeHTML()}</div><div class="ink-dim fs-12 mt-8">ટેપ કરીને અંદર ખોલો. સાઇઝ આશરે (સેવ થતા લખાણ પ્રમાણે) છે.</div>`);
   if(p==='gdrive') return gdPageHTML();
+  if(p==='appfiles') return dmPageHTML();
   if(p==='share') return shMgrPageHTML();
   if(p==='xport') return xportPageHTML();
   if(p==='maint') return card('જાળવણી 🧹', `
@@ -6624,6 +6632,29 @@ function populateBrand(){
 }
 /* ===== એપનું નામ + ફોટો → ઇન્સ્ટોલ વખતે વપરાતું manifest (ફોટો/નામ બદલો પછી ફરી ઇન્સ્ટોલ કરો ત્યારે નવું નામ/આઇકન મળે) ===== */
 var _dmSig = '', _dmUrl = null;
+function dmPageHTML(){
+  return card('📦 ઇન્સ્ટોલ માટે નામ/આઇકન ફાઇલો', `
+    <div class="ink-dim fs-12 mb-6" style="line-height:1.7;">ફોનના હોમ સ્ક્રીન પરનું એપનું નામ અને આઇકન GitHub પરની ફાઇલોમાંથી આવે છે. અહીં તમારા પ્રોફાઇલ નામ + ફોટા પરથી એ ફાઇલો બને છે.<br><b>1.</b> નીચેનું બટન દબાવો (4 ફાઇલ ડાઉનલોડ થશે; "બહુવિધ ડાઉનલોડ" પૂછે તો Allow કરો).<br><b>2.</b> GitHub માં <code>Ego</code> ફોલ્ડરમાં જૂની <code>manifest.json</code>, <code>icon-192.png</code>, <code>icon-512.png</code>, <code>icon-512-maskable.png</code> ની જગ્યાએ આ નવી ફાઇલો અપલોડ કરો.<br><b>3.</b> ફોનમાંથી જૂની એપ કાઢી, Chrome માં સાઇટ ખોલી ફરી <b>Install app</b> કરો.</div>
+    <div class="ink-dim fs-12 mb-6">હાલનું નામ: <b>${esc(DB.settings.brandName||'ExamPath')}</b> · ફોટો: ${DB.settings.photoData?'✅ છે':'❌ નથી (પહેલા પ્રોફાઇલમાં ફોટો મૂકો)'}</div>
+    <button class="btn btn-primary btn-block" onclick="dmGenFiles()">📥 ફાઇલો બનાવો અને ડાઉનલોડ કરો</button>`);
+}
+function dmGenFiles(){
+  const photo = DB.settings.photoData;
+  if(!photo){ toast('પહેલા પ્રોફાઇલમાં ફોટો મૂકો', 'error'); return; }
+  const name = (DB.settings.brandName || 'ExamPath').trim() || 'ExamPath';
+  const img = new Image();
+  img.onload = function(){
+    const mk = function(size){ return new Promise(function(res){ const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d'); const r = Math.min(img.width, img.height); x.drawImage(img, (img.width-r)/2, (img.height-r)/2, r, r, 0, 0, size, size); c.toBlob(res, 'image/png'); }); };
+    Promise.all([mk(192), mk(512), mk(512)]).then(function(b){
+      const man = {name:name, short_name:Array.from(name).slice(0,12).join(''), description:'પરીક્ષાની તૈયારી માટે સ્ટડી ટ્રેકર', start_url:'./index.html', scope:'./', display:'standalone', lang:'gu', background_color:'#F3F4FA', theme_color:'#FFFFFF',
+        icons:[{src:'icon-192.png', sizes:'192x192', type:'image/png', purpose:'any'}, {src:'icon-512.png', sizes:'512x512', type:'image/png', purpose:'any'}, {src:'icon-512-maskable.png', sizes:'512x512', type:'image/png', purpose:'maskable'}]};
+      const list = [['icon-192.png', b[0]], ['icon-512.png', b[1]], ['icon-512-maskable.png', b[2]], ['manifest.json', new Blob([JSON.stringify(man, null, 2)], {type:'application/json'})]];
+      list.forEach(function(f, i){ setTimeout(function(){ const a = document.createElement('a'); a.href = URL.createObjectURL(f[1]); a.download = f[0]; document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); URL.revokeObjectURL(a.href); }, 1500); }, i*700); });
+      toast('4 ફાઇલો ડાઉનલોડ થઈ રહી છે…');
+    });
+  };
+  img.src = photo;
+}
 function dmIcon(img, size, pad, bg){
   const c = document.createElement('canvas'); c.width = c.height = size;
   const x = c.getContext('2d');
@@ -6661,7 +6692,7 @@ function applyDynamicManifest(){
       const i192 = dmIcon(img,192,0,null), i512 = dmIcon(img,512,0,null), im = dmIcon(img,512,64,'#FFFFFF');
       const ic = document.querySelector('link[rel="icon"]'); if(ic) ic.setAttribute('href', i192);
       const ap = document.querySelector('link[rel="apple-touch-icon"]'); if(ap) ap.setAttribute('href', i192);
-      build([{src:i192, sizes:'192x192', type:'image/png', purpose:'any'}, {src:i512, sizes:'512x512', type:'image/png', purpose:'any'}, {src:im, sizes:'512x512', type:'image/png', purpose:'maskable'}]);
+      /* manifest અહીં બદલાતું નથી — સાચું (WebAPK) ઇન્સ્ટોલ જાળવવા માટે. નામ/આઇકન ઇન્સ્ટોલ ફાઇલો સેટિંગ્સમાંથી બનાવો. */
     }catch(e){ console.error('dm icon', e); }
   };
   img.src = photo;
@@ -7054,14 +7085,22 @@ function nfPageBody(p){
 /* ===================== ☁️ GOOGLE DRIVE બેકઅપ ===================== */
 /* ડેટા Google Drive ના છુપાયેલા "appDataFolder" માં સેવ થાય (બીજી Drive ફાઇલોને અડકતું નથી). Client ID અહીં મૂકો અથવા સેટિંગ્સ પેજમાં ભરો. */
 const GD_CLIENT_ID = '976919288019-8i3804niqv7rc5499d3lga9omfmrh7al.apps.googleusercontent.com';
-const GD_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const GD_SCOPE = 'https://www.googleapis.com/auth/drive.appdata openid email profile';
 const GD_LS = 'examPathGd_v1';
 var gd = {tok:null, exp:0, busy:false, err:'', dirty:true, lastStr:'', need:false, msg:''};
 function gdState(){ try{ const o = JSON.parse(localStorage.getItem(GD_LS)||'{}'); if(o.auto===undefined) o.auto = true; return o; }catch(e){ return {auto:true}; } }
 function gdSet(p){ try{ localStorage.setItem(GD_LS, JSON.stringify(Object.assign(gdState(), p))); }catch(e){} }
 function gdClientId(){ try{ const v = localStorage.getItem('examPathGdClient'); if(v) return v; }catch(e){} return GD_CLIENT_ID; }
+async function gdWho(){
+  const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo?_='+Date.now(), {headers:{Authorization:'Bearer '+gd.tok}, cache:'no-store'});
+  if(!r.ok) return;
+  const u = await r.json(); if(!u || !u.email) return;
+  const st = gdState();
+  if(st.email && st.email.toLowerCase() !== String(u.email).toLowerCase()){ const e = new Error('acct'); e.mail = st.email; throw e; }
+  gdSet({email:u.email, name:u.name||'', picture:u.picture||''});
+}
 function gdMarkDirty(){ gd.dirty = true; }
-function gdUI(){ if(currentTab==='settings' && setPage==='gdrive') renderMain(); }
+function gdUI(){ if(currentTab==='settings' && (!setPage || setPage==='gdrive')) renderMain(); }
 function gdFmt(ts){ if(!ts) return '—'; try{ return new Date(ts).toLocaleString('en-IN', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}); }catch(e){ return ''; } }
 function gdMB(n){ return (n/1048576).toFixed(2)+' MB'; }
 function gdRowSub(){ const s = gdState(); if(!gdClientId()) return 'સેટઅપ બાકી'; if(!s.hint) return 'જોડાયેલ નથી'; return (s.auto?'ઓટો ચાલુ':'ઓટો બંધ')+' · છેલ્લું: '+gdFmt(s.last); }
@@ -7076,9 +7115,14 @@ function gdToken(interactive){ return new Promise(async function(res, rej){
   try{ await gdLoadLib(); }catch(e){ return rej(new Error('offline')); }
   try{
     const tc = google.accounts.oauth2.initTokenClient({client_id:cid, scope:GD_SCOPE,
-      callback:function(r){ if(r && r.access_token){ gd.tok = r.access_token; gd.exp = Date.now() + (r.expires_in||3600)*1000; gdSet({hint:true}); res(gd.tok); } else rej(new Error((r&&r.error)||'denied')); },
+      callback:async function(r){
+        if(r && r.access_token){
+          gd.tok = r.access_token; gd.exp = Date.now() + (r.expires_in||3600)*1000;
+          try{ await gdWho(); }catch(e){ if(String(e&&e.message)==='acct'){ try{ google.accounts.oauth2.revoke(r.access_token, function(){}); }catch(x){} gd.tok = null; gd.exp = 0; return rej(new Error('acct')); } }
+          gdSet({hint:true}); res(gd.tok);
+        } else rej(new Error((r&&r.error)||'denied')); },
       error_callback:function(e){ rej(new Error((e&&e.type)||'popup')); }});
-    tc.requestAccessToken({prompt: interactive ? (gdState().hint ? '' : 'consent') : 'none'});
+    const _em = gdState().email; const _o = {prompt: interactive ? (gdState().hint ? '' : 'consent') : 'none'}; if(_em) _o.hint = _em; tc.requestAccessToken(_o);
   }catch(e){ rej(e); }
 }); }
 async function gdApi(path, opt){
@@ -7103,6 +7147,7 @@ async function gdUpload(name, str, existingId, interactive){
 function gdErrText(e){
   const m = String(e && e.message || e);
   if(m==='noid') return 'Client ID ભરેલો નથી';
+  if(m==='acct') return 'આ અલગ Google એકાઉન્ટ છે — બેકઅપ ફક્ત '+(gdState().email||'પહેલા જોડેલા')+' થી જ ચાલશે. એકાઉન્ટ બદલવું હોય તો પહેલા "જોડાણ બંધ કરો" દબાવો.';
   if(m==='offline') return 'ઇન્ટરનેટ નથી — પછી ફરી પ્રયત્ન થશે';
   if(m==='shrunk') return 'ડેટા પહેલાના બેકઅપ કરતાં ઘણો ઓછો છે — સુરક્ષા માટે ઓટો બેકઅપ અટક્યું. "હમણાં બેકઅપ" થી પુષ્ટિ સાથે કરો';
   if(m==='empty') return 'ડેટા ખાલી છે — ખાલી ડેટાથી બેકઅપ નથી કરાતું';
@@ -7111,7 +7156,7 @@ function gdErrText(e){
   return 'ભૂલ: '+m;
 }
 /* interactive=true: પોપઅપ ચાલે (બટન ટેપ). force=true: ઘટેલા ડેટાની ચેતવણી પુષ્ટિ સાથે અવગણી શકાય */
-async function gdBackup(interactive, force){
+async function gdBackup(interactive, force, quiet){
   if(gd.busy) return false;
   gd.busy = true; gd.err = ''; gdUI();
   try{
@@ -7140,23 +7185,27 @@ async function gdBackup(interactive, force){
       appBanner('gdneed', '<span>☁️ Drive બેકઅપ માટે એક ટેપ જોઈએ છે.</span><button class="btn btn-sm btn-primary" onclick="bannerClose(\'gdneed\');gdBackup(true,false)">બેકઅપ</button><button class="btn btn-sm btn-secondary" onclick="bannerClose(\'gdneed\')">પછી</button>');
     }
     gdUI();
-    if(interactive) toast(gd.err, 'error');
+    if(interactive && !quiet) toast(gd.err, 'error');
     return false;
   }
 }
-function gdTick(){
+function gdTick(tap){
   const s = gdState();
-  if(!s.auto || !s.hint || !gdClientId() || !gd.dirty || gd.busy || gd.need) return;
+  if(!s.auto || !s.hint || !gdClientId() || !gd.dirty || gd.busy) return;
   if(Date.now() - (s.last||0) < 10*60000) return;
   if(!navigator.onLine) return;
-  gdBackup(false, false);
+  const valid = gd.tok && Date.now() < gd.exp-60000;
+  if(valid){ gdBackup(false, false); return; }
+  /* ટોકન પૂરું: સ્ક્રીન ટેપ (gesture) વખતે ચુપચાપ નવું લેવાનો પ્રયત્ન (દર 5 મિનિટે એક વાર) */
+  if(tap && Date.now() - (gd.lastTry||0) > 5*60000){ gd.lastTry = Date.now(); gdBackup(true, false, true); return; }
+  if(!tap && !gd.need) gdBackup(false, false);
 }
-function gdConnect(){ gdBackup(true, true); }
+function gdConnect(){ gdSet({auto:true}); gdBackup(true, true); }
 function gdSaveClient(){ const v = (val('f_gdcid')||'').trim(); try{ localStorage.setItem('examPathGdClient', v); }catch(e){} toast('Client ID સેવ થયો'); renderMain(); }
 function gdAuto(v){ gdSet({auto:!!v}); gdUI(); }
 function gdDisconnect(){
   try{ if(gd.tok && window.google && google.accounts) google.accounts.oauth2.revoke(gd.tok, function(){}); }catch(e){}
-  gd.tok = null; gd.exp = 0; gd.need = false; bannerClose('gdneed'); gdSet({hint:false});
+  gd.tok = null; gd.exp = 0; gd.need = false; bannerClose('gdneed'); gdSet({hint:false, email:'', name:'', picture:''});
   toast('Drive જોડાણ બંધ કર્યું'); renderMain();
 }
 async function gdRestoreOpen(){
@@ -7193,6 +7242,7 @@ function gdPageHTML(){
   let h = '';
   h += card('☁️ સ્ટેટસ', `
     <div class="item cursor-default"><span>જોડાણ</span><b>${!cid?'⚪ સેટઅપ બાકી':connected?'✅ જોડાયેલ':'⚪ જોડાયેલ નથી'}</b></div>
+    ${s.email?`<div class="item cursor-default"><span>Google ઇમેઇલ</span><b style="font-size:12.5px;word-break:break-all;text-align:right;">${esc(s.email)}</b></div>`:''}
     <div class="item cursor-default"><span>છેલ્લું બેકઅપ</span><b>${s.last? gdFmt(s.last)+' · '+gdMB(s.size||0) : '—'}</b></div>
     ${gd.busy?'<div class="ink-dim fs-12 mt-8">⏳ કામ ચાલુ છે…</div>':''}
     ${gd.err?`<div class="fs-12 mt-8" style="color:var(--danger);">${esc(gd.err)}</div>`:''}
@@ -7210,7 +7260,7 @@ function gdPageHTML(){
   h += `<div class="ink-dim fs-12" style="line-height:1.7;padding:2px 4px;">• બેકઅપ ફક્ત તમારા Drive ના છુપાયેલા એપ-ફોલ્ડરમાં જાય છે; રોજનું એક (છેલ્લા 14 દિવસ).<br>• ડેટા ઉડી જાય તો: એપ ખોલો → સેટિંગ્સ → Google Drive બેકઅપ → "પાછું લાવો".<br>• ડેટા ખાલી કે ઘણો ઘટી ગયો હોય તો ઓટો બેકઅપ જૂનું બેકઅપ ઓવરરાઇટ નથી કરતું.<br>• ઇન્ટરનેટ વગર એપ સામાન્ય ચાલે છે.</div>`;
   return h;
 }
-document.addEventListener('click', function(){ gdTick(); }, {passive:true});
+document.addEventListener('click', function(){ gdTick(true); }, {passive:true});
 setInterval(gdTick, 60000);
 setTimeout(function(){ try{ if(!DB.exams.length && !(DB.qtests||[]).length && gdClientId()) appBanner('gdrestore', '<span>☁️ ડેટા ખાલી છે. Drive માંથી પાછો લાવશો?</span><button class="btn btn-sm btn-primary" onclick="gdRestoreOpen()">પાછું લાવો</button><button class="btn btn-sm btn-secondary" onclick="bannerClose(\'gdrestore\')">ના</button>'); }catch(e){} }, 3000);
 function initHideOnScroll(){
