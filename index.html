@@ -654,6 +654,57 @@ button.mq-opt:nth-of-type(4) .ltr{background:rgba(250,126,30,.2); color:#C25E0E;
 .mq-opt.sel .ltr{background:var(--primary) !important; color:#fff !important;}
 .mq-opt.ok .ltr{background:var(--success) !important; color:#fff !important;}
 .mq-opt.bad .ltr{background:var(--danger) !important; color:#fff !important;}
+
+/* ---- કેલેન્ડર (v-37) ---- */
+.cal-date-row{border:1px solid var(--border); box-shadow:none; border-radius:12px;}
+.cal-header b{font-size:16px; font-weight:800;}
+.cal-header .btn{width:34px; height:34px; border-radius:50%; padding:0; font-size:18px;}
+.cal-weekdays{font-weight:700;}
+.cal-grid{gap:5px;}
+.cal-cell{border-radius:50%; background:transparent; box-shadow:none; border:2px solid transparent; font-weight:700; font-size:13.5px;}
+.cal-cell.empty{border-color:transparent;}
+.cal-cell.today{background:linear-gradient(var(--bg),var(--bg)) padding-box, var(--ig-grad) border-box; border:2px solid transparent; color:var(--ink);}
+.cal-cell.selected{background:var(--primary); color:#fff; border-color:var(--primary);}
+.cal-cell.locked{background:var(--success); color:#fff;}
+.cal-nums-row{margin-top:1px; font-size:9px;}
+.cal-num-blue{color:#0095F6;} .cal-num-yellow{color:#E8590C;}
+.cal-cell.selected .cal-num-blue, .cal-cell.selected .cal-num-yellow, .cal-cell.selected .cal-num-red, .cal-cell.selected .cal-num-sep{color:#fff;}
+.cal-mode .btn{border-radius:999px; padding:9px 0;}
+.cal-mode .btn.btn-secondary{background:var(--surface2);}
+.cal-mode .btn:nth-child(1).btn-primary{background:linear-gradient(45deg,#0095F6,#4F5BD5); color:#fff;}
+.cal-mode .btn:nth-child(2).btn-primary{background:linear-gradient(45deg,#962FBF,#D62976,#FA7E1E); color:#fff;}
+
+/* ---- સેટિંગ્સ / પ્રોફાઇલ (v-38) ---- */
+.pf-head{display:flex; align-items:center; gap:18px; padding:6px 2px 14px;}
+.pf-av{width:86px; height:86px; border-radius:50%; padding:3.5px; background:var(--ig-grad); flex-shrink:0;}
+.pf-av .pf-in{width:100%; height:100%; border-radius:50%; border:3px solid var(--bg); background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:34px; overflow:hidden;}
+.pf-av img{width:100%; height:100%; object-fit:cover; display:block;}
+.pf-stats{flex:1; display:flex; justify-content:space-around; text-align:center;}
+.pf-stats b{display:block; font-size:19px; font-weight:800; line-height:1.1;}
+.pf-stats span{font-size:11px; color:var(--ink-dim); line-height:1.2; display:block; margin-top:2px;}
+.pf-name{font-weight:800; font-size:15px; padding:0 2px 2px;}
+.pf-btns{display:flex; gap:8px; margin:8px 0 14px;}
+.pf-btns .btn{flex:1; border-radius:8px; padding:9px 0;}
+.set-ico{background:rgba(0,149,246,.14);}
+.set-row:nth-child(7n+1) .set-ico{background:rgba(129,52,175,.16);}
+.set-row:nth-child(7n+2) .set-ico{background:rgba(221,42,123,.15);}
+.set-row:nth-child(7n+3) .set-ico{background:rgba(250,126,30,.18);}
+.set-row:nth-child(7n+4) .set-ico{background:rgba(18,161,80,.15);}
+.set-row:nth-child(7n+5) .set-ico{background:rgba(0,149,246,.15);}
+.set-row:nth-child(7n+6) .set-ico{background:rgba(214,41,118,.14);}
+.set-row:nth-child(7n+7) .set-ico{background:rgba(79,91,213,.16);}
+.set-ico{border-radius:50%;}
+
+/* ---- નકશો (v-38) ---- */
+.mp-gh{border-left:none; padding-left:2px; font-size:16px;}
+.mp-tile{border:1px solid var(--border); border-radius:12px; box-shadow:none;}
+.mp-tile-i{width:46px; height:46px; border-radius:50%; background:var(--surface); display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 0 0 2.5px var(--surface), 0 0 0 5px #D62976;}
+.mp-tile:nth-child(4n+1) .mp-tile-i{box-shadow:0 0 0 2.5px var(--surface), 0 0 0 5px #FA7E1E;}
+.mp-tile:nth-child(4n+2) .mp-tile-i{box-shadow:0 0 0 2.5px var(--surface), 0 0 0 5px #D62976;}
+.mp-tile:nth-child(4n+3) .mp-tile-i{box-shadow:0 0 0 2.5px var(--surface), 0 0 0 5px #962FBF;}
+.mp-tile:nth-child(4n+4) .mp-tile-i{box-shadow:0 0 0 2.5px var(--surface), 0 0 0 5px #4F5BD5;}
+.mp-tile{gap:8px; padding:16px 14px;}
+.mp-tile-b i{background:linear-gradient(90deg,#FA7E1E,#D62976,#962FBF);}
 </style>
 </head>
 <body>
@@ -701,8 +752,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.27-36';
-const APP_BUILT = '2026-11-27T08:22:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.27-38';
+const APP_BUILT = '2026-11-27T08:37:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -2821,7 +2872,7 @@ function renderCalendar(){
    <div class="cal-weekdays"><div>ર</div><div>સો</div><div>મં</div><div>બુ</div><div>ગુ</div><div>શુ</div><div>શ</div></div>
    <div class="cal-grid">${cells}</div>`;
   const head = `<div class="section-header" style="margin-top:0;"><h3>${formatDate(sel)}</h3></div>
-     <div style="display:flex; gap:8px; margin-bottom:4px;">
+     <div class="cal-mode" style="display:flex; gap:8px; margin-bottom:4px;">
        <button class="btn btn-sm ${calMode==='study'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='study'; renderMain();">અભ્યાસ 📖</button>
        <button class="btn btn-sm ${calMode==='revision'?'btn-primary':'btn-secondary'} flex-1" onclick="calMode='revision'; renderMain();">રિવિઝન 🔁</button>
      </div>
@@ -3085,8 +3136,25 @@ const SET_ROWS = [
   ['about','ℹ️','એપ વિશે',()=>'વર્ઝન '+APP_VERSION]
 ];
 function setOpen(p){ setPage = p; renderMain(); }
+function pfHeadHTML(){
+  let st = {streak:0};
+  try{ const ex = getActiveExam(); if(ex) st = calcStudyStreak(ex); }catch(e){}
+  const done = DB.topics.filter(t=>t.status==='completed').length;
+  const nm = (DB.settings.brandName||'ExamPath');
+  return `<div class="pf-head">
+    <div class="pf-av"><div class="pf-in">${DB.settings.photoData?`<img src="${DB.settings.photoData}" alt="">`:'📚'}</div></div>
+    <div class="pf-stats">
+      <div><b>${DB.exams.length}</b><span>પરીક્ષા</span></div>
+      <div><b>${done}</b><span>ટોપિક પૂર્ણ</span></div>
+      <div><b>${(DB.qtests||[]).length}</b><span>ટેસ્ટ</span></div>
+      <div><b>${st.streak||0}🔥</b><span>સ્ટ્રીક</span></div>
+    </div>
+  </div>
+  <div class="pf-name">${esc(nm)}</div>
+  <div class="pf-btns"><button class="btn btn-secondary" onclick="openBrandForm()">પ્રોફાઇલ સંપાદિત કરો</button><button class="btn btn-secondary" onclick="nfOpenInbox()">🔔 નોટિફિકેશન</button></div>`;
+}
 function renderSettings(){
-  if(!setPage) return `<h2>સેટિંગ્સ ⚙️</h2>
+  if(!setPage) return pfHeadHTML() + `<h2>સેટિંગ્સ</h2>
     <div class="card" style="padding:4px 14px;">${SET_ROWS.map(r=>`<div class="set-row" onclick="setOpen('${r[0]}')"><span class="set-ico">${r[1]}</span><span class="set-txt"><b>${r[2]}</b><small>${esc(String(r[3]()))}</small></span><span class="set-arr">›</span></div>`).join('')}
       <div class="set-row" onclick="guard('બધો ડેટા રીસેટ કરવા માટે', resetAllData)"><span class="set-ico">⚠️</span><span class="set-txt"><b style="color:var(--danger);">બધો ડેટા રીસેટ</b><small>કાયમ માટે ભૂંસાય છે</small></span><span class="set-arr">›</span></div></div>`;
   if(String(setPage).indexOf('notif_')===0){ const sp = NF_PAGES[setPage]||['🔔','નોટિફિકેશન']; return pageTopHTML("setPage='notif'; renderMain();", '', '') + `<h2>${sp[0]} ${sp[1]}</h2>` + setPageBody(setPage); }
