@@ -809,8 +809,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.28-41';
-const APP_BUILT = '2026-11-28T07:35:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.28-42';
+const APP_BUILT = '2026-11-28T09:15:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -6092,16 +6092,17 @@ function openMapPlaceForm(id){
   mapTalFill(dist, tal); mapFormState(); mapFcRender(cat);
 }
 /* સ્થળ ફોર્મ: પહેલા મુખ્ય વિભાગ, પછી તેના પેટા વિભાગ */
-function mapFcRender(catId){
+function mapFcRender(catId, pre){
+  pre = pre || 'f_mp';
   const all = mapCatsOf(); const c = all.find(x=>x.id===catId) || all[0]; if(!c) return;
   const main = c.parentId ? all.find(x=>x.id===c.parentId) : c; const kids = all.filter(x=>x.parentId===main.id);
-  document.getElementById('f_mp_cat').value = c.id;
+  document.getElementById(pre+'_cat').value = c.id;
   const mains = all.filter(x=>!x.parentId);
-  document.getElementById('f_mp_catbox').innerHTML =
-    `<div class="fc-l">મુખ્ય વિભાગ</div><div class="mp-chips fc-wrap">${mains.map(m=>`<button type="button" class="mp-chip ${m.id===main.id?'on':''}" onclick="mapFcPick('${m.id}')">${mapCatIco(m)} ${esc(m.name)}</button>`).join('')}</div>`
-    + (kids.length ? `<div class="fc-l">પેટા વિભાગ</div><div class="mp-chips fc-wrap">${kids.map(k=>`<button type="button" class="mp-chip ${k.id===c.id?'on':''}" onclick="mapFcRender('${k.id}')">${esc(k.name)}</button>`).join('')}<button type="button" class="mp-chip ${c.id===main.id?'on':''}" onclick="mapFcRender('${main.id}')">અન્ય</button></div>` : '');
+  document.getElementById(pre+'_catbox').innerHTML =
+    `<div class="fc-l">મુખ્ય વિભાગ</div><div class="mp-chips fc-wrap">${mains.map(m=>`<button type="button" class="mp-chip ${m.id===main.id?'on':''}" onclick="mapFcPick('${m.id}','${pre}')">${mapCatIco(m)} ${esc(m.name)}</button>`).join('')}</div>`
+    + (kids.length ? `<div class="fc-l">પેટા વિભાગ</div><div class="mp-chips fc-wrap">${kids.map(k=>`<button type="button" class="mp-chip ${k.id===c.id?'on':''}" onclick="mapFcRender('${k.id}','${pre}')">${esc(k.name)}</button>`).join('')}<button type="button" class="mp-chip ${c.id===main.id?'on':''}" onclick="mapFcRender('${main.id}','${pre}')">અન્ય</button></div>` : '');
 }
-function mapFcPick(mid){ const kids = mapKids(mid); mapFcRender(kids.length ? kids[0].id : mid); }
+function mapFcPick(mid, pre){ const kids = mapKids(mid); mapFcRender(kids.length ? kids[0].id : mid, pre); }
 function mapFormState(){ const g = val('f_mp_st')==='Gujarat'; document.getElementById('f_mp_gj').style.display = g?'':'none'; document.getElementById('f_mp_ot').style.display = g?'none':''; }
 function saveMapPlace(id){
   const name = val('f_mp_name'), catId = val('f_mp_cat'), state = val('f_mp_st')||'Gujarat';
@@ -6475,14 +6476,14 @@ function openMapBulk(){
   mapBulkOv = {}; mapBulkSkip = {}; mapBulkEd = {};
   const cat = mapDefaultLeaf() || cats[0].id;
   openSheet(`<h3>📥 ઘણાં સ્થળ એકસાથે${mapIsOther()?' — '+esc(mapStName(mapSt)):''}</h3>
-    <div class="field"><label>વિભાગ (બધા સ્થળ આમાં જશે)</label><select id="f_mb_cat" onchange="mapBulkPreview()">${cats.map(c=>`<option value="${c.id}" ${c.id===cat?'selected':''}>${esc(mapCatLabel(c))}</option>`).join('')}</select></div>
+    <div class="field"><label>વિભાગ (બધા સ્થળ આમાં જશે)</label><input type="hidden" id="f_mb_cat" value="${cat}"><div id="f_mb_catbox"></div></div>
     <div class="field"><label>યાદી પેસ્ટ કરો (એક લીટીમાં એક સ્થળ)</label>
       <textarea id="f_mb_text" rows="7" oninput="mapBulkPreview()" placeholder="નામ | તાલુકો કે સ્થળ | જિલ્લો | વિગત&#10;ગૌરીશંકર તળાવ | ભાવનગર | ભાવનગર&#10;અથવા PDF માંથી સીધી કોપી કરેલી લીટી:&#10;ગોમતી તળાવ ડાકોર ખેડા"></textarea>
       <div class="ink-dim fs-12" style="margin-top:4px;">ખાના <b>|</b> કે ટેબથી છૂટા રાખો. જગ્યાથી છૂટું હોય તો છેલ્લો શબ્દ જિલ્લો ગણાય. પાંચમા ખાનામાં વિભાગનું નામ આપી શકાય.</div></div>
     <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="mapCopyPrompt()">📋 AI માટે પ્રોમ્પ્ટ કોપી કરો</button>
     <div id="mapBulkPrev"></div>
     <div class="sheet-actions" style="margin-top:12px;"><button class="btn btn-primary btn-block" id="mapBulkBtn" onclick="mapBulkSave()">બધા ઉમેરો</button></div>`);
-  mapBulkPreview();
+  mapFcRender(cat,'f_mb'); mapBulkPreview();
 }
 function mapBulkRows(){
   const rows = mapParseBulk((document.getElementById('f_mb_text')||{}).value||'');
