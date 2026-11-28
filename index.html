@@ -756,6 +756,12 @@ button.mq-opt:nth-of-type(4) .ltr{background:rgba(250,126,30,.2); color:#C25E0E;
 .mp-pc-note{margin-top:10px; padding:11px 13px; background:var(--surface2); border-left:3px solid var(--primary); border-radius:0 10px 10px 0; white-space:pre-wrap; line-height:1.7; font-size:14.5px;}
 .mp-pc-loc{margin-top:10px; border:none; border-radius:999px; background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary); font-weight:800; font-size:13px; padding:8px 14px; cursor:pointer; font-family:inherit;}
 .mp-box:has(.mp-nav){border:1px solid var(--border); box-shadow:none; border-radius:14px;}
+
+/* ---- v-41: વિભાગ ફોર્મ ---- */
+.mc-icrow{display:flex; gap:8px; align-items:center;} .mc-icrow input{flex:1; min-width:0; box-sizing:border-box; padding:10px 12px; font-size:22px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--ink);}
+.mc-icgrid{display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-top:8px;} .mc-icgrid button{border:none; background:var(--surface2); border-radius:10px; font-size:22px; padding:6px 0; cursor:pointer;} .mc-icgrid button:active{background:color-mix(in srgb,var(--primary) 20%,var(--surface2));}
+.fc-l{font-size:12px; font-weight:700; color:var(--ink-dim); margin:4px 0 6px;} .fc-wrap{flex-wrap:wrap; overflow:visible;}
+.mc-h .mp-pc-e,.mc-k .mp-pc-e,.mc-mv .mp-pc-e{margin-left:4px;}
 </style>
 </head>
 <body>
@@ -803,8 +809,8 @@ function normalizeData(parsed){
   merged.settings = Object.assign(defaultData().settings, (parsed&&parsed.settings)||{});
   return merged;
 }
-const APP_VERSION = '2026.11.27-40';
-const APP_BUILT = '2026-11-27T21:42:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
+const APP_VERSION = '2026.11.28-41';
+const APP_BUILT = '2026-11-28T07:35:00+05:30'; /* દરેક નવી આવૃત્તિમાં આ સમય પણ બદલવો */
 let STORAGE_LIMIT = 5 * 1024 * 1024; /* IndexedDB ન મળે તો localStorage ની આશરે મર્યાદા; નહીંતર ખરી quota */
 
 /* ---- IndexedDB (મોટો ડેટા, GB સુધી) ---- */
@@ -3199,7 +3205,7 @@ function pfHeadHTML(){
       <div><b>${DB.exams.length}</b><span>પરીક્ષા</span></div>
       <div><b>${done}</b><span>ટોપિક પૂર્ણ</span></div>
       <div><b>${(DB.qtests||[]).length}</b><span>ટેસ્ટ</span></div>
-      <div><b>${st.streak||0}🔥</b><span>સ્ટ્રીક</span></div>
+      <div><b>${st.streak||0}</b><span>સ્ટ્રીક</span></div>
     </div>
   </div>
   <div class="pf-name">${esc(nm)}</div>
@@ -6014,17 +6020,18 @@ function mapSheetRefresh(){
 function openMapCatManage(){
   const all = mapCatsOf(); const mains = all.filter(c=>!c.parentId);
   const cntOf = id=>(DB.mapPlaces||[]).filter(p=>p.catId===id).length;
-  const mv = (c, sib, k)=>`<div class="mc-mv"><button class="btn btn-sm btn-secondary" ${k===0?'disabled':''} onclick="mapMoveCat('${c.id}',-1)" aria-label="ઉપર">▲</button><button class="btn btn-sm btn-secondary" ${k===sib.length-1?'disabled':''} onclick="mapMoveCat('${c.id}',1)" aria-label="નીચે">▼</button></div>`;
+  const mv = (c, sib, k)=>`<div class="mc-mv"><button class="mp-pc-e" ${k===0?'disabled':''} onclick="mapMoveCat('${c.id}',-1)" aria-label="ઉપર">▲</button><button class="mp-pc-e" ${k===sib.length-1?'disabled':''} onclick="mapMoveCat('${c.id}',1)" aria-label="નીચે">▼</button></div>`;
   const html = mains.map((m,i)=>{ const kids = all.filter(x=>x.parentId===m.id); const n = cntOf(m.id)+kids.reduce((a,x)=>a+cntOf(x.id),0);
     return `<div class="mc-main">
-      <div class="mc-h"><div class="mc-t" onclick="mapFromManage=true; openMapCatForm('${m.id}')"><div class="mc-n">${esc(m.name)}</div><div class="mc-s">${n} સ્થળ${kids.length?` · ${kids.length} પેટા વિભાગ`:''}</div></div>
-        <button class="btn btn-sm btn-secondary" onclick="mapFromManage=true; openMapCatForm('${m.id}')">એડિટ</button>${mv(m,mains,i)}</div>
-      ${kids.length?`<div class="mc-kids">${kids.map((k,j)=>`<div class="mc-k"><div class="mc-t" onclick="mapFromManage=true; openMapCatForm('${k.id}')"><div class="mc-kn">${esc(k.name)}</div><div class="mc-s">${cntOf(k.id)} સ્થળ</div></div><button class="btn btn-sm btn-secondary" onclick="mapFromManage=true; openMapCatForm('${k.id}')">એડિટ</button>${mv(k,kids,j)}</div>`).join('')}</div>`:''}
+      <div class="mc-h"><div class="mc-t" onclick="mapFromManage=true; openMapCatForm('${m.id}')"><div class="mc-n">${mapCatIco(m)} ${esc(m.name)}</div><div class="mc-s">${n} સ્થળ${kids.length?` · ${kids.length} પેટા વિભાગ`:''}</div></div>
+        <button class="mp-pc-e" onclick="mapFromManage=true; openMapCatForm('${m.id}')" aria-label="એડિટ">✎</button>${mv(m,mains,i)}</div>
+      ${kids.length?`<div class="mc-kids">${kids.map((k,j)=>`<div class="mc-k"><div class="mc-t" onclick="mapFromManage=true; openMapCatForm('${k.id}')"><div class="mc-kn">${esc(k.name)}</div><div class="mc-s">${cntOf(k.id)} સ્થળ</div></div><button class="mp-pc-e" onclick="mapFromManage=true; openMapCatForm('${k.id}')" aria-label="એડિટ">✎</button>${mv(k,kids,j)}</div>`).join('')}</div>`:''}
       <button class="mc-add" onclick="mapFromManage=true; openMapCatForm(null,'${m.id}')">+ પેટા વિભાગ ઉમેરો</button></div>`; }).join('');
   openSheet(`<h3>વિભાગો</h3>
     ${all.length ? html : '<div class="ink-dim" style="padding:10px 0;">હજી કોઈ વિભાગ નથી. નીચેથી મુખ્ય વિભાગ બનાવો (દા.ત. જળાશયો), પછી તેમાં પેટા વિભાગ ઉમેરો (તળાવ, સરોવર, કુંડ, વાવ…).</div>'}
     <div class="sheet-actions" style="margin-top:12px;"><button class="btn btn-primary btn-block" onclick="mapFromManage=true; openMapCatForm(null)">+ નવો મુખ્ય વિભાગ</button></div>`);
 }
+const MC_ICONS = ['💧','🌊','🏞️','🛕','🕌','⛪','🦁','🐘','🦚','🐅','🌳','⛰️','🏖️','⚓','🏛️','🏰','🏯','🗿','🏺','⭐','🏭','🎓','📚','🎪','🎉','🎭','💃','🎵','🪔','🌾','🧵','🍽️','✈️','🚆','🌉','⛲','🔬','🏥','📋','📍'];
 function openMapCatForm(id, par){
   const c = id ? (DB.mapCats||[]).find(x=>x.id===id) : null;
   const hasKids = c && mapKids(c.id).length;
@@ -6032,6 +6039,7 @@ function openMapCatForm(id, par){
   const defPar = c ? (c.parentId||'') : (par||'');
   openSheet(`<h3>${c?'વિભાગ એડિટ':(par?'નવો પેટા વિભાગ':'નવો મુખ્ય વિભાગ')}</h3>
     <div class="field"><label>વિભાગનું નામ</label><input type="text" id="f_mc_name" value="${c?esc(c.name):''}" placeholder="દા.ત. તળાવ, સરોવર, કુંડ"></div>
+    <div class="field"><label>આઇકન (ઇમોજી)</label><div class="mc-icrow"><input type="text" id="f_mc_icon" maxlength="8" value="${c&&c.icon?esc(c.icon):''}" placeholder="${c?mapCatIco(c):'📍'}"><button class="mp-pc-e" type="button" onclick="document.getElementById('f_mc_icon').value=''" aria-label="આપમેળે">↺</button></div><div class="mc-icgrid">${MC_ICONS.map(e=>`<button type="button" onclick="document.getElementById('f_mc_icon').value='${e}'">${e}</button>`).join('')}</div><div class="ink-dim fs-12" style="margin-top:4px;">ખાલી રાખશો તો નામ પ્રમાણે આપમેળે આઇકન આવશે.</div></div>
     <div class="field"><label>મુખ્ય વિભાગ</label><select id="f_mc_par" ${hasKids?'disabled':''}><option value="">આ પોતે મુખ્ય વિભાગ છે</option>${mains.map(m=>`<option value="${m.id}" ${m.id===defPar?'selected':''}>${esc(m.name)} ની અંદર (પેટા વિભાગ)</option>`).join('')}</select>${hasKids?'<div class="ink-dim fs-12" style="margin-top:4px;">આમાં પેટા વિભાગ છે, એટલે આ બીજાની અંદર ન મૂકી શકાય.</div>':''}</div>
     <div class="sheet-actions">${c?`<button class="btn btn-danger" onclick="deleteMapCat('${id}')">ડિલીટ</button>`:''}<button class="btn btn-primary btn-block" onclick="saveMapCat(${c?`'${id}'`:'null'})">સેવ કરો</button></div>`);
 }
@@ -6041,8 +6049,9 @@ function saveMapCat(id){
   const ex = getActiveExam(); if(!ex) return;
   if(mapCatsOf().find(c=>c.id!==id && (c.parentId||'')===parentId && c.name.trim().toLowerCase()===name.toLowerCase())){ toast('આ નામનો વિભાગ પહેલેથી છે','error'); return; }
   let cid = id;
-  if(id){ const c=DB.mapCats.find(x=>x.id===id); if(c){ c.name=name; if(!mapKids(id).length) c.parentId=parentId; } }
-  else { const c={id:uid(),examId:ex.id,name,parentId}; (DB.mapCats=DB.mapCats||[]).push(c); cid=c.id; }
+  const icon = (val('f_mc_icon')||'').slice(0,8);
+  if(id){ const c=DB.mapCats.find(x=>x.id===id); if(c){ c.name=name; c.icon=icon; if(!mapKids(id).length) c.parentId=parentId; } }
+  else { const c={id:uid(),examId:ex.id,name,parentId,icon}; (DB.mapCats=DB.mapCats||[]).push(c); cid=c.id; }
   mapSelectLeaf(cid); if(parentId) mapSub = cid;
   save(); closeSheet(); mapRefresh(); toast('સેવ થયું'); if(mapFromManage){ mapFromManage=false; openMapCatManage(); }
 }
@@ -6073,15 +6082,26 @@ function openMapPlaceForm(id){
   const tal = p ? (p.taluka||'') : (mapTal||'');
   openSheet(`<h3>${p?'સ્થળ એડિટ':'નવું સ્થળ'}</h3>
     <div class="field"><label>નામ</label><input type="text" id="f_mp_name" value="${p?esc(p.name):''}" placeholder="દા.ત. લક્ષ્મી વિલાસ પેલેસ"></div>
-    <div class="field"><label>વિભાગ</label><select id="f_mp_cat">${cats.map(c=>`<option value="${c.id}" ${c.id===cat?'selected':''}>${esc(mapCatLabel(c))}</option>`).join('')}</select></div>
+    <div class="field"><label>વિભાગ</label><input type="hidden" id="f_mp_cat" value="${cat}"><div id="f_mp_catbox"></div></div>
     <div class="field"><label>રાજ્ય</label><select id="f_mp_st" onchange="mapFormState()">${stOpts.map(o=>`<option value="${o.k}" ${o.k===stSel?'selected':''}>${esc(o.n)}</option>`).join('')}</select></div>
     <div id="f_mp_gj"><div class="field"><label>જિલ્લો</label><select id="f_mp_dist" onchange="mapTalFill(this.value,'')"><option value="">— પસંદ કરો —</option>${GJ_MAP.d.map(d=>`<option value="${d.k}" ${d.k===dist?'selected':''}>${esc(d.n)}</option>`).join('')}</select></div>
     <div class="field"><label>તાલુકો</label><select id="f_mp_tal" onchange="mapTalSel()"></select><input type="text" id="f_mp_tal2" placeholder="તાલુકો / ગામ લખો" style="display:none;margin-top:6px;"></div></div>
     <div id="f_mp_ot" class="field" style="display:none;"><label>સ્થળ / જિલ્લો (વૈકલ્પિક)</label><input type="text" id="f_mp_loc" value="${p&&mapStOf(p)!=='Gujarat'?esc(p.taluka||''):''}" placeholder="દા.ત. જયપુર"></div>
     <div class="field"><label>વિગત / નોંધ</label><textarea id="f_mp_note" rows="6" placeholder="ઇતિહાસ, કોણે બનાવ્યું, વર્ષ, ખાસ મુદ્દા...">${p?esc(p.note||''):''}</textarea></div>
     <div class="sheet-actions">${p?`<button class="btn btn-danger" onclick="deleteMapPlace('${id}')">ડિલીટ</button>`:''}<button class="btn btn-primary btn-block" onclick="saveMapPlace(${p?`'${id}'`:'null'})">સેવ કરો</button></div>`);
-  mapTalFill(dist, tal); mapFormState();
+  mapTalFill(dist, tal); mapFormState(); mapFcRender(cat);
 }
+/* સ્થળ ફોર્મ: પહેલા મુખ્ય વિભાગ, પછી તેના પેટા વિભાગ */
+function mapFcRender(catId){
+  const all = mapCatsOf(); const c = all.find(x=>x.id===catId) || all[0]; if(!c) return;
+  const main = c.parentId ? all.find(x=>x.id===c.parentId) : c; const kids = all.filter(x=>x.parentId===main.id);
+  document.getElementById('f_mp_cat').value = c.id;
+  const mains = all.filter(x=>!x.parentId);
+  document.getElementById('f_mp_catbox').innerHTML =
+    `<div class="fc-l">મુખ્ય વિભાગ</div><div class="mp-chips fc-wrap">${mains.map(m=>`<button type="button" class="mp-chip ${m.id===main.id?'on':''}" onclick="mapFcPick('${m.id}')">${mapCatIco(m)} ${esc(m.name)}</button>`).join('')}</div>`
+    + (kids.length ? `<div class="fc-l">પેટા વિભાગ</div><div class="mp-chips fc-wrap">${kids.map(k=>`<button type="button" class="mp-chip ${k.id===c.id?'on':''}" onclick="mapFcRender('${k.id}')">${esc(k.name)}</button>`).join('')}<button type="button" class="mp-chip ${c.id===main.id?'on':''}" onclick="mapFcRender('${main.id}')">અન્ય</button></div>` : '');
+}
+function mapFcPick(mid){ const kids = mapKids(mid); mapFcRender(kids.length ? kids[0].id : mid); }
 function mapFormState(){ const g = val('f_mp_st')==='Gujarat'; document.getElementById('f_mp_gj').style.display = g?'':'none'; document.getElementById('f_mp_ot').style.display = g?'none':''; }
 function saveMapPlace(id){
   const name = val('f_mp_name'), catId = val('f_mp_cat'), state = val('f_mp_st')||'Gujarat';
